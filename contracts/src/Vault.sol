@@ -38,10 +38,7 @@ contract Vault is Ownable {
      */
     function deposit(uint256 amount) external {
         require(amount > 0, "Vault: amount must be greater than zero");
-        require(
-            token.transferFrom(msg.sender, address(this), amount),
-            "Vault: transfer failed"
-        );
+        require(token.transferFrom(msg.sender, address(this), amount), "Vault: transfer failed");
         balances[msg.sender] += amount;
         emit Deposit(msg.sender, amount);
     }
@@ -91,4 +88,3 @@ contract Vault is Ownable {
         emit ExecutorUpdated(oldExecutor, newExecutor);
     }
 }
-

@@ -23,4 +23,3 @@ contract DeployVaultScript is Script {
         vm.stopBroadcast();
     }
 }
-

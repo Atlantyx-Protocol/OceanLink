@@ -113,11 +113,7 @@ contract VaultTest is Test {
         // Execute transfer: user1 -> user2
         uint256 transferAmount = 300e6;
         Vault.Transfer[] memory transfers = new Vault.Transfer[](1);
-        transfers[0] = Vault.Transfer({
-            from: user1,
-            to: user2,
-            amount: transferAmount
-        });
+        transfers[0] = Vault.Transfer({from: user1, to: user2, amount: transferAmount});
 
         vm.prank(executor);
         vault.executeTransfers(transfers);
@@ -135,11 +131,7 @@ contract VaultTest is Test {
         vault.deposit(amount);
 
         Vault.Transfer[] memory transfers = new Vault.Transfer[](1);
-        transfers[0] = Vault.Transfer({
-            from: user1,
-            to: user2,
-            amount: 100e6
-        });
+        transfers[0] = Vault.Transfer({from: user1, to: user2, amount: 100e6});
 
         vm.prank(user1);
         vm.expectRevert("Vault: not authorized");
@@ -155,11 +147,7 @@ contract VaultTest is Test {
         vault.deposit(amount);
 
         Vault.Transfer[] memory transfers = new Vault.Transfer[](1);
-        transfers[0] = Vault.Transfer({
-            from: user1,
-            to: user2,
-            amount: amount + 1
-        });
+        transfers[0] = Vault.Transfer({from: user1, to: user2, amount: amount + 1});
 
         vm.prank(executor);
         vm.expectRevert("Vault: insufficient balance");
@@ -214,4 +202,3 @@ contract VaultTest is Test {
         vault.setExecutor(newExecutor);
     }
 }
-

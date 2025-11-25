@@ -94,6 +94,22 @@ EXECUTOR_ADDRESS=0x... # Your executor address
 
 For Base Sepolia and Arbitrum Sepolia, update the RPC URLs and deploy similarly.
 
+### Deployed Contracts
+
+#### Base Sepolia
+
+- **RPC URL**: `https://base-sepolia.g.alchemy.com/v2/iJNCam89D3waZumSzuSgR`
+- **Token Address**: `0xCdBb9C109Da8FF1423C753A9D4cEb85d680DC0fa`
+- **Executor Address**: `0x9b55124d945b6e61c521add7aa213433b3b1c8a2`
+- **Vault Address**: `0xAa7A0f08cF8E7456DEb46A09a9C77b531C278f3c`
+
+#### Sepolia
+
+- **RPC URL**: `https://eth-sepolia.g.alchemy.com/v2/iJNCam89D3waZumSzuSgR`
+- **Token Address**: `0xDB6676239269Ae5b8665d9eF9656D6b272A8C7A8`
+- **Executor Address**: `0x9b55124d945b6e61c521add7aa213433b3b1c8a2`
+- **Vault Address**: `0x3A0568585d83cb3c5349B9aB0F957Ec054177dB0`
+
 ### 5. Configure Backend Services
 
 Create `.env` files for each backend service:
@@ -119,6 +135,14 @@ BASE_RPC_URL=http://localhost:8545
 ARBITRUM_RPC_URL=http://localhost:8546
 BASE_VAULT_ADDRESS=0x... # Deployed Vault address on Base
 ARBITRUM_VAULT_ADDRESS=0x... # Deployed Vault address on Arbitrum
+```
+
+For testnet deployment, use:
+```env
+BASE_RPC_URL=https://base-sepolia.g.alchemy.com/v2/iJNCam89D3waZumSzuSgR
+SEPOLIA_RPC_URL=https://eth-sepolia.g.alchemy.com/v2/iJNCam89D3waZumSzuSgR
+BASE_VAULT_ADDRESS=0xAa7A0f08cF8E7456DEb46A09a9C77b531C278f3c
+SEPOLIA_VAULT_ADDRESS=0x3A0568585d83cb3c5349B9aB0F957Ec054177dB0
 ```
 
 ### 6. Start Services
@@ -217,8 +241,10 @@ curl http://localhost:3001/intents?user_address=0x...
 - `EXECUTOR_INTERVAL_MS`: Executor run interval in milliseconds (default: 10000)
 - `EXECUTOR_PRIVATE_KEY`: Private key of executor wallet
 - `BASE_RPC_URL`: RPC URL for Base chain
+- `SEPOLIA_RPC_URL`: RPC URL for Sepolia chain
 - `ARBITRUM_RPC_URL`: RPC URL for Arbitrum chain
 - `BASE_VAULT_ADDRESS`: Vault contract address on Base
+- `SEPOLIA_VAULT_ADDRESS`: Vault contract address on Sepolia
 - `ARBITRUM_VAULT_ADDRESS`: Vault contract address on Arbitrum
 
 ### Frontend

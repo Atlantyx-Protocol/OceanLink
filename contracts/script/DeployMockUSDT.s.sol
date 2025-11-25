@@ -28,4 +28,3 @@ contract DeployMockUSDTScript is Script {
         vm.stopBroadcast();
     }
 }
-
