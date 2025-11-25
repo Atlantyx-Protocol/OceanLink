@@ -1,18 +1,14 @@
 [profile.default]
 src = "src"
+test = "test"
 out = "out"
 libs = ["lib"]
-test = "test"
-script = "script"
-cache_path = "cache"
-evm_version = "paris"
-via_ir = false
-optimizer = true
-optimizer_runs = 200
+remappings = ["forge-std/=lib/forge-std/", "openzeppelin-contracts/=lib/openzeppelin-contracts/"]
 solc_version = "0.8.23"
-remappings = []
+
+[fmt]
+line_length = 120
 
 [profile.ci]
 fuzz = { runs = 10000 }
 invariant = { runs = 1000 }
-
