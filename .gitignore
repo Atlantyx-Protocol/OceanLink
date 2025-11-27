@@ -34,10 +34,19 @@ cache/
 out/
 broadcast/
 
-# Database
+# Dabase
 *.db
 *.db-journal
 
 # Prisma
 backend/*/prisma/migrations/
+
+# Rust / Cargo
+target/
+**/target/
+**/Cargo.lock
+!/Cargo.lock
+*.pdb
+rust-project.json
+
 
