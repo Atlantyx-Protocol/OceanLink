@@ -21,5 +21,12 @@ forge script script/DeployVault.s.sol:DeployVaultScript \
   --broadcast \
   --verify
 
+forge script script/MintUSDT.s.sol:MintUSDTScript \
+  --rpc-url "$BASE_RPC_URL" \
+  --private-key "$PRIVATE_KEY" \
+  --broadcast \
+  --verify
+
+
 echo "Deployment completed!"
 

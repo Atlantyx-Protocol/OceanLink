@@ -8,11 +8,11 @@ mod orderbook;
 use api::router;
 use blockchain::{BlockchainClient, SharedBlockchainClient};
 use orderbook::init_state;
+use ethers::core::types::Address;
 use std::env;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
-use alloy::primitives::Address;
 
 #[tokio::main]
 async fn main() {
