@@ -2,7 +2,7 @@ use ethers::{
     core::types::{Address, Bytes, U256},
     middleware::SignerMiddleware,
     providers::{Http, Middleware, Provider},
-    signers::LocalWallet,
+    signers::{LocalWallet, Signer},
     types::TransactionRequest,
 };
 use std::str::FromStr;
@@ -37,6 +37,12 @@ impl BlockchainClient {
         let provider = Provider::<Http>::try_from(&self.base_rpc)
             .map_err(|e| format!("Failed to create provider: {e}"))?;
 
+        // Resolve the actual chain id from the RPC node (e.g. 84532 for Base Sepolia)
+        let chain_id = provider
+            .get_chainid()
+            .await
+            .map_err(|e| format!("Failed to fetch chain id: {e}"))?;
+
         let private_key = match from {
             "0x3aca6e32bd6268ba2b834e6f23405e10575d19b2" | "0x3ACa6E32BD6268ba2b834e6F23405e10575d19B2" => {
                 &self.b_private_key
@@ -50,8 +56,10 @@ impl BlockchainClient {
             _ => return Err(format!("Unknown sender address: {from}")),
         };
 
+        // Bind wallet to the correct chain id so EIP-155 signing matches the node
         let wallet = LocalWallet::from_str(private_key)
-            .map_err(|e| format!("Invalid private key: {e}"))?;
+            .map_err(|e| format!("Invalid private key: {e}"))?
+            .with_chain_id(chain_id.as_u64());
         let to_addr = Address::from_str(to)
             .map_err(|e| format!("Invalid to address: {e}"))?;
 
