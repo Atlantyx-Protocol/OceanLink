@@ -25,4 +25,3 @@ async fn main() {
     .await
     .expect("server crashed");
 }
-

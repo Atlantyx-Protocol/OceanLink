@@ -36,7 +36,6 @@ impl AppContext {
             from_chain: req.from_chain,
             to_chain: req.to_chain,
             amount: req.amount,
-            signature: req.signature,
             status: IntentStatus::PendingRisk,
         };
 
@@ -109,5 +108,4 @@ pub struct CreateIntentRequest {
     pub from_chain: crate::models::ChainId,
     pub to_chain: crate::models::ChainId,
     pub amount: u64,
-    pub signature: String,
 }

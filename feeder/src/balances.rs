@@ -29,4 +29,3 @@ pub fn snapshot(balances: &Balances) -> Vec<BalanceSnapshot> {
         })
         .collect()
 }
-

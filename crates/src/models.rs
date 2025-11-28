@@ -32,7 +32,6 @@ pub struct Intent {
     pub from_chain: ChainId,
     pub to_chain: ChainId,
     pub amount: u64,
-    pub signature: String,
     pub status: IntentStatus,
 }
 

@@ -40,7 +40,6 @@ async fn nets_four_intents_end_to_end() {
             from_chain: ChainId::Base,
             to_chain: ChainId::Arbitrum,
             amount: 1_000_000,
-            signature: "sig-a".into(),
         })
         .await;
 
@@ -50,7 +49,6 @@ async fn nets_four_intents_end_to_end() {
             from_chain: ChainId::Arbitrum,
             to_chain: ChainId::Base,
             amount: 500_000,
-            signature: "sig-b".into(),
         })
         .await;
 
@@ -60,7 +58,6 @@ async fn nets_four_intents_end_to_end() {
             from_chain: ChainId::Arbitrum,
             to_chain: ChainId::Base,
             amount: 300_000,
-            signature: "sig-c".into(),
         })
         .await;
 
@@ -70,7 +67,6 @@ async fn nets_four_intents_end_to_end() {
             from_chain: ChainId::Arbitrum,
             to_chain: ChainId::Base,
             amount: 200_000,
-            signature: "sig-d".into(),
         })
         .await;
 

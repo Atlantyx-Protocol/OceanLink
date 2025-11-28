@@ -6,19 +6,23 @@ use uuid::Uuid;
 pub enum Chain {
     Base,
     Arbitrum,
+    Sepolia,
 }
+
+pub const USER_A: &str = "0x9b55124d945b6e61c521add7aa213433b3b1c8a2";
+pub const USER_B: &str = "0x3aca6e32bd6268ba2b834e6f23405e10575d19b2";
+pub const USER_C: &str = "0x7cb386178d13e21093fdc988c7e77102d6464f3e";
+pub const USER_D: &str = "0xe08745df99d3563821b633aa93ee02f7f883f25c";
 
 impl Chain {
     pub fn as_str(&self) -> &'static str {
         match self {
             Chain::Base => "Base",
             Chain::Arbitrum => "Arbitrum",
+            Chain::Sepolia => "Sepolia",
         }
     }
 
-    pub fn all() -> [Chain; 2] {
-        [Chain::Base, Chain::Arbitrum]
-    }
 }
 
 impl fmt::Display for Chain {
@@ -34,6 +38,7 @@ impl FromStr for Chain {
         match s.to_lowercase().as_str() {
             "base" => Ok(Chain::Base),
             "arbitrum" => Ok(Chain::Arbitrum),
+            "sepolia" => Ok(Chain::Sepolia),
             other => Err(format!("invalid chain '{other}'")),
         }
     }
@@ -73,7 +78,6 @@ pub struct Intent {
     pub to_chain: Chain,
     pub amount: u64,
     pub kind: IntentKind,
-    pub signature: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -83,4 +87,3 @@ pub struct TransferPlanEntry {
     pub to: String,
     pub amount: u64,
 }
-
