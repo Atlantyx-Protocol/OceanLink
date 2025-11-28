@@ -6,10 +6,10 @@ import {MockUSDT} from "../src/MockUSDT.sol";
 
 contract MintUSDTScript is Script {
     // User addresses
-    address constant USER_A = 0x9B55124d945B6E61c521adD7aA213433b3B1c8A2;
-    address constant USER_B = 0x3aCA6E32BD6268bA2B834e6F23405E10575d19B2;
-    address constant USER_C = 0x7cb386178d13e21093fdc988c7e77102d6464f3e;
-    address constant USER_D = 0xe08745df99d3563821b633aa93ee02f7f883f25c;
+    address constant USER_A = 0x9B55124d945B6E61c521adD7aA213433b3b1c8a2;
+    address constant USER_B = 0x3ACa6E32BD6268ba2b834e6F23405e10575d19B2;
+    address constant USER_C = 0x7CB386178D13e21093FDc988C7e77102D6464F3E;
+    address constant USER_D = 0xE08745df99d3563821b633aA93Ee02F7F883F25c;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
