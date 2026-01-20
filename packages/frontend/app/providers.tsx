@@ -1,10 +1,11 @@
 'use client'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { WagmiProvider, createConfig, http, defineChain } from 'wagmi'
+import { WagmiProvider, createConfig, http } from 'wagmi'
 import { baseSepolia, arbitrumSepolia, localhost } from 'wagmi/chains'
-import { injected, metaMaskSafe } from 'wagmi/connectors'
+import { injected, metaMask } from 'wagmi/connectors'
 import { useState } from 'react'
+import { defineChain } from 'viem'
 
 // Define custom localhost chains with different chain IDs
 const localhostBase = defineChain({
@@ -23,7 +24,7 @@ const config = createConfig({
   chains: [baseSepolia, arbitrumSepolia, localhostBase, localhostArbitrum],
   connectors: [
     injected(),
-    metaMaskSafe(),
+    metaMask(),
   ],
   transports: {
     [baseSepolia.id]: http(),
@@ -44,4 +45,3 @@ export function Providers({ children }: { children: React.ReactNode }) {
     </WagmiProvider>
   )
 }
-
