@@ -27,6 +27,15 @@ forge script script/MintUSDT.s.sol:MintUSDTScript \
   --broadcast \
   --verify
 
+# verify contracts
+cd contracts
+forge verify-contract \
+  --chain base-sepolia \
+  --compiler-version 0.8.23 \
+  0xAa7A0f08cF8E7456DEb46A09a9C77b531C278f3c \
+  contracts/src/Vault.sol:Vault \
+  --etherscan-api-key $BASESCAN_API_KEY           
+
 
 echo "Deployment completed!"
 

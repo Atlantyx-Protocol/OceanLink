@@ -6,6 +6,12 @@ settings:
 
 importers:
 
+  .:
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/backend:
     dependencies:
       '@fastify/cors':
@@ -48,8 +54,6 @@ importers:
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
-
-  packages/contracts: {}
 
   packages/frontend:
     dependencies:
