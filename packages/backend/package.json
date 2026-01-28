@@ -8,11 +8,16 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
-    "clean": "rimraf dist"
+    "clean": "rimraf dist",
+    "approve": "tsx src/scripts/approve-usdc.ts",
+    "approve:sepolia": "tsx src/scripts/approve-usdc.ts sepolia",
+    "approve:arbitrum": "tsx src/scripts/approve-usdc.ts arbitrumSepolia",
+    "approve:base": "tsx src/scripts/approve-usdc.ts baseSepolia"
   },
   "dependencies": {
     "@fastify/cors": "^8.5.0",
     "dotenv": "^16.3.1",
+    "ethers": "^6.11.0",
     "fastify": "^4.25.2",
     "viem": "^2.0.0",
     "zod": "^3.22.4"
