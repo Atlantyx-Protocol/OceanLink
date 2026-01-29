@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { approvalService } from '../services/approval.js';
-import { CHAIN_CONFIGS } from '../config/chains.js';
+import { getChainConfig, getAllChainConfigs, CHAIN_KEYS } from '../config/chains.js';
 
 const approvalRoutes: FastifyPluginAsync = async (fastify) => {
   // Approve USDC for all chains
@@ -21,10 +21,10 @@ const approvalRoutes: FastifyPluginAsync = async (fastify) => {
     async (request, reply) => {
       const { chain } = request.params;
 
-      if (!CHAIN_CONFIGS[chain]) {
+      if (!getChainConfig(chain)) {
         return reply.status(400).send({
           success: false,
-          error: `Unknown chain: ${chain}. Available: ${Object.keys(CHAIN_CONFIGS).join(', ')}`,
+          error: `Unknown chain: ${chain}. Available: ${CHAIN_KEYS.join(', ')}`,
         });
       }
 
@@ -53,9 +53,10 @@ const approvalRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Get available chains
   fastify.get('/approval/chains', async () => {
+    const configs = getAllChainConfigs();
     return {
       success: true,
-      chains: Object.entries(CHAIN_CONFIGS).map(([key, config]) => ({
+      chains: Object.entries(configs).map(([key, config]) => ({
         key,
         name: config.name,
         chainId: config.chainId,

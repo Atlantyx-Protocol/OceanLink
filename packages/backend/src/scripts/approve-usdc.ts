@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
 import { approvalService } from '../services/approval.js';
-import { CHAIN_CONFIGS } from '../config/chains.js';
+import { getChainConfig, CHAIN_KEYS } from '../config/chains.js';
 
-dotenv.config();
+dotenv.config({ path: '../../../.env' });
 
 async function main() {
   const args = process.argv.slice(2);
@@ -15,9 +15,9 @@ async function main() {
 
   if (chainArg && chainArg !== 'all') {
     // Approve for specific chain
-    if (!CHAIN_CONFIGS[chainArg]) {
+    if (!getChainConfig(chainArg)) {
       console.error(`Unknown chain: ${chainArg}`);
-      console.log(`Available chains: ${Object.keys(CHAIN_CONFIGS).join(', ')}`);
+      console.log(`Available chains: ${CHAIN_KEYS.join(', ')}`);
       process.exit(1);
     }
 

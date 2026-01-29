@@ -19,6 +19,7 @@ pnpm dev
 
 ```env
 PRIVATE_KEY=0x...                    # Wallet private key
+PRIVATE_KEY_A=0x...                  # Wallet A private key (for bridge)
 SEPOLIA_RPC_URL=https://...          # Ethereum Sepolia RPC
 ARBITRUM_SEPOLIA_RPC_URL=https://... # Arbitrum Sepolia RPC
 BASE_SEPOLIA_RPC_URL=https://...     # Base Sepolia RPC
@@ -61,6 +62,12 @@ pnpm approve:base
 | POST | `/api/htlc/refund` | Refund after timelock |
 | GET | `/api/htlc/:chain/:id` | Get HTLC details |
 
+### Bridge
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/bridge/create` | Approve USDC + create HTLC (uses PRIVATE_KEY_A) |
+| GET | `/api/bridge/generate-secret` | Generate 256-bit secret + hashlock |
+
 ## Usage Examples
 
 ### Create HTLC
@@ -102,6 +109,39 @@ curl -X POST http://localhost:3001/api/htlc/refund \
     "chain": "sepolia",
     "contractId": "0x..."
   }'
+```
+
+### Create Bridge (Approve + HTLC)
+
+```bash
+# Create bridge with defaults (receiver = sender A, amount = 700 USDC, timelock = 2h)
+curl -X POST http://localhost:3001/api/bridge/create
+
+# Create bridge with custom receiver and amount
+curl -X POST http://localhost:3001/api/bridge/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "receiver": "0x...",
+    "amount": "1000000000"
+  }'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "approvalTxHash": "0x...",
+    "htlcTxHash": "0x...",
+    "contractId": "0x...",
+    "secret": "0x...",
+    "hashlock": "0x...",
+    "sender": "0x...",
+    "receiver": "0x...",
+    "amount": "700000000",
+    "timelock": 1234567890
+  }
+}
 ```
 
 ## Supported Chains

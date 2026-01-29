@@ -5,8 +5,9 @@ import { healthRoutes } from './routes/health.js';
 import { contractRoutes } from './routes/contracts.js';
 import approvalRoutes from './routes/approval.js';
 import htlcRoutes from './routes/htlc.js';
+import bridgeRoutes from './routes/bridge.js';
 
-dotenv.config();
+dotenv.config({ path: '../../.env' });
 
 const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -37,6 +38,7 @@ async function start() {
     await fastify.register(contractRoutes, { prefix: '/api/contracts' });
     await fastify.register(approvalRoutes, { prefix: '/api' });
     await fastify.register(htlcRoutes, { prefix: '/api' });
+    await fastify.register(bridgeRoutes, { prefix: '/api' });
 
     // Start server
     await fastify.listen({ port: PORT, host: HOST });

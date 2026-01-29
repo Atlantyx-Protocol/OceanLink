@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from 'fastify';
 import { htlcService } from '../services/htlc.js';
-import { CHAIN_CONFIGS } from '../config/chains.js';
+import { getChainConfig } from '../config/chains.js';
 
 const htlcRoutes: FastifyPluginAsync = async (fastify) => {
   // Generate hash pair (preimage + hashlock)
@@ -20,13 +20,13 @@ const htlcRoutes: FastifyPluginAsync = async (fastify) => {
     };
   }>('/htlc/new', async (request, reply) => {
     const { chain, receiver, hashlock, timelock, amount } = request.body;
+    const config = getChainConfig(chain);
 
-    if (!CHAIN_CONFIGS[chain]) {
+    if (!config) {
       return reply.status(400).send({ error: `Unknown chain: ${chain}` });
     }
 
     try {
-      const config = CHAIN_CONFIGS[chain];
       const result = await htlcService.newContract(chain, {
         receiver,
         hashlock,
@@ -53,7 +53,7 @@ const htlcRoutes: FastifyPluginAsync = async (fastify) => {
   }>('/htlc/withdraw', async (request, reply) => {
     const { chain, contractId, preimage } = request.body;
 
-    if (!CHAIN_CONFIGS[chain]) {
+    if (!getChainConfig(chain)) {
       return reply.status(400).send({ error: `Unknown chain: ${chain}` });
     }
 
@@ -76,7 +76,7 @@ const htlcRoutes: FastifyPluginAsync = async (fastify) => {
   }>('/htlc/refund', async (request, reply) => {
     const { chain, contractId } = request.body;
 
-    if (!CHAIN_CONFIGS[chain]) {
+    if (!getChainConfig(chain)) {
       return reply.status(400).send({ error: `Unknown chain: ${chain}` });
     }
 
@@ -96,7 +96,7 @@ const htlcRoutes: FastifyPluginAsync = async (fastify) => {
   }>('/htlc/:chain/:id', async (request, reply) => {
     const { chain, id } = request.params;
 
-    if (!CHAIN_CONFIGS[chain]) {
+    if (!getChainConfig(chain)) {
       return reply.status(400).send({ error: `Unknown chain: ${chain}` });
     }
 

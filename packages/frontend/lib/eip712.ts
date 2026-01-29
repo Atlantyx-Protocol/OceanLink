@@ -1,4 +1,4 @@
-import { Address, TypedDataDomain, TypedDataField } from "viem";
+import { Address, TypedDataDomain, TypedDataParameter } from "viem";
 
 export const INTENT_EIP712_DOMAIN = (chainId: bigint): TypedDataDomain => ({
   name: "OceanLink",
@@ -7,7 +7,7 @@ export const INTENT_EIP712_DOMAIN = (chainId: bigint): TypedDataDomain => ({
   verifyingContract: "0x0000000000000000000000000000000000000000" as Address,
 });
 
-export const INTENT_EIP712_TYPES: Record<string, TypedDataField[]> = {
+export const INTENT_EIP712_TYPES: Record<string, TypedDataParameter[]> = {
   Intent: [
     { name: "user", type: "address" },
     { name: "srcChainId", type: "uint256" },

@@ -1,5 +1,5 @@
-import { ethers, JsonRpcProvider, Wallet, Contract, MaxUint256 } from 'ethers';
-import { CHAIN_CONFIGS, ChainConfig, getAllChains } from '../config/chains.js';
+import { JsonRpcProvider, Wallet, Contract, MaxUint256 } from 'ethers';
+import { getChainConfig, ChainConfig, getAllChains, CHAIN_KEYS } from '../config/chains.js';
 
 const ERC20_ABI = [
   'function approve(address spender, uint256 amount) external returns (bool)',
@@ -136,9 +136,9 @@ class ApprovalService {
     chainKey: string,
     amount: bigint = MaxUint256
   ): Promise<ApprovalResult> {
-    const chainConfig = CHAIN_CONFIGS[chainKey];
+    const chainConfig = getChainConfig(chainKey);
     if (!chainConfig) {
-      throw new Error(`Unknown chain: ${chainKey}. Available: ${Object.keys(CHAIN_CONFIGS).join(', ')}`);
+      throw new Error(`Unknown chain: ${chainKey}. Available: ${CHAIN_KEYS.join(', ')}`);
     }
     return this.approveUSDCForChain(chainConfig, amount);
   }

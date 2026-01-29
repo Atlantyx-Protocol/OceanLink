@@ -1,5 +1,5 @@
 import { ethers, JsonRpcProvider, Wallet, Contract } from 'ethers';
-import { CHAIN_CONFIGS, ChainConfig } from '../config/chains.js';
+import { getChainConfig, ChainConfig } from '../config/chains.js';
 
 const HTLC_ABI = [
   'function newContract(address receiver, bytes32 hashlock, uint256 timelock, address token, uint256 amount) external returns (bytes32 id)',
@@ -41,7 +41,7 @@ class HTLCService {
   }
 
   private getProvider(chainKey: string): JsonRpcProvider {
-    const config = CHAIN_CONFIGS[chainKey];
+    const config = getChainConfig(chainKey);
     if (!config) throw new Error(`Unknown chain: ${chainKey}`);
     return new JsonRpcProvider(config.rpcUrl);
   }
@@ -52,7 +52,7 @@ class HTLCService {
   }
 
   private getHTLCContract(chainKey: string): Contract {
-    const config = CHAIN_CONFIGS[chainKey];
+    const config = getChainConfig(chainKey);
     if (!config) throw new Error(`Unknown chain: ${chainKey}`);
     return new Contract(config.htlcAddress, HTLC_ABI, this.getSigner(chainKey));
   }
