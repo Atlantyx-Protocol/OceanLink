@@ -1,10 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import dotenv from 'dotenv';
-import { healthRoutes } from './routes/health.js';
-import { contractRoutes } from './routes/contracts.js';
 import approvalRoutes from './routes/approval.js';
-import htlcRoutes from './routes/htlc.js';
 import bridgeRoutes from './routes/bridge.js';
 
 dotenv.config({ path: '../../.env' });
@@ -34,10 +31,7 @@ async function start() {
     });
 
     // Register routes
-    await fastify.register(healthRoutes, { prefix: '/api' });
-    await fastify.register(contractRoutes, { prefix: '/api/contracts' });
     await fastify.register(approvalRoutes, { prefix: '/api' });
-    await fastify.register(htlcRoutes, { prefix: '/api' });
     await fastify.register(bridgeRoutes, { prefix: '/api' });
 
     // Start server

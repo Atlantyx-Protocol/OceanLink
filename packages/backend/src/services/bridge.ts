@@ -8,7 +8,11 @@ const ERC20_ABI = [
 
 const HTLC_ABI = [
   'function newContract(address receiver, bytes32 hashlock, uint256 timelock, address token, uint256 amount) external returns (bytes32 id)',
+  'function withdraw(bytes32 id, bytes32 preimage) external',
+  'function refund(bytes32 id) external',
   'event HTLCNew(bytes32 indexed id, address indexed sender, address indexed receiver, address token, uint256 amount, bytes32 hashlock, uint256 timelock, uint64 nonce)',
+  'event HTLCWithdraw(bytes32 indexed id, bytes32 preimage)',
+  'event HTLCRefund(bytes32 indexed id)',
 ];
 
 export interface CreateBridgeResult {
@@ -21,6 +25,16 @@ export interface CreateBridgeResult {
   receiver: string;
   amount: string;
   timelock: number;
+}
+
+export interface WithdrawResult {
+  txHash: string;
+  blockNumber: number;
+}
+
+export interface RefundResult {
+  txHash: string;
+  blockNumber: number;
 }
 
 class BridgeService {
@@ -124,6 +138,57 @@ class BridgeService {
       receiver: params.receiver,
       amount: params.amount.toString(),
       timelock,
+    };
+  }
+
+  // Withdraw from HTLC with preimage
+  async withdraw(params: {
+    privateKey: string;
+    contractId: string;
+    preimage: string;
+  }): Promise<WithdrawResult> {
+    const chainKey = 'sepolia';
+    const config = getChainConfig(chainKey)!;
+    const signer = this.getSigner(chainKey, params.privateKey);
+
+    console.log(`[${chainKey}] Withdrawing from HTLC...`);
+    console.log(`  Contract ID: ${params.contractId}`);
+
+    const htlc = new Contract(config.htlcAddress, HTLC_ABI, signer);
+    const tx = await htlc.withdraw(params.contractId, params.preimage);
+
+    console.log(`  TX sent: ${tx.hash}`);
+    const receipt = await tx.wait();
+    console.log(`  Confirmed in block ${receipt.blockNumber}`);
+
+    return {
+      txHash: tx.hash,
+      blockNumber: receipt.blockNumber,
+    };
+  }
+
+  // Refund from HTLC after timelock expires
+  async refund(params: {
+    privateKey: string;
+    contractId: string;
+  }): Promise<RefundResult> {
+    const chainKey = 'sepolia';
+    const config = getChainConfig(chainKey)!;
+    const signer = this.getSigner(chainKey, params.privateKey);
+
+    console.log(`[${chainKey}] Refunding HTLC...`);
+    console.log(`  Contract ID: ${params.contractId}`);
+
+    const htlc = new Contract(config.htlcAddress, HTLC_ABI, signer);
+    const tx = await htlc.refund(params.contractId);
+
+    console.log(`  TX sent: ${tx.hash}`);
+    const receipt = await tx.wait();
+    console.log(`  Confirmed in block ${receipt.blockNumber}`);
+
+    return {
+      txHash: tx.hash,
+      blockNumber: receipt.blockNumber,
     };
   }
 }
