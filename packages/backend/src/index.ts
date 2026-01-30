@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import dotenv from 'dotenv';
-import approvalRoutes from './routes/approval.js';
+import approvalRoutes from './routes/usdc.js';
 import bridgeRoutes from './routes/bridge.js';
 
 dotenv.config({ path: '../../.env' });

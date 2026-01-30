@@ -2,9 +2,9 @@ import { FastifyPluginAsync } from 'fastify';
 import { approvalService } from '../services/approval.js';
 import { getChainConfig, getAllChainConfigs, CHAIN_KEYS } from '../config/chains.js';
 
-const approvalRoutes: FastifyPluginAsync = async (fastify) => {
+const usdcRoutes: FastifyPluginAsync = async (fastify) => {
   // Approve USDC for all chains
-  fastify.post('/approval/all', async (request, reply) => {
+  fastify.post('/usdc/approve/all', async (request, reply) => {
     try {
       const results = await approvalService.approveUSDCForAllChains();
       return { success: true, results };
@@ -17,7 +17,7 @@ const approvalRoutes: FastifyPluginAsync = async (fastify) => {
 
   // Approve USDC for a specific chain
   fastify.post<{ Params: { chain: string } }>(
-    '/approval/:chain',
+    '/usdc/approve/:chain',
     async (request, reply) => {
       const { chain } = request.params;
 
@@ -40,7 +40,7 @@ const approvalRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // Get all current allowances
-  fastify.get('/approval/allowances', async (request, reply) => {
+  fastify.get('/usdc/allowances', async (request, reply) => {
     try {
       const allowances = await approvalService.getAllAllowances();
       return { success: true, allowances };
@@ -51,8 +51,46 @@ const approvalRoutes: FastifyPluginAsync = async (fastify) => {
     }
   });
 
+  // Get USDC balance for an address on a specific chain
+  fastify.get<{ Params: { chain: string }; Querystring: { address: string } }>(
+    '/usdc/balance/:chain',
+    async (request, reply) => {
+      const { chain } = request.params;
+      const { address } = request.query;
+
+      if (!address) {
+        return reply.status(400).send({
+          success: false,
+          error: 'address query parameter is required',
+        });
+      }
+
+      if (!getChainConfig(chain)) {
+        return reply.status(400).send({
+          success: false,
+          error: `Unknown chain: ${chain}. Available: ${CHAIN_KEYS.join(', ')}`,
+        });
+      }
+
+      try {
+        const result = await approvalService.getBalance(chain, address);
+        return {
+          success: true,
+          chain,
+          address,
+          balance: result.balance,
+          decimals: result.decimals,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        fastify.log.error(error, `Failed to get USDC balance for ${address} on ${chain}`);
+        return reply.status(500).send({ success: false, error: message });
+      }
+    }
+  );
+
   // Get available chains
-  fastify.get('/approval/chains', async () => {
+  fastify.get('/usdc/chains', async () => {
     const configs = getAllChainConfigs();
     return {
       success: true,
@@ -67,4 +105,4 @@ const approvalRoutes: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-export default approvalRoutes;
+export default usdcRoutes;

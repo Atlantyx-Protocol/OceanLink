@@ -164,6 +164,26 @@ class ApprovalService {
 
     return allowances;
   }
+
+  async getBalance(chainKey: string, address: string): Promise<{ balance: string; decimals: number }> {
+    const chainConfig = getChainConfig(chainKey);
+    if (!chainConfig) {
+      throw new Error(`Unknown chain: ${chainKey}. Available: ${CHAIN_KEYS.join(', ')}`);
+    }
+
+    const provider = this.getProvider(chainConfig.rpcUrl);
+    const usdcContract = new Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
+
+    const [balance, decimals] = await Promise.all([
+      usdcContract.balanceOf(address),
+      usdcContract.decimals(),
+    ]);
+
+    return {
+      balance: balance.toString(),
+      decimals: Number(decimals),
+    };
+  }
 }
 
 export const approvalService = new ApprovalService();
