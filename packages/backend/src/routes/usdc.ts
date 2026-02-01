@@ -39,17 +39,43 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Get all current allowances
-  fastify.get('/usdc/allowances', async (request, reply) => {
-    try {
-      const allowances = await approvalService.getAllAllowances();
-      return { success: true, allowances };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      fastify.log.error(error, 'Failed to get allowances');
-      return reply.status(500).send({ success: false, error: message });
+  // Get USDC allowance for an address on a specific chain
+  fastify.get<{ Params: { chain: string }; Querystring: { address: string } }>(
+    '/usdc/allowance/:chain',
+    async (request, reply) => {
+      const { chain } = request.params;
+      const { address } = request.query;
+
+      if (!address) {
+        return reply.status(400).send({
+          success: false,
+          error: 'address query parameter is required',
+        });
+      }
+
+      if (!getChainConfig(chain)) {
+        return reply.status(400).send({
+          success: false,
+          error: `Unknown chain: ${chain}. Available: ${CHAIN_KEYS.join(', ')}`,
+        });
+      }
+
+      try {
+        const result = await approvalService.getAllowance(chain, address);
+        return {
+          success: true,
+          chain,
+          address,
+          allowance: result.allowance,
+          htlcAddress: result.htlcAddress,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        fastify.log.error(error, `Failed to get USDC allowance for ${address} on ${chain}`);
+        return reply.status(500).send({ success: false, error: message });
+      }
     }
-  });
+  );
 
   // Get USDC balance for an address on a specific chain
   fastify.get<{ Params: { chain: string }; Querystring: { address: string } }>(
