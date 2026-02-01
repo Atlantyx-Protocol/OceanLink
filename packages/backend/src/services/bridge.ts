@@ -79,7 +79,7 @@ class BridgeService {
     let approvalTxHash: string | undefined;
     if (currentAllowance < params.amount) {
       console.log(`[${chainKey}] Approving USDC...`);
-      const approveTx = await usdc.approve(config.htlcAddress, MaxUint256);
+      const approveTx = await usdc.approve(config.htlcAddress, params.amount);
       await approveTx.wait();
       approvalTxHash = approveTx.hash;
       console.log(`[${chainKey}] Approval TX: ${approvalTxHash}`);

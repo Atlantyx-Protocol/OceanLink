@@ -184,6 +184,23 @@ class ApprovalService {
       decimals: Number(decimals),
     };
   }
+
+  async getAllowance(chainKey: string, address: string): Promise<{ allowance: string; htlcAddress: string }> {
+    const chainConfig = getChainConfig(chainKey);
+    if (!chainConfig) {
+      throw new Error(`Unknown chain: ${chainKey}. Available: ${CHAIN_KEYS.join(', ')}`);
+    }
+
+    const provider = this.getProvider(chainConfig.rpcUrl);
+    const usdcContract = new Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
+
+    const allowance = await usdcContract.allowance(address, chainConfig.htlcAddress);
+
+    return {
+      allowance: allowance.toString(),
+      htlcAddress: chainConfig.htlcAddress,
+    };
+  }
 }
 
 export const approvalService = new ApprovalService();
