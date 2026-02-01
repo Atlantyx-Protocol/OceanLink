@@ -22,19 +22,32 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+    echo -e "${BLUE}[INFO]${NC} $1" >&2
 }
 
 log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo -e "${GREEN}[SUCCESS]${NC} $1" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}[WARN]${NC} $1" >&2
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+# Check if required dependencies are installed
+check_deps() {
+    if ! command -v jq &> /dev/null; then
+        log_error "jq is not installed. Please install it: brew install jq"
+        exit 1
+    fi
+
+    if ! command -v curl &> /dev/null; then
+        log_error "curl is not installed"
+        exit 1
+    fi
 }
 
 # Check if required env vars are set
@@ -205,7 +218,8 @@ main() {
     echo "=========================================="
     echo ""
 
-    # Step 0: Check environment
+    # Step 0: Check dependencies and environment
+    check_deps
     check_env
     echo ""
 
