@@ -61,8 +61,11 @@ class BridgeService {
     receiver: string;
     amount: bigint;
     timelockHours?: number;
+    chain?: string;
+    isPresiding?: boolean; // if true, generate new secret; if false, use provided hashlock
+    hashlock?: string; // required when isPresiding = false
   }): Promise<CreateBridgeResult> {
-    const chainKey = 'sepolia';
+    const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey)!;
     const signer = this.getSigner(chainKey, params.privateKey);
     const senderAddress = await signer.getAddress();
@@ -84,9 +87,23 @@ class BridgeService {
       console.log(`[${chainKey}] Already approved`);
     }
 
-    // Step 2: Generate secret and hashlock
-    const { secret, hashlock } = this.generateSecret();
-    console.log(`[${chainKey}] Secret: ${secret}`);
+    // Step 2: Generate secret and hashlock (only if isPresiding = true)
+    let secret: string;
+    let hashlock: string;
+
+    if (params.isPresiding) {
+      const generated = this.generateSecret();
+      secret = generated.secret;
+      hashlock = generated.hashlock;
+      console.log(`[${chainKey}] Generated new secret: ${secret}`);
+    } else {
+      if (!params.hashlock) {
+        throw new Error('hashlock is required when isPresiding is false');
+      }
+      secret = ''; // No secret for responding party
+      hashlock = params.hashlock;
+      console.log(`[${chainKey}] Using provided hashlock: ${hashlock}`);
+    }
     console.log(`[${chainKey}] Hashlock: ${hashlock}`);
 
     // Step 3: Calculate timelock (default 2 hours from now)
@@ -146,9 +163,11 @@ class BridgeService {
     privateKey: string;
     contractId: string;
     preimage: string;
+    chain?: string;
   }): Promise<WithdrawResult> {
-    const chainKey = 'sepolia';
-    const config = getChainConfig(chainKey)!;
+    const chainKey = params.chain || 'sepolia';
+    const config = getChainConfig(chainKey);
+    if (!config) throw new Error(`Unknown chain: ${chainKey}`);
     const signer = this.getSigner(chainKey, params.privateKey);
 
     console.log(`[${chainKey}] Withdrawing from HTLC...`);
@@ -171,9 +190,11 @@ class BridgeService {
   async refund(params: {
     privateKey: string;
     contractId: string;
+    chain?: string;
   }): Promise<RefundResult> {
-    const chainKey = 'sepolia';
-    const config = getChainConfig(chainKey)!;
+    const chainKey = params.chain || 'sepolia';
+    const config = getChainConfig(chainKey);
+    if (!config) throw new Error(`Unknown chain: ${chainKey}`);
     const signer = this.getSigner(chainKey, params.privateKey);
 
     console.log(`[${chainKey}] Refunding HTLC...`);
