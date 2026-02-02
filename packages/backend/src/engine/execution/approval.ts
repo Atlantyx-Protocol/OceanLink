@@ -1,5 +1,5 @@
 import { JsonRpcProvider, Wallet, Contract, MaxUint256 } from 'ethers';
-import { getChainConfig, ChainConfig, getAllChains, CHAIN_KEYS } from '../config/chains.js';
+import { getChainConfig, ChainConfig, getAllChains, CHAIN_KEYS } from '../../config/chains.js';
 
 const ERC20_ABI = [
   'function approve(address spender, uint256 amount) external returns (bool)',

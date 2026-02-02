@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { approvalService } from '../services/approval.js';
+import { approvalService } from '../engine/execution/approval.js';
 import { getChainConfig, getAllChainConfigs, CHAIN_KEYS } from '../config/chains.js';
 
 const usdcRoutes: FastifyPluginAsync = async (fastify) => {

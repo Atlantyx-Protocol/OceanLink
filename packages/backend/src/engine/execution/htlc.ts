@@ -1,5 +1,5 @@
 import { ethers, JsonRpcProvider, Wallet, Contract } from 'ethers';
-import { getChainConfig, ChainConfig } from '../config/chains.js';
+import { getChainConfig, ChainConfig } from '../../config/chains.js';
 
 const HTLC_ABI = [
   'function newContract(address receiver, bytes32 hashlock, uint256 timelock, address token, uint256 amount) external returns (bytes32 id)',

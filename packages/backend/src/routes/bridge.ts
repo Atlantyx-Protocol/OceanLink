@@ -1,5 +1,5 @@
 import { FastifyPluginAsync } from 'fastify';
-import { bridgeService } from '../services/bridge.js';
+import { bridgeService } from '../engine/execution/bridge.js';
 
 const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   // Create bridge: approve + newContract
