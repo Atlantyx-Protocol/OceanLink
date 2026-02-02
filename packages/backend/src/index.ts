@@ -36,7 +36,7 @@ async function start() {
 
     // Start server
     await fastify.listen({ port: PORT, host: HOST });
-    
+
     console.log(`🚀 Backend server running on http://${HOST}:${PORT}`);
   } catch (err) {
     fastify.log.error(err);

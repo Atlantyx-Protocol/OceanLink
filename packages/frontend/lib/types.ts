@@ -8,4 +8,3 @@ export type Intent = {
   expiry: bigint; // unix timestamp
   nonce: bigint;
 };
-

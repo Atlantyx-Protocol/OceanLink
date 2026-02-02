@@ -20,15 +20,19 @@ export const getChainConfig = (chainKey: string): ChainConfig | undefined => {
       chainId: 421614,
       name: 'Arbitrum Sepolia',
       rpcUrl: process.env.ARBITRUM_SEPOLIA_RPC_URL || '',
-      usdcAddress: process.env.USDC_ADDRESS_ARBITRUM_SEPOLIA || '0x7c07f2688F515ca98F734D2A000Ab5bC63b77516',
-      htlcAddress: process.env.HTLC_ADDRESS_ARBITRUM_SEPOLIA || '0x8aA86c2EED53595f1B46645c0919837ee858145A',
+      usdcAddress:
+        process.env.USDC_ADDRESS_ARBITRUM_SEPOLIA || '0x7c07f2688F515ca98F734D2A000Ab5bC63b77516',
+      htlcAddress:
+        process.env.HTLC_ADDRESS_ARBITRUM_SEPOLIA || '0x8aA86c2EED53595f1B46645c0919837ee858145A',
     },
     baseSepolia: {
       chainId: 84532,
       name: 'Base Sepolia',
       rpcUrl: process.env.BASE_SEPOLIA_RPC_URL || '',
-      usdcAddress: process.env.USDC_ADDRESS_BASE_SEPOLIA || '0x4f3881a80DcaA7BfE969BFac4848E4B92eD87ec1',
-      htlcAddress: process.env.HTLC_ADDRESS_BASE_SEPOLIA || '0x39B3449104D62fF81B3963a7654af4C465D6BA58',
+      usdcAddress:
+        process.env.USDC_ADDRESS_BASE_SEPOLIA || '0x4f3881a80DcaA7BfE969BFac4848E4B92eD87ec1',
+      htlcAddress:
+        process.env.HTLC_ADDRESS_BASE_SEPOLIA || '0x39B3449104D62fF81B3963a7654af4C465D6BA58',
     },
   };
   return configs[chainKey];

@@ -16,28 +16,25 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Approve USDC for a specific chain
-  fastify.post<{ Params: { chain: string } }>(
-    '/usdc/approve/:chain',
-    async (request, reply) => {
-      const { chain } = request.params;
+  fastify.post<{ Params: { chain: string } }>('/usdc/approve/:chain', async (request, reply) => {
+    const { chain } = request.params;
 
-      if (!getChainConfig(chain)) {
-        return reply.status(400).send({
-          success: false,
-          error: `Unknown chain: ${chain}. Available: ${CHAIN_KEYS.join(', ')}`,
-        });
-      }
-
-      try {
-        const result = await approvalService.approveUSDCForSpecificChain(chain);
-        return { success: true, result };
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        fastify.log.error(error, `Failed to approve USDC for ${chain}`);
-        return reply.status(500).send({ success: false, error: message });
-      }
+    if (!getChainConfig(chain)) {
+      return reply.status(400).send({
+        success: false,
+        error: `Unknown chain: ${chain}. Available: ${CHAIN_KEYS.join(', ')}`,
+      });
     }
-  );
+
+    try {
+      const result = await approvalService.approveUSDCForSpecificChain(chain);
+      return { success: true, result };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      fastify.log.error(error, `Failed to approve USDC for ${chain}`);
+      return reply.status(500).send({ success: false, error: message });
+    }
+  });
 
   // Get USDC allowance for an address on a specific chain
   fastify.get<{ Params: { chain: string }; Querystring: { address: string } }>(

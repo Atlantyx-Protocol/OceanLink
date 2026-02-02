@@ -1,13 +1,13 @@
-'use client'
+'use client';
 
-import { useAccount, useConnect, useDisconnect } from 'wagmi'
-import { CreateIntentForm } from './components/CreateIntentForm'
-import { MyIntentsList } from './components/MyIntentsList'
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { CreateIntentForm } from './components/CreateIntentForm';
+import { MyIntentsList } from './components/MyIntentsList';
 
 export default function Home() {
-  const { address, isConnected } = useAccount()
-  const { connect, connectors } = useConnect()
-  const { disconnect } = useDisconnect()
+  const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
 
   return (
     <main className="min-h-screen p-8 max-w-6xl mx-auto">
@@ -63,6 +63,5 @@ export default function Home() {
         </div>
       )}
     </main>
-  )
+  );
 }
-

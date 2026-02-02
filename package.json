@@ -1,21 +1,28 @@
 {
-    "name": "oceanlink-monorepo",
-    "version": "1.0.0",
-    "private": true,
-    "description": "OceanLink Monorepo - Frontend, Backend, and Smart Contracts",
-    "scripts": {
-      "dev": "pnpm --parallel --stream dev",
-      "dev:frontend": "pnpm --filter @ocean-link/frontend dev",
-      "dev:backend": "pnpm --filter @ocean-link/backend dev",
-      "build": "pnpm --recursive build",
-      "lint": "pnpm --recursive lint",
-      "clean": "pnpm --recursive clean",
-      "test": "pnpm --recursive test"
-    },
-    "keywords": ["monorepo", "oceanlink", "blockchain"],
-    "author": "",
-    "license": "MIT",
-    "devDependencies": {
-      "typescript": "^5.3.3"
-    }
+  "name": "oceanlink-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OceanLink Monorepo - Frontend, Backend, and Smart Contracts",
+  "scripts": {
+    "dev": "pnpm --parallel --stream dev",
+    "dev:frontend": "pnpm --filter @ocean-link/frontend dev",
+    "dev:backend": "pnpm --filter @ocean-link/backend dev",
+    "build": "pnpm --recursive build",
+    "lint": "pnpm --recursive lint",
+    "clean": "pnpm --recursive clean",
+    "test": "pnpm --recursive test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\""
+  },
+  "keywords": [
+    "monorepo",
+    "oceanlink",
+    "blockchain"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "prettier": "^3.8.1",
+    "typescript": "^5.3.3"
   }
+}

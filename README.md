@@ -3,6 +3,7 @@
 A monorepo containing the OceanLink frontend, backend, and smart contracts.
 
 ## Project Structure
+
 ```
 OceanLink/
 ├── packages/
@@ -22,6 +23,7 @@ OceanLink/
 ## Getting Started
 
 ### Install dependencies
+
 ```bash
 pnpm install
 ```
@@ -29,11 +31,13 @@ pnpm install
 ### Development
 
 Run all packages in development mode:
+
 ```bash
 pnpm dev
 ```
 
 Or run individually:
+
 ```bash
 # Frontend only
 pnpm --filter @ocean-link/frontend dev
@@ -48,6 +52,7 @@ pnpm --filter @ocean-link/contracts test
 ### Build
 
 Build all packages:
+
 ```bash
 pnpm build
 ```
@@ -55,6 +60,7 @@ pnpm build
 ## Packages
 
 ### Frontend (`@ocean-link/frontend`)
+
 - Next.js 14
 - React 18
 - Wagmi & Viem for Web3
@@ -63,6 +69,7 @@ pnpm build
 **Dev**: `http://localhost:3000`
 
 ### Backend (`@ocean-link/backend`)
+
 - Fastify
 - TypeScript
 - Viem for blockchain interaction
@@ -70,6 +77,7 @@ pnpm build
 **Dev**: `http://localhost:3001`
 
 ### Contracts (`@ocean-link/contracts`)
+
 - Foundry
 - Solidity smart contracts
 
@@ -84,6 +92,7 @@ pnpm build
 ## License
 
 MIT
+
 ```
 
 ---
@@ -92,10 +101,11 @@ MIT
 
 Your root should now have:
 ```
+
 OceanLink/
 ├── packages/
-├── tsconfig.json      ✓
-├── .gitignore         ✓
-├── README.md          ✓
+├── tsconfig.json ✓
+├── .gitignore ✓
+├── README.md ✓
 ├── package.json
 └── pnpm-workspace.yaml

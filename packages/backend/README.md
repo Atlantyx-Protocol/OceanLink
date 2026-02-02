@@ -40,33 +40,37 @@ pnpm approve:base
 ## API Endpoints
 
 ### Health
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/ping` | Ping |
+
+| Method | Endpoint      | Description  |
+| ------ | ------------- | ------------ |
+| GET    | `/api/health` | Health check |
+| GET    | `/api/ping`   | Ping         |
 
 ### Approval
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/approval/all` | Approve USDC on all chains |
-| POST | `/api/approval/:chain` | Approve USDC on specific chain |
-| GET | `/api/approval/allowances` | Get current allowances |
-| GET | `/api/approval/chains` | List available chains |
+
+| Method | Endpoint                   | Description                    |
+| ------ | -------------------------- | ------------------------------ |
+| POST   | `/api/approval/all`        | Approve USDC on all chains     |
+| POST   | `/api/approval/:chain`     | Approve USDC on specific chain |
+| GET    | `/api/approval/allowances` | Get current allowances         |
+| GET    | `/api/approval/chains`     | List available chains          |
 
 ### HTLC
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/htlc/generate-hash` | Generate preimage + hashlock |
-| POST | `/api/htlc/new` | Create new HTLC |
-| POST | `/api/htlc/withdraw` | Withdraw with preimage |
-| POST | `/api/htlc/refund` | Refund after timelock |
-| GET | `/api/htlc/:chain/:id` | Get HTLC details |
+
+| Method | Endpoint                  | Description                  |
+| ------ | ------------------------- | ---------------------------- |
+| GET    | `/api/htlc/generate-hash` | Generate preimage + hashlock |
+| POST   | `/api/htlc/new`           | Create new HTLC              |
+| POST   | `/api/htlc/withdraw`      | Withdraw with preimage       |
+| POST   | `/api/htlc/refund`        | Refund after timelock        |
+| GET    | `/api/htlc/:chain/:id`    | Get HTLC details             |
 
 ### Bridge
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/bridge/create` | Approve USDC + create HTLC (uses PRIVATE_KEY_A) |
-| GET | `/api/bridge/generate-secret` | Generate 256-bit secret + hashlock |
+
+| Method | Endpoint                      | Description                                     |
+| ------ | ----------------------------- | ----------------------------------------------- |
+| POST   | `/api/bridge/create`          | Approve USDC + create HTLC (uses PRIVATE_KEY_A) |
+| GET    | `/api/bridge/generate-secret` | Generate 256-bit secret + hashlock              |
 
 ## Usage Examples
 
@@ -127,6 +131,7 @@ curl -X POST http://localhost:3001/api/bridge/create \
 ```
 
 Response:
+
 ```json
 {
   "success": true,
@@ -146,8 +151,8 @@ Response:
 
 ## Supported Chains
 
-| Chain | Key |
-|-------|-----|
-| Ethereum Sepolia | `sepolia` |
+| Chain            | Key               |
+| ---------------- | ----------------- |
+| Ethereum Sepolia | `sepolia`         |
 | Arbitrum Sepolia | `arbitrumSepolia` |
-| Base Sepolia | `baseSepolia` |
+| Base Sepolia     | `baseSepolia`     |

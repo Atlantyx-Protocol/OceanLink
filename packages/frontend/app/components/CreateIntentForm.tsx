@@ -1,11 +1,11 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
-import { useAccount, useWalletClient } from 'wagmi'
-import { INTENT_EIP712_DOMAIN, INTENT_EIP712_TYPES } from '@/lib/eip712'
-import { Intent } from '@/lib/types'
+import { useState } from 'react';
+import { useAccount, useWalletClient } from 'wagmi';
+import { INTENT_EIP712_DOMAIN, INTENT_EIP712_TYPES } from '@/lib/eip712';
+import { Intent } from '@/lib/types';
 
-const ORDERBOOK_API_URL = process.env.NEXT_PUBLIC_ORDERBOOK_API_URL || 'http://localhost:3001'
+const ORDERBOOK_API_URL = process.env.NEXT_PUBLIC_ORDERBOOK_API_URL || 'http://localhost:3001';
 
 const CHAINS = [
   { id: 84532, name: 'Base Sepolia' },
@@ -14,52 +14,58 @@ const CHAINS = [
   { id: 31337, name: 'Localhost (Base)' },
   { id: 31338, name: 'Localhost (Sepolia)' },
   { id: 31339, name: 'Localhost (Arbitrum)' },
-]
+];
 
 // Token addresses per chain (should match deployed contracts)
 const TOKEN_ADDRESSES: Record<string, string> = {
-  '84532': process.env.NEXT_PUBLIC_BASE_TOKEN_ADDRESS || '0xCdBb9C109Da8FF1423C753A9D4cEb85d680DC0fa', // Base Sepolia
-  '11155111': process.env.NEXT_PUBLIC_SEPOLIA_TOKEN_ADDRESS || '0xDB6676239269Ae5b8665d9eF9656D6b272A8C7A8', // Sepolia
-  '421614': process.env.NEXT_PUBLIC_ARBITRUM_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000', // Arbitrum Sepolia (needs to be set)
-  '31337': process.env.NEXT_PUBLIC_BASE_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000', // Localhost Base
-  '31338': process.env.NEXT_PUBLIC_SEPOLIA_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000', // Localhost Sepolia
-  '31339': process.env.NEXT_PUBLIC_ARBITRUM_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000', // Localhost Arbitrum
-}
+  '84532':
+    process.env.NEXT_PUBLIC_BASE_TOKEN_ADDRESS || '0xCdBb9C109Da8FF1423C753A9D4cEb85d680DC0fa', // Base Sepolia
+  '11155111':
+    process.env.NEXT_PUBLIC_SEPOLIA_TOKEN_ADDRESS || '0xDB6676239269Ae5b8665d9eF9656D6b272A8C7A8', // Sepolia
+  '421614':
+    process.env.NEXT_PUBLIC_ARBITRUM_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000', // Arbitrum Sepolia (needs to be set)
+  '31337':
+    process.env.NEXT_PUBLIC_BASE_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000', // Localhost Base
+  '31338':
+    process.env.NEXT_PUBLIC_SEPOLIA_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000', // Localhost Sepolia
+  '31339':
+    process.env.NEXT_PUBLIC_ARBITRUM_TOKEN_ADDRESS || '0x0000000000000000000000000000000000000000', // Localhost Arbitrum
+};
 
 export function CreateIntentForm() {
-  const { address } = useAccount()
-  const { data: walletClient } = useWalletClient()
-  const [srcChainId, setSrcChainId] = useState<string>('84532')
-  const [dstChainId, setDstChainId] = useState<string>('421614')
-  const [amount, setAmount] = useState<string>('')
-  const [minAmountOut, setMinAmountOut] = useState<string>('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const { address } = useAccount();
+  const { data: walletClient } = useWalletClient();
+  const [srcChainId, setSrcChainId] = useState<string>('84532');
+  const [dstChainId, setDstChainId] = useState<string>('421614');
+  const [amount, setAmount] = useState<string>('');
+  const [minAmountOut, setMinAmountOut] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!address || !walletClient) {
-      setError('Wallet not connected')
-      return
+      setError('Wallet not connected');
+      return;
     }
 
-    setLoading(true)
-    setError(null)
-    setSuccess(null)
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
 
     try {
-      const amountBigInt = BigInt(Math.floor(parseFloat(amount) * 1e6)) // USDC has 6 decimals
+      const amountBigInt = BigInt(Math.floor(parseFloat(amount) * 1e6)); // USDC has 6 decimals
       const minAmountOutBigInt = minAmountOut
         ? BigInt(Math.floor(parseFloat(minAmountOut) * 1e6))
-        : amountBigInt
+        : amountBigInt;
 
-      const expiry = BigInt(Math.floor(Date.now() / 1000) + 3600) // 1 hour from now
-      const nonce = BigInt(Date.now()) // Simple nonce using timestamp
+      const expiry = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour from now
+      const nonce = BigInt(Date.now()); // Simple nonce using timestamp
 
-      const tokenAddress = TOKEN_ADDRESSES[srcChainId]
+      const tokenAddress = TOKEN_ADDRESSES[srcChainId];
       if (!tokenAddress || tokenAddress === '0x0000000000000000000000000000000000000000') {
-        throw new Error(`Token address not configured for chain ${srcChainId}`)
+        throw new Error(`Token address not configured for chain ${srcChainId}`);
       }
 
       const intent: Intent = {
@@ -71,16 +77,16 @@ export function CreateIntentForm() {
         minAmountOut: minAmountOutBigInt,
         expiry,
         nonce,
-      }
+      };
 
       // Sign the intent
-      const domain = INTENT_EIP712_DOMAIN(intent.srcChainId)
+      const domain = INTENT_EIP712_DOMAIN(intent.srcChainId);
       const signature = await walletClient.signTypedData({
         domain,
         types: INTENT_EIP712_TYPES,
         primaryType: 'Intent',
         message: intent,
-      })
+      });
 
       // Submit to backend
       const response = await fetch(`${ORDERBOOK_API_URL}/intents`, {
@@ -102,25 +108,25 @@ export function CreateIntentForm() {
           },
           signature,
         }),
-      })
+      });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to submit intent')
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit intent');
       }
 
-      const result = await response.json()
-      setSuccess(`Intent created successfully! ID: ${result.id}`)
-      
+      const result = await response.json();
+      setSuccess(`Intent created successfully! ID: ${result.id}`);
+
       // Reset form
-      setAmount('')
-      setMinAmountOut('')
+      setAmount('');
+      setMinAmountOut('');
     } catch (err: any) {
-      setError(err.message || 'An error occurred')
+      setError(err.message || 'An error occurred');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
@@ -203,6 +209,5 @@ export function CreateIntentForm() {
         {loading ? 'Creating Intent...' : 'Create Intent'}
       </button>
     </form>
-  )
+  );
 }
-

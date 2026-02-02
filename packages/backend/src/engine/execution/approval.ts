@@ -106,7 +106,6 @@ class ApprovalService {
         chainConfig.htlcAddress
       );
       result.allowance = newAllowance.toString();
-
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       result.error = errorMessage;
@@ -165,7 +164,10 @@ class ApprovalService {
     return allowances;
   }
 
-  async getBalance(chainKey: string, address: string): Promise<{ balance: string; decimals: number }> {
+  async getBalance(
+    chainKey: string,
+    address: string
+  ): Promise<{ balance: string; decimals: number }> {
     const chainConfig = getChainConfig(chainKey);
     if (!chainConfig) {
       throw new Error(`Unknown chain: ${chainKey}. Available: ${CHAIN_KEYS.join(', ')}`);
@@ -185,7 +187,10 @@ class ApprovalService {
     };
   }
 
-  async getAllowance(chainKey: string, address: string): Promise<{ allowance: string; htlcAddress: string }> {
+  async getAllowance(
+    chainKey: string,
+    address: string
+  ): Promise<{ allowance: string; htlcAddress: string }> {
     const chainConfig = getChainConfig(chainKey);
     if (!chainConfig) {
       throw new Error(`Unknown chain: ${chainKey}. Available: ${CHAIN_KEYS.join(', ')}`);
