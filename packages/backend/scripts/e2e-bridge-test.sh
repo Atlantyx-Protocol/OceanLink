@@ -2,6 +2,7 @@
 
 # E2E Bridge Test Script
 # Tests the full HTLC bridge flow between Sepolia and Base Sepolia
+# Updated for new HashedTimelockERC20 contract with orders and fills
 
 set -e
 
@@ -94,103 +95,109 @@ check_balance() {
     echo "$balance"
 }
 
-# Create bridge (presiding - generates secret)
-create_bridge_presiding() {
+# Create order (presiding - generates secret)
+create_order_presiding() {
     local private_key=$1
     local receiver=$2
     local chain=$3
 
-    log_info "Creating bridge on $chain (presiding - generating secret)..."
+    log_info "Creating order on $chain (presiding - generating secret)..."
 
     response=$(curl -s -X POST "$API_BASE/bridge/create" \
         -H "Content-Type: application/json" \
         -d "{
             \"privateKey\": \"$private_key\",
-            \"receiver\": \"$receiver\",
-            \"amount\": \"$AMOUNT\",
+            \"receivers\": [\"$receiver\"],
+            \"amounts\": [\"$AMOUNT\"],
             \"chain\": \"$chain\",
-            \"isPresiding\": true,
-            \"timelockHours\": 1
+            \"isPresiding\": true
         }")
 
     success=$(echo "$response" | jq -r '.success')
 
     if [ "$success" != "true" ]; then
-        log_error "Failed to create bridge: $response"
+        log_error "Failed to create order: $response"
         exit 1
     fi
 
-    contract_id=$(echo "$response" | jq -r '.data.contractId')
-    secret=$(echo "$response" | jq -r '.data.secret')
-    hashlock=$(echo "$response" | jq -r '.data.hashlock')
+    order_id=$(echo "$response" | jq -r '.data.orderId')
+    fill_id=$(echo "$response" | jq -r '.data.fills[0].fillId')
+    secret=$(echo "$response" | jq -r '.data.fills[0].secret')
+    hashlock=$(echo "$response" | jq -r '.data.fills[0].hashlock')
     tx_hash=$(echo "$response" | jq -r '.data.htlcTxHash')
 
-    log_success "Bridge created on $chain"
-    echo "  Contract ID: $contract_id"
-    echo "  Secret: $secret"
-    echo "  Hashlock: $hashlock"
-    echo "  TX Hash: $tx_hash"
+    log_success "Order created on $chain"
+    echo "  Order ID: $order_id" >&2
+    echo "  Fill ID: $fill_id" >&2
+    echo "  Secret: $secret" >&2
+    echo "  Hashlock: $hashlock" >&2
+    echo "  TX Hash: $tx_hash" >&2
 
     # Return values via global variables
-    PRESIDING_CONTRACT_ID="$contract_id"
+    PRESIDING_ORDER_ID="$order_id"
+    PRESIDING_FILL_ID="$fill_id"
     PRESIDING_SECRET="$secret"
     PRESIDING_HASHLOCK="$hashlock"
 }
 
-# Create bridge (responding - uses existing hashlock)
-create_bridge_responding() {
+# Create order (responding - uses existing hashlock)
+create_order_responding() {
     local private_key=$1
     local receiver=$2
     local chain=$3
     local hashlock=$4
 
-    log_info "Creating bridge on $chain (responding - using existing hashlock)..."
+    log_info "Creating order on $chain (responding - using existing hashlock)..."
 
     response=$(curl -s -X POST "$API_BASE/bridge/create" \
         -H "Content-Type: application/json" \
         -d "{
             \"privateKey\": \"$private_key\",
-            \"receiver\": \"$receiver\",
-            \"amount\": \"$AMOUNT\",
+            \"receivers\": [\"$receiver\"],
+            \"amounts\": [\"$AMOUNT\"],
             \"chain\": \"$chain\",
             \"isPresiding\": false,
-            \"hashlock\": \"$hashlock\",
-            \"timelockHours\": 1
+            \"hashlocks\": [\"$hashlock\"]
         }")
 
     success=$(echo "$response" | jq -r '.success')
 
     if [ "$success" != "true" ]; then
-        log_error "Failed to create bridge: $response"
+        log_error "Failed to create order: $response"
         exit 1
     fi
 
-    contract_id=$(echo "$response" | jq -r '.data.contractId')
+    order_id=$(echo "$response" | jq -r '.data.orderId')
+    fill_id=$(echo "$response" | jq -r '.data.fills[0].fillId')
     tx_hash=$(echo "$response" | jq -r '.data.htlcTxHash')
 
-    log_success "Bridge created on $chain"
-    echo "  Contract ID: $contract_id"
-    echo "  TX Hash: $tx_hash"
+    log_success "Order created on $chain"
+    echo "  Order ID: $order_id" >&2
+    echo "  Fill ID: $fill_id" >&2
+    echo "  TX Hash: $tx_hash" >&2
 
-    # Return value via global variable
-    RESPONDING_CONTRACT_ID="$contract_id"
+    # Return values via global variables
+    RESPONDING_ORDER_ID="$order_id"
+    RESPONDING_FILL_ID="$fill_id"
 }
 
-# Withdraw from bridge
-withdraw_bridge() {
+# Withdraw from order fill
+withdraw_order() {
     local private_key=$1
-    local contract_id=$2
-    local preimage=$3
-    local chain=$4
-    local user_name=$5
+    local order_id=$2
+    local fill_id=$3
+    local preimage=$4
+    local chain=$5
+    local user_name=$6
 
-    log_info "$user_name withdrawing from bridge on $chain..."
+    log_info "$user_name withdrawing from order on $chain..."
 
     response=$(curl -s -X POST "$API_BASE/bridge/withdraw" \
         -H "Content-Type: application/json" \
         -d "{
             \"privateKey\": \"$private_key\",
-            \"contractId\": \"$contract_id\",
+            \"orderId\": \"$order_id\",
+            \"fillId\": \"$fill_id\",
             \"preimage\": \"$preimage\",
             \"chain\": \"$chain\"
         }")
@@ -206,15 +213,15 @@ withdraw_bridge() {
     block_number=$(echo "$response" | jq -r '.data.blockNumber')
 
     log_success "$user_name successfully withdrew from $chain"
-    echo "  TX Hash: $tx_hash"
-    echo "  Block: $block_number"
+    echo "  TX Hash: $tx_hash" >&2
+    echo "  Block: $block_number" >&2
 }
 
 # Main test flow
 main() {
     echo ""
     echo "=========================================="
-    echo "  HTLC Bridge E2E Test"
+    echo "  HTLC Bridge E2E Test (New Contract)"
     echo "=========================================="
     echo ""
 
@@ -233,31 +240,32 @@ main() {
     BALANCE_B_BEFORE=$(check_balance "baseSepolia" "$USER_B_ADDRESS" "$MIN_BALANCE")
     echo ""
 
-    # Step 2: User A creates bridge on Sepolia (presiding)
-    # Note: Approval is handled automatically by createBridge
+    # Step 2: User A creates order on Sepolia (presiding)
     echo "=========================================="
-    echo "  Step 2: User A Creates Bridge on Sepolia"
+    echo "  Step 2: User A Creates Order on Sepolia"
     echo "=========================================="
 
-    create_bridge_presiding "$PRIVATE_KEY_A" "$USER_B_ADDRESS" "sepolia"
+    create_order_presiding "$PRIVATE_KEY_A" "$USER_B_ADDRESS" "sepolia"
     echo ""
 
     # Store important values
     echo -e "${YELLOW}>>> IMPORTANT: Store these values <<<${NC}"
-    echo "SEPOLIA_CONTRACT_ID=$PRESIDING_CONTRACT_ID"
+    echo "SEPOLIA_ORDER_ID=$PRESIDING_ORDER_ID"
+    echo "SEPOLIA_FILL_ID=$PRESIDING_FILL_ID"
     echo "SECRET=$PRESIDING_SECRET"
     echo "HASHLOCK=$PRESIDING_HASHLOCK"
     echo ""
 
-    # Step 3: User B creates bridge on Base Sepolia (responding)
+    # Step 3: User B creates order on Base Sepolia (responding)
     echo "=========================================="
-    echo "  Step 3: User B Creates Bridge on Base Sepolia"
+    echo "  Step 3: User B Creates Order on Base Sepolia"
     echo "=========================================="
 
-    create_bridge_responding "$PRIVATE_KEY_B" "$USER_A_ADDRESS" "baseSepolia" "$PRESIDING_HASHLOCK"
+    create_order_responding "$PRIVATE_KEY_B" "$USER_A_ADDRESS" "baseSepolia" "$PRESIDING_HASHLOCK"
     echo ""
 
-    echo "BASE_SEPOLIA_CONTRACT_ID=$RESPONDING_CONTRACT_ID"
+    echo "BASE_SEPOLIA_ORDER_ID=$RESPONDING_ORDER_ID"
+    echo "BASE_SEPOLIA_FILL_ID=$RESPONDING_FILL_ID"
     echo ""
 
     # Step 4: Re-check balances
@@ -278,7 +286,7 @@ main() {
     echo "  Step 5: User A Withdraws on Base Sepolia"
     echo "=========================================="
 
-    withdraw_bridge "$PRIVATE_KEY_A" "$RESPONDING_CONTRACT_ID" "$PRESIDING_SECRET" "baseSepolia" "User A"
+    withdraw_order "$PRIVATE_KEY_A" "$RESPONDING_ORDER_ID" "$RESPONDING_FILL_ID" "$PRESIDING_SECRET" "baseSepolia" "User A"
     echo ""
 
     # Step 6: User B withdraws on Sepolia (using revealed secret)
@@ -286,7 +294,7 @@ main() {
     echo "  Step 6: User B Withdraws on Sepolia"
     echo "=========================================="
 
-    withdraw_bridge "$PRIVATE_KEY_B" "$PRESIDING_CONTRACT_ID" "$PRESIDING_SECRET" "sepolia" "User B"
+    withdraw_order "$PRIVATE_KEY_B" "$PRESIDING_ORDER_ID" "$PRESIDING_FILL_ID" "$PRESIDING_SECRET" "sepolia" "User B"
     echo ""
 
     # Step 7: Final balance check
@@ -309,8 +317,10 @@ main() {
     echo ""
     log_success "E2E Bridge Test Completed Successfully!"
     echo ""
-    echo "Sepolia Contract ID: $PRESIDING_CONTRACT_ID"
-    echo "Base Sepolia Contract ID: $RESPONDING_CONTRACT_ID"
+    echo "Sepolia Order ID: $PRESIDING_ORDER_ID"
+    echo "Sepolia Fill ID: $PRESIDING_FILL_ID"
+    echo "Base Sepolia Order ID: $RESPONDING_ORDER_ID"
+    echo "Base Sepolia Fill ID: $RESPONDING_FILL_ID"
     echo "Secret (preimage): $PRESIDING_SECRET"
     echo "Hashlock: $PRESIDING_HASHLOCK"
     echo ""

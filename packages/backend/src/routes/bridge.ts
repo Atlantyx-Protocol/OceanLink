@@ -2,16 +2,16 @@ import { FastifyPluginAsync } from 'fastify';
 import { bridgeService } from '../engine/execution/bridge.js';
 
 const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
-  // Create bridge: approve + newContract
+  // Create order with multiple fills: approve + newOrder
+  // Timelock is configured via TIME_LOCK env variable (in minutes, default 1)
   fastify.post<{
     Body: {
       privateKey: string; // required: private key of the sender
-      receiver?: string; // optional, defaults to sender address
-      amount?: string; // optional, defaults to 700 USDC (700 * 1e6)
+      receivers: string[]; // required: array of receiver addresses
+      amounts: string[]; // required: array of amounts (as strings for bigint)
       chain?: string; // optional, defaults to 'sepolia'
-      isPresiding?: boolean; // optional, if true generate new secret, default false
-      hashlock?: string; // required when isPresiding is false
-      timelockHours?: number; // optional, defaults to 1 hour
+      isPresiding?: boolean; // optional, if true generate new secrets, default false
+      hashlocks?: string[]; // required when isPresiding is false
     };
   }>('/bridge/create', async (request, reply) => {
     try {
@@ -21,30 +21,48 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(400).send({ error: 'privateKey is required' });
       }
 
-      // Default amount is 700 USDC (6 decimals)
-      const amount = body.amount ? BigInt(body.amount) : BigInt(700 * 1e6);
-
-      // Get sender address from private key to use as default receiver
-      const { ethers } = await import('ethers');
-      const wallet = new ethers.Wallet(body.privateKey);
-      const senderAddress = wallet.address;
-
-      const receiver = body.receiver || senderAddress;
-      const isPresiding = body.isPresiding ?? false;
-
-      // Validate hashlock is provided when not presiding
-      if (!isPresiding && !body.hashlock) {
-        return reply.status(400).send({ error: 'hashlock is required when isPresiding is false' });
+      if (!body.receivers || !Array.isArray(body.receivers) || body.receivers.length === 0) {
+        return reply
+          .status(400)
+          .send({ error: 'receivers array is required and must not be empty' });
       }
 
-      const result = await bridgeService.createBridge({
+      if (!body.amounts || !Array.isArray(body.amounts) || body.amounts.length === 0) {
+        return reply.status(400).send({ error: 'amounts array is required and must not be empty' });
+      }
+
+      if (body.receivers.length !== body.amounts.length) {
+        return reply
+          .status(400)
+          .send({ error: 'receivers and amounts arrays must have the same length' });
+      }
+
+      const isPresiding = body.isPresiding ?? false;
+
+      // Validate hashlocks when not presiding
+      if (!isPresiding) {
+        if (
+          !body.hashlocks ||
+          !Array.isArray(body.hashlocks) ||
+          body.hashlocks.length !== body.receivers.length
+        ) {
+          return reply.status(400).send({
+            error:
+              'hashlocks array is required and must match receivers length when isPresiding is false',
+          });
+        }
+      }
+
+      // Convert amounts to bigint
+      const amounts = body.amounts.map((amt) => BigInt(amt));
+
+      const result = await bridgeService.createOrder({
         privateKey: body.privateKey,
-        receiver,
-        amount,
-        timelockHours: body.timelockHours ?? 1,
+        receivers: body.receivers,
+        amounts,
         chain: body.chain,
         isPresiding,
-        hashlock: body.hashlock,
+        hashlocks: body.hashlocks,
       });
 
       return {
@@ -68,19 +86,24 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post<{
     Body: {
       privateKey: string;
-      contractId: string;
+      orderId: string;
+      fillId: string;
       preimage: string;
       chain?: string;
     };
   }>('/bridge/withdraw', async (request, reply) => {
-    const { privateKey, contractId, preimage, chain } = request.body || {};
+    const { privateKey, orderId, fillId, preimage, chain } = request.body || {};
 
     if (!privateKey) {
       return reply.status(400).send({ error: 'privateKey is required' });
     }
 
-    if (!contractId) {
-      return reply.status(400).send({ error: 'contractId is required' });
+    if (orderId === undefined || orderId === null) {
+      return reply.status(400).send({ error: 'orderId is required' });
+    }
+
+    if (fillId === undefined || fillId === null) {
+      return reply.status(400).send({ error: 'fillId is required' });
     }
 
     if (!preimage) {
@@ -90,7 +113,8 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
     try {
       const result = await bridgeService.withdraw({
         privateKey,
-        contractId,
+        orderId: orderId.toString(),
+        fillId: fillId.toString(),
         preimage,
         chain,
       });
@@ -110,30 +134,108 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post<{
     Body: {
       privateKey: string;
-      contractId: string;
+      orderId: string;
       chain?: string;
     };
   }>('/bridge/refund', async (request, reply) => {
-    const { privateKey, contractId, chain } = request.body || {};
+    const { privateKey, orderId, chain } = request.body || {};
 
     if (!privateKey) {
       return reply.status(400).send({ error: 'privateKey is required' });
     }
 
-    if (!contractId) {
-      return reply.status(400).send({ error: 'contractId is required' });
+    if (orderId === undefined || orderId === null) {
+      return reply.status(400).send({ error: 'orderId is required' });
     }
 
     try {
       const result = await bridgeService.refund({
         privateKey,
-        contractId,
+        orderId: orderId.toString(),
         chain,
       });
 
       return {
         success: true,
         data: result,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      fastify.log.error(error);
+      return reply.status(500).send({ error: message });
+    }
+  });
+
+  // Get next order id
+
+  // Get order details
+  fastify.get<{
+    Params: { orderId: string };
+    Querystring: { chain?: string };
+  }>('/bridge/order/:orderId', async (request, reply) => {
+    const { orderId } = request.params;
+    const { chain } = request.query;
+
+    try {
+      const order = await bridgeService.getOrder({
+        orderId,
+        chain,
+      });
+
+      return {
+        success: true,
+        data: order,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      fastify.log.error(error);
+      return reply.status(500).send({ error: message });
+    }
+  });
+
+  // Get fill details
+  fastify.get<{
+    Params: { orderId: string; fillId: string };
+    Querystring: { chain?: string };
+  }>('/bridge/order/:orderId/fill/:fillId', async (request, reply) => {
+    const { orderId, fillId } = request.params;
+    const { chain } = request.query;
+
+    try {
+      const fill = await bridgeService.getFill({
+        orderId,
+        fillId,
+        chain,
+      });
+
+      return {
+        success: true,
+        data: fill,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      fastify.log.error(error);
+      return reply.status(500).send({ error: message });
+    }
+  });
+
+  // Get all fills for an order
+  fastify.get<{
+    Params: { orderId: string };
+    Querystring: { chain?: string };
+  }>('/bridge/order/:orderId/fills', async (request, reply) => {
+    const { orderId } = request.params;
+    const { chain } = request.query;
+
+    try {
+      const fills = await bridgeService.getOrderFills({
+        orderId,
+        chain,
+      });
+
+      return {
+        success: true,
+        data: fills,
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
