@@ -3,12 +3,12 @@
  *
  * Given a directed weighted graph and a threshold x, the algorithm repeatedly:
  *   1. Finds any directed cycle using DFS.
- *   2. Computes  ratio = (max_w − min_w) / max_w  for that cycle.
+ *   2. Computes  ratio = min_w / max_w  for that cycle.
  *   3. If ratio > x:
  *        a. Records a snapshot of the cycle (original weights).
  *        b. Removes the edge with weight min_w from the graph.
  *        c. Subtracts min_w from every other edge in the cycle.
- *   4. Stops when no cycle is found or the found cycle's ratio ≤ x.
+ *   4. Stops when no cycle is found or the found cycle's ratio ≤ x (not > x).
  */
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ function findCycle(graph: Edge[], numVertices: number): Edge[] | null {
  * Runs the cycle-reduction algorithm on a mutable edge list.
  *
  * NOTE on termination:  The algorithm stops as soon as the first cycle it
- * finds does not satisfy ratio > x (or no cycle exists at all).  Because DFS
+ * finds does not satisfy ratio > x, i.e. ratio ≤ x (or no cycle exists at all).  Because DFS
  * returns "any" cycle, a non-qualifying cycle found before a qualifying one
  * would cause early termination — an acceptable trade-off given n < 10 and the
  * emphasis on simplicity over completeness.
@@ -139,7 +139,7 @@ export function runAlgorithm(
     const weights = cycle.map((e) => e.w);
     const maxW = Math.max(...weights);
     const minW = Math.min(...weights);
-    const ratio = (maxW - minW) / maxW;
+    const ratio = minW / maxW;
 
     // Step 3 — check the threshold.
     if (ratio <= x) break; // cycle doesn't qualify → done
