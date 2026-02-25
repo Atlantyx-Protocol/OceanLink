@@ -127,22 +127,22 @@ describe("runAlgorithm", () => {
 
   // -------------------------------------------------------------------------
   it("self-loop — ratio is always 1, never captured", () => {
-    // Self-loop 0→0(7): max=min=7, ratio=min/max=1  ≤  x=1  → never processed
+    // Self-loop 0→0(7): max=min=7, ratio=min/max=1  <  x=2  → never processed
     const edges = buildGraph([[0, 0, 7]]);
-    const result = runAlgorithm(1, edges, 1);
+    const result = runAlgorithm(1, edges, 2);
     assert.equal(result.length, 0, "self-loop ratio=1 should never qualify");
     assert.equal(edges.length, 1, "edge untouched");
   });
 
   // -------------------------------------------------------------------------
   it("all edges in cycle have equal weight — ratio 1, never captured", () => {
-    // 0→1(5) → 1→2(5) → 2→0(5): ratio = min/max = 1  ≤  x=1  → not processed
+    // 0→1(5) → 1→2(5) → 2→0(5): ratio = min/max = 1  <  x=2  → not processed
     const edges = buildGraph([
       [0, 1, 5],
       [1, 2, 5],
       [2, 0, 5],
     ]);
-    const result = runAlgorithm(3, edges, 1);
+    const result = runAlgorithm(3, edges, 2);
     assert.equal(result.length, 0);
     assert.equal(edges.length, 3);
   });
