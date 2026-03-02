@@ -1,0 +1,265 @@
+import { randomUUID } from 'node:crypto';
+import { runAlgorithm } from '../algorithm/algorithm.js';
+import type { Edge, EdgeSnapshot } from '../algorithm/algorithm.js';
+import { orderStore } from '../store/orderStore.js';
+import type { OrderStore } from '../store/orderStore.js';
+import type {
+  IntentOrder,
+  MatchResult,
+  MatchedOrderEntry,
+  CreateIntentInput,
+  TickStats,
+} from '../types.js';
+
+// ---------------------------------------------------------------------------
+// runAlgorithm adapter — design notes
+//
+// runAlgorithm(n, edges, x): EdgeSnapshot[][]
+//   n      — number of distinct vertices (chain indices, 0-based)
+//   edges  — directed weighted edge list, MUTATED IN PLACE by the algorithm
+//   x      — threshold ratio: a cycle is matched only when min_w/max_w > x
+//
+// Mapping  IntentOrder  →  Edge:
+//   edge.id  = index of the order in the snapshot array passed to the algorithm
+//   edge.u   = chainToVertex[order.srcChain]
+//   edge.v   = chainToVertex[order.desChain]
+//   edge.w   = Number(order.amount)
+//
+//   ⚠ Precision note: amount is stored as a decimal string; converting to
+//   Number() is safe for USDC values up to ~9 × 10^15 micro-units
+//   (≈ 9 quadrillion micro-USDC, or 9 billion USDC).  For amounts beyond
+//   that, replace with a BigInt-aware graph implementation.
+//
+// Interpreting the mutation after the algorithm runs:
+//   • edge.id no longer in the surviving edge list  →  order FULLY MATCHED
+//     (its edge was the minimum-weight edge in a cycle and was splice-d out)
+//   • edge.id still present but edge.w < originalWeight  →  order PARTIAL
+//     (minW was subtracted from it; the remainder stays in the queue)
+//
+// If the runAlgorithm signature ever changes, update the adapter below and
+// mark the old adapter with a TODO: ADAPTER UPDATE REQUIRED comment.
+// ---------------------------------------------------------------------------
+
+/** Type alias so tests can inject a mock without importing the concrete fn. */
+export type AlgorithmFn = (n: number, edges: Edge[], x: number) => EdgeSnapshot[][];
+
+export class MatchingService {
+  constructor(
+    private readonly store: OrderStore,
+    /**
+     * The matching algorithm to use.  Defaults to the built-in runAlgorithm.
+     * Pass a mock here in tests to verify the adapter contract.
+     */
+    private readonly algorithmFn: AlgorithmFn = runAlgorithm,
+    /**
+     * Ratio threshold for the algorithm.  A cycle is only matched when
+     *   min_amount / max_amount  >  threshold
+     * ENV: MATCH_THRESHOLD (default 0.8)
+     */
+    private readonly threshold: number = parseFloat(
+      process.env.MATCH_THRESHOLD ?? '0.8',
+    ),
+  ) {}
+
+  // -------------------------------------------------------------------------
+  // Public API
+  // -------------------------------------------------------------------------
+
+  /**
+   * Validates input, creates an IntentOrder, stores it, and returns it.
+   * Returns { error } on validation failure.
+   */
+  createOrder(
+    input: CreateIntentInput,
+  ): { order: IntentOrder } | { error: string } {
+    const srcChain = Number(input.srcChain);
+    const desChain = Number(input.desChain);
+    const amount = String(input.amount);
+    const deadline = Number(input.deadline);
+
+    if (!Number.isInteger(srcChain) || srcChain <= 0) {
+      return { error: 'srcChain must be a positive integer' };
+    }
+    if (!Number.isInteger(desChain) || desChain <= 0) {
+      return { error: 'desChain must be a positive integer' };
+    }
+    const parsedAmount = Number(amount);
+    if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+      return { error: 'amount must be a positive number' };
+    }
+    const now = Math.floor(Date.now() / 1000);
+    if (!Number.isInteger(deadline) || deadline < now) {
+      return { error: 'deadline must be a Unix epoch timestamp (seconds) >= now' };
+    }
+
+    const order: IntentOrder = {
+      orderId: randomUUID(),
+      srcChain,
+      desChain,
+      amount,
+      deadline,
+      createdAt: now,
+      status: 'QUEUED',
+    };
+
+    this.store.add(order);
+    return { order };
+  }
+
+  /**
+   * Executes one full matching tick:
+   *   1. Expire stale orders (deadline < now).
+   *   2. Collect active orders (QUEUED + PARTIAL).
+   *   3. Build graph input for runAlgorithm.
+   *   4. Run the algorithm; interpret mutations to determine MATCHED / PARTIAL.
+   *   5. Persist MatchResult records; update order statuses.
+   *   6. Return TickStats for the caller (scheduler) to log.
+   */
+  runTick(): TickStats {
+    const expired = this.store.expireStale();
+    const activeOrders = this.store.getActiveOrders();
+    const queuedBefore = activeOrders.length;
+
+    const matchResults = this.runMatchingPass(activeOrders);
+
+    const queuedAfter = this.store.getActiveOrders().length;
+    const matchedOrders = matchResults.flatMap((r) =>
+      r.orders.filter((o) => o.status === 'MATCHED'),
+    ).length;
+    const partialOrders = matchResults.flatMap((r) =>
+      r.orders.filter((o) => o.status === 'PARTIAL'),
+    ).length;
+
+    return {
+      queuedBefore,
+      expired,
+      matchResults,
+      matchedOrders,
+      partialOrders,
+      queuedAfter,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Internal — matching pass (also used in tests)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Core matching logic.  Accepts an explicit order list so tests can
+   * control exactly which orders are fed into the algorithm.
+   *
+   * @returns array of MatchResult produced (one per qualifying cycle group).
+   */
+  runMatchingPass(activeOrders: IntentOrder[]): MatchResult[] {
+    if (activeOrders.length === 0) return [];
+
+    // -- Step 1: map chainId → vertex index (0-based) ---------------------
+    const chainToVertex = new Map<number, number>();
+    for (const order of activeOrders) {
+      if (!chainToVertex.has(order.srcChain)) {
+        chainToVertex.set(order.srcChain, chainToVertex.size);
+      }
+      if (!chainToVertex.has(order.desChain)) {
+        chainToVertex.set(order.desChain, chainToVertex.size);
+      }
+    }
+    const n = chainToVertex.size;
+
+    // -- Step 2: build Edge[] from orders ---------------------------------
+    // IMPORTANT: edge.id === index into activeOrders so we can map back after
+    const edges: Edge[] = activeOrders.map((order, idx) => ({
+      id: idx,
+      u: chainToVertex.get(order.srcChain)!,
+      v: chainToVertex.get(order.desChain)!,
+      w: Number(order.amount), // see precision note at top of file
+    }));
+
+    // Snapshot original state before the algorithm mutates edges
+    const originalWeights = new Map<number, number>(edges.map((e) => [e.id, e.w]));
+    const originalIds = new Set(edges.map((e) => e.id));
+
+    // -- Step 3: run algorithm (MUTATES edges) ----------------------------
+    // TODO: ADAPTER UPDATE REQUIRED if runAlgorithm signature changes
+    const rawCycles = this.algorithmFn(n, edges, this.threshold);
+
+    if (rawCycles.length === 0) return [];
+
+    // -- Step 4: interpret mutations to determine order outcomes ----------
+    const remainingIds = new Set(edges.map((e) => e.id));
+
+    const matchedEntries: MatchedOrderEntry[] = [];
+
+    for (const id of originalIds) {
+      const order = activeOrders[id];
+      const originalW = originalWeights.get(id)!;
+
+      if (!remainingIds.has(id)) {
+        // Edge was splice-d out → order FULLY MATCHED
+        matchedEntries.push({
+          orderId: order.orderId,
+          srcChain: order.srcChain,
+          desChain: order.desChain,
+          matchedAmount: String(originalW),
+          remainingAmount: '0',
+          status: 'MATCHED',
+        });
+        this.store.update(order.orderId, { status: 'MATCHED' });
+        this.store.removeFromPairIndex(order.orderId);
+      } else {
+        // Edge survived — check whether its weight was reduced
+        const survivingEdge = edges.find((e) => e.id === id)!;
+        if (survivingEdge.w < originalW) {
+          const consumed = originalW - survivingEdge.w;
+
+          if (survivingEdge.w === 0) {
+            // Weight reduced to exactly 0 → fully consumed, same as MATCHED.
+            // This happens when two equal-weight edges are in a cycle: the
+            // algorithm removes the first (by findIndex) and zeroes the second.
+            matchedEntries.push({
+              orderId: order.orderId,
+              srcChain: order.srcChain,
+              desChain: order.desChain,
+              matchedAmount: String(consumed),
+              remainingAmount: '0',
+              status: 'MATCHED',
+            });
+            this.store.update(order.orderId, { status: 'MATCHED' });
+            this.store.removeFromPairIndex(order.orderId);
+          } else {
+            // Weight reduced but still > 0 → genuinely partial
+            matchedEntries.push({
+              orderId: order.orderId,
+              srcChain: order.srcChain,
+              desChain: order.desChain,
+              matchedAmount: String(consumed),
+              remainingAmount: String(survivingEdge.w),
+              status: 'PARTIAL',
+            });
+            // Update stored amount to remaining so the next tick uses the
+            // correct (reduced) weight for this order.
+            this.store.update(order.orderId, {
+              status: 'PARTIAL',
+              amount: String(survivingEdge.w),
+            });
+          }
+        }
+      }
+    }
+
+    if (matchedEntries.length === 0) return [];
+
+    // -- Step 5: build and persist the MatchResult -----------------------
+    const result: MatchResult = {
+      matchId: randomUUID(),
+      matchedAt: Math.floor(Date.now() / 1000),
+      orders: matchedEntries,
+      rawCycles,
+    };
+
+    this.store.addMatchResult(result);
+    return [result];
+  }
+}
+
+/** Application-level singleton. */
+export const matchingService = new MatchingService(orderStore);

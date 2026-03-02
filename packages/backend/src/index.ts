@@ -3,6 +3,8 @@ import cors from '@fastify/cors';
 import dotenv from 'dotenv';
 import approvalRoutes from './routes/usdc.js';
 import bridgeRoutes from './routes/bridge.js';
+import intentRoutes from './engine/matching/routes/intentRoutes.js';
+import { matchScheduler } from './engine/matching/scheduler/matchScheduler.js';
 
 dotenv.config({ path: '../../.env' });
 
@@ -33,6 +35,18 @@ async function start() {
     // Register routes
     await fastify.register(approvalRoutes, { prefix: '/api' });
     await fastify.register(bridgeRoutes, { prefix: '/api' });
+    await fastify.register(intentRoutes, { prefix: '/api' });
+
+    // Start matching engine scheduler
+    matchScheduler.start();
+
+    // Graceful shutdown
+    const shutdown = () => {
+      matchScheduler.stop();
+      void fastify.close();
+    };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
 
     // Start server
     await fastify.listen({ port: PORT, host: HOST });

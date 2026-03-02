@@ -1,0 +1,64 @@
+// ---------------------------------------------------------------------------
+// Matching Engine — shared types
+// ---------------------------------------------------------------------------
+
+/** Lifecycle states of an intent order. */
+export type OrderStatus = 'QUEUED' | 'PARTIAL' | 'MATCHED' | 'EXPIRED';
+
+/**
+ * An intent order submitted by a user via POST /intent.
+ * Stored in the in-memory queue until matched or expired.
+ */
+export interface IntentOrder {
+  orderId: string;
+  srcChain: number;     // source chainId (> 0)
+  desChain: number;     // destination chainId (> 0)
+  amount: string;       // USDC amount as a decimal string (avoids float representation issues)
+  deadline: number;     // Unix epoch in seconds — order is invalid after this
+  createdAt: number;    // Unix epoch in seconds — set at creation
+  status: OrderStatus;
+}
+
+/**
+ * One order's contribution to a MatchResult.
+ * status is MATCHED when the full amount was consumed, PARTIAL when only
+ * part of the amount was consumed and the rest remains in the queue.
+ */
+export interface MatchedOrderEntry {
+  orderId: string;
+  srcChain: number;
+  desChain: number;
+  matchedAmount: string;    // amount consumed in this match event
+  remainingAmount: string;  // '0' if MATCHED, positive decimal string if PARTIAL
+  status: 'MATCHED' | 'PARTIAL';
+}
+
+/**
+ * One matching event produced by the scheduler tick.
+ * Contains all orders affected in this event and the raw cycle snapshots
+ * returned by the underlying graph algorithm.
+ */
+export interface MatchResult {
+  matchId: string;
+  matchedAt: number;   // Unix epoch in seconds
+  orders: MatchedOrderEntry[];
+  rawCycles: Array<Array<{ u: number; v: number; w: number }>>;
+}
+
+/** Validated body of POST /intent. */
+export interface CreateIntentInput {
+  srcChain: number | string;
+  desChain: number | string;
+  amount: string | number;
+  deadline: number | string;
+}
+
+/** Summary returned by a single scheduler tick (used for logging). */
+export interface TickStats {
+  queuedBefore: number;
+  expired: number;
+  matchResults: MatchResult[];
+  matchedOrders: number;
+  partialOrders: number;
+  queuedAfter: number;
+}
