@@ -54,10 +54,10 @@ export class MatchingService {
     /**
      * Ratio threshold for the algorithm.  A cycle is only matched when
      *   min_amount / max_amount  >  threshold
-     * ENV: MATCH_THRESHOLD (default 0.8)
+     * ENV: MATCH_THRESHOLD (default 0)
      */
     private readonly threshold: number = parseFloat(
-      process.env.MATCH_THRESHOLD ?? '0.8',
+      process.env.MATCH_THRESHOLD ?? '0',
     ),
   ) {}
 
@@ -255,7 +255,6 @@ export class MatchingService {
       orders: matchedEntries,
       rawCycles,
     };
-
     this.store.addMatchResult(result);
     return [result];
   }
