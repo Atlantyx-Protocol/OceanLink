@@ -34,14 +34,34 @@ export interface MatchedOrderEntry {
 }
 
 /**
+ * One order's participation in a single matched cycle.
+ */
+export interface CycleMatchEntry {
+  orderId: string;
+  srcChain: number;
+  desChain: number;
+  matchedAmount: string;  // amount exchanged in this cycle (= minW of the cycle)
+}
+
+/**
+ * A single matched cycle: a set of orders that form a directed cycle in the
+ * graph, exchanging `matchedAmount` units between them.
+ */
+export interface CycleMatch {
+  matchedAmount: string;  // volume exchanged in this cycle (= minW)
+  orders: CycleMatchEntry[];
+}
+
+/**
  * One matching event produced by the scheduler tick.
- * Contains all orders affected in this event and the raw cycle snapshots
- * returned by the underlying graph algorithm.
+ * Contains all orders affected in this event, a per-cycle breakdown, and the
+ * raw cycle snapshots returned by the underlying graph algorithm.
  */
 export interface MatchResult {
   matchId: string;
   matchedAt: number;   // Unix epoch in seconds
   orders: MatchedOrderEntry[];
+  cycles: CycleMatch[];
   rawCycles: Array<Array<{ u: number; v: number; w: number }>>;
 }
 

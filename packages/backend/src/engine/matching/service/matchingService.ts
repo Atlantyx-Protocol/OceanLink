@@ -7,6 +7,8 @@ import type {
   IntentOrder,
   MatchResult,
   MatchedOrderEntry,
+  CycleMatch,
+  CycleMatchEntry,
   CreateIntentInput,
   TickStats,
 } from '../types.js';
@@ -248,15 +250,96 @@ export class MatchingService {
 
     if (matchedEntries.length === 0) return [];
 
-    // -- Step 5: build and persist the MatchResult -----------------------
+    // -- Step 5: build per-cycle breakdown --------------------------------
+    const cycles = this.buildCycleMatches(activeOrders, chainToVertex, rawCycles);
+
+    // -- Step 6: build and persist the MatchResult -----------------------
     const result: MatchResult = {
       matchId: randomUUID(),
       matchedAt: Math.floor(Date.now() / 1000),
       orders: matchedEntries,
+      cycles,
       rawCycles,
     };
     this.store.addMatchResult(result);
     return [result];
+  }
+
+  // -------------------------------------------------------------------------
+  // Internal — per-cycle order mapping
+  // -------------------------------------------------------------------------
+
+  /**
+   * Replays the algorithm's weight-mutation steps to map each EdgeSnapshot
+   * back to a concrete IntentOrder, producing one CycleMatch per raw cycle.
+   *
+   * The algorithm mutates the edge list in place (splice + subtract), so we
+   * maintain a parallel `simEdges` map that mirrors those mutations as we
+   * iterate through each captured cycle.
+   */
+  private buildCycleMatches(
+    activeOrders: IntentOrder[],
+    chainToVertex: Map<number, number>,
+    rawCycles: Array<Array<{ u: number; v: number; w: number }>>,
+  ): CycleMatch[] {
+    // Working copy of edge weights keyed by order index (= edge.id).
+    const simEdges = new Map<number, { u: number; v: number; w: number }>(
+      activeOrders.map((order, idx) => [
+        idx,
+        {
+          u: chainToVertex.get(order.srcChain)!,
+          v: chainToVertex.get(order.desChain)!,
+          w: Number(order.amount),
+        },
+      ]),
+    );
+
+    return rawCycles.map((snapshot) => {
+      const minW = Math.min(...snapshot.map((s) => s.w));
+      const minSnapIdx = snapshot.findIndex((s) => s.w === minW);
+
+      // Map each snapshot entry {u, v, w} to the matching edge id in simEdges.
+      // w is the weight BEFORE the cycle's mutation, which is exactly what
+      // simEdges holds at this point (we apply mutations after, below).
+      const usedIds = new Set<number>();
+      const matchedIds: (number | undefined)[] = snapshot.map(({ u, v, w }) => {
+        for (const [id, edge] of simEdges) {
+          if (!usedIds.has(id) && edge.u === u && edge.v === v && edge.w === w) {
+            usedIds.add(id);
+            return id;
+          }
+        }
+        return undefined;
+      });
+
+      // Build the per-cycle order entries.
+      const orders: CycleMatchEntry[] = matchedIds
+        .map((id) => {
+          if (id === undefined) return null;
+          const order = activeOrders[id]!;
+          return {
+            orderId: order.orderId,
+            srcChain: order.srcChain,
+            desChain: order.desChain,
+            matchedAmount: String(minW),
+          };
+        })
+        .filter((e): e is CycleMatchEntry => e !== null);
+
+      // Replay the algorithm's mutation so the next cycle sees updated weights.
+      // The min-weight edge is removed; every other edge in the cycle is reduced.
+      for (let i = 0; i < matchedIds.length; i++) {
+        const id = matchedIds[i];
+        if (id === undefined) continue;
+        if (i === minSnapIdx) {
+          simEdges.delete(id);
+        } else {
+          simEdges.get(id)!.w -= minW;
+        }
+      }
+
+      return { matchedAmount: String(minW), orders };
+    });
   }
 }
 

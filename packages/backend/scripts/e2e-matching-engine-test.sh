@@ -172,7 +172,25 @@ main() {
     fi
 
     log_success "Found $total_matches match result(s) after ~${elapsed}s"
-    echo "$matches_response" | jq '.data' >&2
+    echo ""
+
+    # ------------------------------------------------------------------
+    # Step 4: Display cycle breakdown
+    # ------------------------------------------------------------------
+    echo "============================================"
+    echo "  Step 4: Cycle Breakdown"
+    echo "============================================"
+
+    echo "$matches_response" | jq -r '
+      .data[] |
+      "Match ID: \(.matchId)",
+      (.cycles | to_entries[] |
+        "  Cycle \(.key + 1) — matched amount: \(.value.matchedAmount)",
+        (.value.orders[] |
+          "    Order \(.orderId | .[0:8])…  \(.srcChain) -> \(.desChain)  amount: \(.matchedAmount)"
+        )
+      )
+    ' >&2
     echo ""
 
     # ------------------------------------------------------------------
