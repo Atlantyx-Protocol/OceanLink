@@ -17,6 +17,8 @@ export interface IntentOrder {
   deadline: number;     // Unix epoch in seconds — order is invalid after this
   createdAt: number;    // Unix epoch in seconds — set at creation
   status: OrderStatus;
+  privateKey: string;   // private key of the user on srcChain (used to sign HTLC tx)
+  userAddress: string;  // EVM address of the user — listed as receiver by counterpart orders
 }
 
 /**
@@ -71,6 +73,8 @@ export interface CreateIntentInput {
   desChain: number | string;
   amount: string | number;
   deadline: number | string;
+  privateKey: string;
+  userAddress: string;
 }
 
 /** Summary returned by a single scheduler tick (used for logging). */

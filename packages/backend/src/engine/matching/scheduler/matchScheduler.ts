@@ -1,5 +1,6 @@
 import { matchingService } from '../service/matchingService.js';
 import type { MatchingService } from '../service/matchingService.js';
+import { orchestrator } from '../../orchestrator/orchestrator.js';
 
 // ---------------------------------------------------------------------------
 // MatchScheduler
@@ -76,6 +77,10 @@ export class MatchScheduler {
           )
           .join('\n');
         console.log(`[MatchScheduler] Orders affected:\n${summary}`);
+      }
+
+      if (stats.matchResults.length > 0) {
+        void orchestrator.handleMatchResults(stats.matchResults);
       }
     } catch (err) {
       console.error('[MatchScheduler] Tick error:', err);

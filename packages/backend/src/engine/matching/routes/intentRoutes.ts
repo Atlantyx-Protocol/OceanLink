@@ -21,12 +21,14 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
       desChain: unknown;
       amount: unknown;
       deadline: unknown;
+      privateKey: unknown;
+      userAddress: unknown;
     };
   }>('/intent', async (request, reply) => {
     const body = request.body as Record<string, unknown>;
 
     // Coarse presence check before passing to service validation
-    const required = ['srcChain', 'desChain', 'amount', 'deadline'] as const;
+    const required = ['srcChain', 'desChain', 'amount', 'deadline', 'privateKey', 'userAddress'] as const;
     for (const field of required) {
       if (body[field] === undefined || body[field] === null) {
         return reply.code(400).send({ error: `Missing required field: ${field}` });
@@ -38,6 +40,8 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
       desChain: body.desChain as number | string,
       amount: body.amount as string | number,
       deadline: body.deadline as number | string,
+      privateKey: body.privateKey as string,
+      userAddress: body.userAddress as string,
     });
 
     if ('error' in result) {

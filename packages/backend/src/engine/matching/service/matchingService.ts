@@ -94,6 +94,13 @@ export class MatchingService {
       return { error: 'deadline must be a Unix epoch timestamp (seconds) >= now' };
     }
 
+    if (!input.privateKey) {
+      return { error: 'privateKey is required' };
+    }
+    if (!input.userAddress) {
+      return { error: 'userAddress is required' };
+    }
+
     const order: IntentOrder = {
       orderId: randomUUID(),
       srcChain,
@@ -102,6 +109,8 @@ export class MatchingService {
       deadline,
       createdAt: now,
       status: 'QUEUED',
+      privateKey: input.privateKey,
+      userAddress: input.userAddress,
     };
 
     this.store.add(order);
