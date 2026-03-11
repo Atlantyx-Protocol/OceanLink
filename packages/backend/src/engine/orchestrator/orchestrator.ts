@@ -75,7 +75,26 @@ export class Orchestrator {
   private async executeConsolidated(cycles: CycleMatch[], matchId: string): Promise<void> {
     if (cycles.length === 0) return;
 
-    // -- 1. Extract send actions from all cycles ----------------------------
+    const sendActions = this.extractSendActionsFromCycles(cycles);
+    const groupEntries = this.groupActionsByChainKey(sendActions);
+
+    this.logCycleSummary(cycles, matchId, groupEntries);
+
+    const adminKey = process.env.PRIVATE_KEY_ADMIN;
+    if (!adminKey) {
+      throw new Error('[Orchestrator] PRIVATE_KEY_ADMIN is not configured in environment');
+    }
+
+    const [presidingKey, presidingActions] = groupEntries[0];
+    const presidingResult = await this.executePresidingOrder(presidingActions, adminKey);
+    const cycleHashlockMap = this.buildCycleHashlockMap(presidingActions, presidingResult);
+
+    await this.executeNonPresidingOrders(groupEntries, presidingKey, cycleHashlockMap, adminKey);
+
+    console.log(`[Orchestrator] All ${groupEntries.length} consolidated order(s) on-chain`);
+  }
+
+  private extractSendActionsFromCycles(cycles: CycleMatch[]): SendAction[] {
     const sendActions: SendAction[] = [];
 
     for (let cycleIdx = 0; cycleIdx < cycles.length; cycleIdx++) {
@@ -109,18 +128,24 @@ export class Orchestrator {
       }
     }
 
-    // -- 2. Group by chainKey ------------------------------------------------
-    const groupKey = (a: SendAction) => a.chainKey;
+    return sendActions;
+  }
+
+  private groupActionsByChainKey(sendActions: SendAction[]): [string, SendAction[]][] {
     const groups = new Map<string, SendAction[]>();
     for (const action of sendActions) {
-      const key = groupKey(action);
+      const key = action.chainKey;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(action);
     }
+    return [...groups.entries()];
+  }
 
-    const groupEntries = [...groups.entries()];
-
-    // -- 3. Log matched cycle summary ---------------------------------------
+  private logCycleSummary(
+    cycles: CycleMatch[],
+    matchId: string,
+    groupEntries: [string, SendAction[]][]
+  ): void {
     console.log(
       `[Orchestrator] matchId=${matchId} — ${cycles.length} cycle(s), consolidated into ${groupEntries.length} bridge order(s)`
     );
@@ -134,21 +159,18 @@ export class Orchestrator {
         console.log(`[Orchestrator]   cycle ${i + 1}: ${src} <-> ${des} (${cycle.matchedAmount})`);
       }
     }
+  }
 
-    // -- 4. Execute presiding order (first group) ---------------------------
-    const [presidingKey, presidingActions] = groupEntries[0];
-
+  private async executePresidingOrder(
+    presidingActions: SendAction[],
+    adminKey: string
+  ): Promise<{ fills: { hashlock: string }[]; orderId: string; htlcTxHash: string }> {
     console.log(
       `[Orchestrator] Presiding order: ${presidingActions.length} fill(s) on ${presidingActions[0].chainKey}, ` +
         `receivers=[${presidingActions.map((a) => a.receiverAddress).join(', ')}]`
     );
 
-    const adminKey = process.env.PRIVATE_KEY_ADMIN;
-    if (!adminKey) {
-      throw new Error('[Orchestrator] PRIVATE_KEY_ADMIN is not configured in environment');
-    }
-
-    const presidingResult = await bridgeService.createOrder({
+    const result = await bridgeService.createOrder({
       privateKey: adminKey,
       receivers: presidingActions.map((a) => a.receiverAddress),
       amounts: presidingActions.map((a) => a.amount),
@@ -158,20 +180,32 @@ export class Orchestrator {
     });
 
     console.log(
-      `[Orchestrator] Presiding HTLC created — orderId=${presidingResult.orderId}, txHash=${presidingResult.htlcTxHash}`
+      `[Orchestrator] Presiding HTLC created — orderId=${result.orderId}, txHash=${result.htlcTxHash}`
     );
 
-    // -- 5. Build cycleIdx → hashlock map -----------------------------------
+    return result;
+  }
+
+  private buildCycleHashlockMap(
+    presidingActions: SendAction[],
+    presidingResult: { fills: { hashlock: string }[] }
+  ): Map<number, string> {
     const cycleHashlockMap = new Map<number, string>();
     for (let i = 0; i < presidingActions.length; i++) {
       cycleHashlockMap.set(presidingActions[i].cycleIdx, presidingResult.fills[i].hashlock);
     }
+    return cycleHashlockMap;
+  }
 
-    // -- 6. Execute non-presiding orders ------------------------------------
+  private async executeNonPresidingOrders(
+    groupEntries: [string, SendAction[]][],
+    presidingKey: string,
+    cycleHashlockMap: Map<number, string>,
+    adminKey: string
+  ): Promise<void> {
     for (const [key, actions] of groupEntries) {
       if (key === presidingKey) continue;
 
-      // Sort by cycleIdx for deterministic hashlock alignment
       actions.sort((a, b) => a.cycleIdx - b.cycleIdx);
 
       const hashlocks = actions.map((a) => {
@@ -199,8 +233,6 @@ export class Orchestrator {
         `[Orchestrator] HTLC created — orderId=${result.orderId}, txHash=${result.htlcTxHash}`
       );
     }
-
-    console.log(`[Orchestrator] All ${groupEntries.length} consolidated order(s) on-chain`);
   }
 }
 
