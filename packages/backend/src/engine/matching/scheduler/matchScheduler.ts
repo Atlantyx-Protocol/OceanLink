@@ -20,10 +20,7 @@ export class MatchScheduler {
 
   constructor(
     private readonly service: MatchingService,
-    private readonly intervalMs: number = parseInt(
-      process.env.MATCH_INTERVAL_MS ?? '5000',
-      10,
-    ),
+    private readonly intervalMs: number = parseInt(process.env.MATCH_INTERVAL_MS ?? '5000', 10)
   ) {}
 
   /** Starts the scheduler.  Idempotent — safe to call multiple times. */
@@ -33,7 +30,7 @@ export class MatchScheduler {
       void this.tick();
     }, this.intervalMs);
     console.log(
-      `[MatchScheduler] Started — interval=${this.intervalMs}ms, threshold=${process.env.MATCH_THRESHOLD ?? '0.8'}`,
+      `[MatchScheduler] Started — interval=${this.intervalMs}ms, threshold=${process.env.MATCH_THRESHOLD ?? '0.8'}`
     );
   }
 
@@ -66,14 +63,14 @@ export class MatchScheduler {
           `expired: ${stats.expired}, ` +
           `matched: ${stats.matchedOrders}, ` +
           `partial: ${stats.partialOrders}, ` +
-          `cycles: ${stats.matchResults.reduce((s, r) => s + r.rawCycles.length, 0)}`,
+          `cycles: ${stats.matchResults.reduce((s, r) => s + r.rawCycles.length, 0)}`
       );
 
       if (matchedOrders.length > 0) {
         const summary = matchedOrders
           .map(
             (o) =>
-              `  ${o.orderId.slice(0, 8)}… [${o.status}] matched=${o.matchedAmount} remaining=${o.remainingAmount}`,
+              `  ${o.orderId.slice(0, 8)}… [${o.status}] matched=${o.matchedAmount} remaining=${o.remainingAmount}`
           )
           .join('\n');
         console.log(`[MatchScheduler] Orders affected:\n${summary}`);

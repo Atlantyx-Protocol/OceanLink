@@ -52,15 +52,14 @@ describe('MatchingService.createOrder', () => {
       deadline: futureDeadline(),
     });
 
-    assert.ok(!('error' in result), `Expected order, got error: ${(result as { error: string }).error}`);
+    assert.ok(
+      !('error' in result),
+      `Expected order, got error: ${(result as { error: string }).error}`
+    );
     const { order } = result as { order: ReturnType<OrderStore['get']> & object };
 
     assert.ok(order, 'order should be defined');
-    assert.match(
-      order!.orderId,
-      /^[0-9a-f-]{36}$/,
-      'orderId should be a UUID',
-    );
+    assert.match(order!.orderId, /^[0-9a-f-]{36}$/, 'orderId should be a UUID');
     assert.equal(order!.status, 'QUEUED');
     assert.equal(order!.srcChain, 1);
     assert.equal(order!.desChain, 2);
@@ -91,7 +90,7 @@ describe('MatchingService.createOrder', () => {
     assert.match(
       (result as { error: string }).error,
       /deadline/i,
-      'Error message should mention "deadline"',
+      'Error message should mention "deadline"'
     );
   });
 
@@ -158,17 +157,13 @@ describe('OrderStore.expireStale', () => {
     const order = store.get('test-expired-order');
     assert.equal(order?.status, 'EXPIRED', 'Order status should be EXPIRED');
 
-    assert.equal(
-      store.getActiveOrders().length,
-      0,
-      'No active orders after expiry',
-    );
+    assert.equal(store.getActiveOrders().length, 0, 'No active orders after expiry');
 
     // Pair index should be cleared
     assert.deepEqual(
       store.getByPair(10, 20),
       [],
-      'Secondary pair index should be empty after expiry',
+      'Secondary pair index should be empty after expiry'
     );
   });
 
@@ -306,11 +301,18 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
     // Verify store state
     assert.equal(store.get('order-y')?.status, 'MATCHED');
     assert.equal(store.get('order-x')?.status, 'PARTIAL');
-    assert.equal(store.get('order-x')?.amount, '10', 'Stored amount should be updated to remainder');
+    assert.equal(
+      store.get('order-x')?.amount,
+      '10',
+      'Stored amount should be updated to remainder'
+    );
 
     // MATCHED order should be removed from pair index
     const pair21 = store.getByPair(2, 1);
-    assert.ok(!pair21.some((o) => o.orderId === 'order-y'), 'MATCHED order should not be in pair index');
+    assert.ok(
+      !pair21.some((o) => o.orderId === 'order-y'),
+      'MATCHED order should not be in pair index'
+    );
   });
 
   it('equal-amount orders are both MATCHED (ratio = 1.0 > threshold 0)', () => {

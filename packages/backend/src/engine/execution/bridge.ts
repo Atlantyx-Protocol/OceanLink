@@ -82,7 +82,7 @@ class BridgeService {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey)!;
     const signer = this.getSigner(chainKey, params.privateKey);
-    const senderAddress = params.onBehalfOf || await signer.getAddress();
+    const senderAddress = params.onBehalfOf || (await signer.getAddress());
 
     // Validate inputs
     if (params.receivers.length !== params.amounts.length) {
@@ -104,7 +104,7 @@ class BridgeService {
     if (currentAllowance < totalAmount) {
       throw new Error(
         `[${chainKey}] Insufficient USDC allowance: have ${currentAllowance}, need ${totalAmount}. ` +
-        `Please approve USDC via /usdc/approve/${chainKey} first.`
+          `Please approve USDC via /usdc/approve/${chainKey} first.`
       );
     }
     console.log(`[${chainKey}] Allowance check passed: ${currentAllowance}`);

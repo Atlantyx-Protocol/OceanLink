@@ -28,7 +28,14 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
     const body = request.body as Record<string, unknown>;
 
     // Coarse presence check before passing to service validation
-    const required = ['srcChain', 'desChain', 'amount', 'deadline', 'privateKey', 'userAddress'] as const;
+    const required = [
+      'srcChain',
+      'desChain',
+      'amount',
+      'deadline',
+      'privateKey',
+      'userAddress',
+    ] as const;
     for (const field of required) {
       if (body[field] === undefined || body[field] === null) {
         return reply.code(400).send({ error: `Missing required field: ${field}` });
@@ -69,10 +76,7 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
     Querystring: { page?: string; pageSize?: string };
   }>('/matches', async (request, reply) => {
     const page = Math.max(1, parseInt(request.query.page ?? '1', 10) || 1);
-    const pageSize = Math.min(
-      100,
-      Math.max(1, parseInt(request.query.pageSize ?? '20', 10) || 20),
-    );
+    const pageSize = Math.min(100, Math.max(1, parseInt(request.query.pageSize ?? '20', 10) || 20));
 
     const result = orderStore.getMatchResults(page, pageSize);
     return reply.send(result);

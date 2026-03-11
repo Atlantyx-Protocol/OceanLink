@@ -58,9 +58,7 @@ export class MatchingService {
      *   min_amount / max_amount  >  threshold
      * ENV: MATCH_THRESHOLD (default 0)
      */
-    private readonly threshold: number = parseFloat(
-      process.env.MATCH_THRESHOLD ?? '0',
-    ),
+    private readonly threshold: number = parseFloat(process.env.MATCH_THRESHOLD ?? '0')
   ) {}
 
   // -------------------------------------------------------------------------
@@ -71,9 +69,7 @@ export class MatchingService {
    * Validates input, creates an IntentOrder, stores it, and returns it.
    * Returns { error } on validation failure.
    */
-  createOrder(
-    input: CreateIntentInput,
-  ): { order: IntentOrder } | { error: string } {
+  createOrder(input: CreateIntentInput): { order: IntentOrder } | { error: string } {
     const srcChain = Number(input.srcChain);
     const desChain = Number(input.desChain);
     const amount = String(input.amount);
@@ -135,10 +131,10 @@ export class MatchingService {
 
     const queuedAfter = this.store.getActiveOrders().length;
     const matchedOrders = matchResults.flatMap((r) =>
-      r.orders.filter((o) => o.status === 'MATCHED'),
+      r.orders.filter((o) => o.status === 'MATCHED')
     ).length;
     const partialOrders = matchResults.flatMap((r) =>
-      r.orders.filter((o) => o.status === 'PARTIAL'),
+      r.orders.filter((o) => o.status === 'PARTIAL')
     ).length;
 
     return {
@@ -289,7 +285,7 @@ export class MatchingService {
   private buildCycleMatches(
     activeOrders: IntentOrder[],
     chainToVertex: Map<number, number>,
-    rawCycles: Array<Array<{ u: number; v: number; w: number }>>,
+    rawCycles: Array<Array<{ u: number; v: number; w: number }>>
   ): CycleMatch[] {
     // Working copy of edge weights keyed by order index (= edge.id).
     const simEdges = new Map<number, { u: number; v: number; w: number }>(
@@ -300,7 +296,7 @@ export class MatchingService {
           v: chainToVertex.get(order.desChain)!,
           w: Number(order.amount),
         },
-      ]),
+      ])
     );
 
     return rawCycles.map((snapshot) => {

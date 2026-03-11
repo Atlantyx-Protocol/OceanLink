@@ -20,7 +20,9 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
 
       const privateKey = process.env.PRIVATE_KEY_ADMIN;
       if (!privateKey) {
-        return reply.status(500).send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
+        return reply
+          .status(500)
+          .send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
       }
 
       if (!body.receivers || !Array.isArray(body.receivers) || body.receivers.length === 0) {
@@ -99,7 +101,9 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
 
     const privateKey = process.env.PRIVATE_KEY_ADMIN;
     if (!privateKey) {
-      return reply.status(500).send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
+      return reply
+        .status(500)
+        .send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
     }
 
     if (orderId === undefined || orderId === null) {
@@ -146,7 +150,9 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
 
     const privateKey = process.env.PRIVATE_KEY_ADMIN;
     if (!privateKey) {
-      return reply.status(500).send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
+      return reply
+        .status(500)
+        .send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
     }
 
     if (orderId === undefined || orderId === null) {

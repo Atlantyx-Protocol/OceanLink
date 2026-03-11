@@ -59,9 +59,7 @@ export class OrderStore {
    * the next matching pass.
    */
   getActiveOrders(): IntentOrder[] {
-    return [...this.orders.values()].filter(
-      (o) => o.status === 'QUEUED' || o.status === 'PARTIAL',
-    );
+    return [...this.orders.values()].filter((o) => o.status === 'QUEUED' || o.status === 'PARTIAL');
   }
 
   /** Quick lookup of active orders for a specific chain pair. */
@@ -100,10 +98,7 @@ export class OrderStore {
     const now = Math.floor(Date.now() / 1000);
     let count = 0;
     for (const order of this.orders.values()) {
-      if (
-        (order.status === 'QUEUED' || order.status === 'PARTIAL') &&
-        order.deadline < now
-      ) {
+      if ((order.status === 'QUEUED' || order.status === 'PARTIAL') && order.deadline < now) {
         order.status = 'EXPIRED';
         this.pairIndex.get(this.pairKey(order.srcChain, order.desChain))?.delete(order.orderId);
         count++;
@@ -126,7 +121,7 @@ export class OrderStore {
    */
   getMatchResults(
     page: number,
-    pageSize: number,
+    pageSize: number
   ): { data: MatchResult[]; total: number; page: number; pageSize: number } {
     const total = this.matchResults.length;
     const start = (page - 1) * pageSize;

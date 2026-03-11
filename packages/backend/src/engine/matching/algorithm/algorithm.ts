@@ -123,11 +123,7 @@ function findCycle(graph: Edge[], numVertices: number): Edge[] | null {
  * @returns     Array of captured cycles; each cycle is a list of EdgeSnapshots
  *              recording (u, v, w) of every edge BEFORE it was modified.
  */
-export function runAlgorithm(
-  n: number,
-  edges: Edge[],
-  x: number,
-): EdgeSnapshot[][] {
+export function runAlgorithm(n: number, edges: Edge[], x: number): EdgeSnapshot[][] {
   const capturedCycles: EdgeSnapshot[][] = [];
 
   while (true) {
@@ -186,13 +182,11 @@ export function buildGraph(triples: [number, number, number][]): Edge[] {
 /** Pretty-prints all captured cycles to stdout. */
 export function printResults(cycles: EdgeSnapshot[][]): void {
   if (cycles.length === 0) {
-    console.log("No qualifying cycles found.");
+    console.log('No qualifying cycles found.');
     return;
   }
   cycles.forEach((cycle, i) => {
-    const edgeStr = cycle
-      .map((e) => `(${e.u} -> ${e.v}, w=${e.w})`)
-      .join(", ");
+    const edgeStr = cycle.map((e) => `(${e.u} -> ${e.v}, w=${e.w})`).join(', ');
     console.log(`Cycle ${i + 1}: [${edgeStr}]`);
   });
 }

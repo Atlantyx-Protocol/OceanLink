@@ -62,7 +62,7 @@ export class Orchestrator {
       } catch (err) {
         console.error(
           `[Orchestrator] Consolidated execution failed (matchId=${result.matchId}):`,
-          err,
+          err
         );
       }
     }
@@ -72,10 +72,7 @@ export class Orchestrator {
   // Core consolidated execution
   // -------------------------------------------------------------------------
 
-  private async executeConsolidated(
-    cycles: CycleMatch[],
-    matchId: string,
-  ): Promise<void> {
+  private async executeConsolidated(cycles: CycleMatch[], matchId: string): Promise<void> {
     if (cycles.length === 0) return;
 
     // -- 1. Extract send actions from all cycles ----------------------------
@@ -88,8 +85,7 @@ export class Orchestrator {
 
       const resolvedOrders = cycleEntries.map((entry) => {
         const order = this.store.get(entry.orderId);
-        if (!order)
-          throw new Error(`[Orchestrator] Order not found: ${entry.orderId}`);
+        if (!order) throw new Error(`[Orchestrator] Order not found: ${entry.orderId}`);
         return order;
       });
 
@@ -99,9 +95,7 @@ export class Orchestrator {
 
         const chainKey = this.chainIdToKey.get(order.srcChain);
         if (!chainKey) {
-          throw new Error(
-            `[Orchestrator] No chain key for chainId=${order.srcChain}`,
-          );
+          throw new Error(`[Orchestrator] No chain key for chainId=${order.srcChain}`);
         }
 
         sendActions.push({
@@ -128,20 +122,16 @@ export class Orchestrator {
 
     // -- 3. Log matched cycle summary ---------------------------------------
     console.log(
-      `[Orchestrator] matchId=${matchId} — ${cycles.length} cycle(s), consolidated into ${groupEntries.length} bridge order(s)`,
+      `[Orchestrator] matchId=${matchId} — ${cycles.length} cycle(s), consolidated into ${groupEntries.length} bridge order(s)`
     );
 
     for (let i = 0; i < cycles.length; i++) {
       const cycle = cycles[i];
       const entry = cycle.orders[0];
       if (entry) {
-        const src =
-          this.chainIdToKey.get(entry.srcChain) ?? String(entry.srcChain);
-        const des =
-          this.chainIdToKey.get(entry.desChain) ?? String(entry.desChain);
-        console.log(
-          `[Orchestrator]   cycle ${i + 1}: ${src} <-> ${des} (${cycle.matchedAmount})`,
-        );
+        const src = this.chainIdToKey.get(entry.srcChain) ?? String(entry.srcChain);
+        const des = this.chainIdToKey.get(entry.desChain) ?? String(entry.desChain);
+        console.log(`[Orchestrator]   cycle ${i + 1}: ${src} <-> ${des} (${cycle.matchedAmount})`);
       }
     }
 
@@ -150,7 +140,7 @@ export class Orchestrator {
 
     console.log(
       `[Orchestrator] Presiding order: ${presidingActions.length} fill(s) on ${presidingActions[0].chainKey}, ` +
-        `receivers=[${presidingActions.map((a) => a.receiverAddress).join(', ')}]`,
+        `receivers=[${presidingActions.map((a) => a.receiverAddress).join(', ')}]`
     );
 
     const adminKey = process.env.PRIVATE_KEY_ADMIN;
@@ -168,16 +158,13 @@ export class Orchestrator {
     });
 
     console.log(
-      `[Orchestrator] Presiding HTLC created — orderId=${presidingResult.orderId}, txHash=${presidingResult.htlcTxHash}`,
+      `[Orchestrator] Presiding HTLC created — orderId=${presidingResult.orderId}, txHash=${presidingResult.htlcTxHash}`
     );
 
     // -- 5. Build cycleIdx → hashlock map -----------------------------------
     const cycleHashlockMap = new Map<number, string>();
     for (let i = 0; i < presidingActions.length; i++) {
-      cycleHashlockMap.set(
-        presidingActions[i].cycleIdx,
-        presidingResult.fills[i].hashlock,
-      );
+      cycleHashlockMap.set(presidingActions[i].cycleIdx, presidingResult.fills[i].hashlock);
     }
 
     // -- 6. Execute non-presiding orders ------------------------------------
@@ -189,16 +176,13 @@ export class Orchestrator {
 
       const hashlocks = actions.map((a) => {
         const h = cycleHashlockMap.get(a.cycleIdx);
-        if (!h)
-          throw new Error(
-            `[Orchestrator] No hashlock for cycleIdx=${a.cycleIdx}`,
-          );
+        if (!h) throw new Error(`[Orchestrator] No hashlock for cycleIdx=${a.cycleIdx}`);
         return h;
       });
 
       console.log(
         `[Orchestrator] Non-presiding order: ${actions.length} fill(s) on ${actions[0].chainKey}, ` +
-          `receivers=[${actions.map((a) => a.receiverAddress).join(', ')}]`,
+          `receivers=[${actions.map((a) => a.receiverAddress).join(', ')}]`
       );
 
       const result = await bridgeService.createOrder({
@@ -212,13 +196,11 @@ export class Orchestrator {
       });
 
       console.log(
-        `[Orchestrator] HTLC created — orderId=${result.orderId}, txHash=${result.htlcTxHash}`,
+        `[Orchestrator] HTLC created — orderId=${result.orderId}, txHash=${result.htlcTxHash}`
       );
     }
 
-    console.log(
-      `[Orchestrator] All ${groupEntries.length} consolidated order(s) on-chain`,
-    );
+    console.log(`[Orchestrator] All ${groupEntries.length} consolidated order(s) on-chain`);
   }
 }
 

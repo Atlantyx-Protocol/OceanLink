@@ -138,7 +138,9 @@ class ApprovalService {
     return this.approveUSDCForChain(chainConfig, privateKey, amount);
   }
 
-  async getAllAllowances(privateKey: string): Promise<Record<string, { chain: string; allowance: string }>> {
+  async getAllAllowances(
+    privateKey: string
+  ): Promise<Record<string, { chain: string; allowance: string }>> {
     const chains = getAllChains();
     const allowances: Record<string, { chain: string; allowance: string }> = {};
 

@@ -11,14 +11,14 @@ export type OrderStatus = 'QUEUED' | 'PARTIAL' | 'MATCHED' | 'EXPIRED';
  */
 export interface IntentOrder {
   orderId: string;
-  srcChain: number;     // source chainId (> 0)
-  desChain: number;     // destination chainId (> 0)
-  amount: string;       // USDC amount as a decimal string (avoids float representation issues)
-  deadline: number;     // Unix epoch in seconds — order is invalid after this
-  createdAt: number;    // Unix epoch in seconds — set at creation
+  srcChain: number; // source chainId (> 0)
+  desChain: number; // destination chainId (> 0)
+  amount: string; // USDC amount as a decimal string (avoids float representation issues)
+  deadline: number; // Unix epoch in seconds — order is invalid after this
+  createdAt: number; // Unix epoch in seconds — set at creation
   status: OrderStatus;
-  privateKey: string;   // private key of the user on srcChain (used to sign HTLC tx)
-  userAddress: string;  // EVM address of the user — listed as receiver by counterpart orders
+  privateKey: string; // private key of the user on srcChain (used to sign HTLC tx)
+  userAddress: string; // EVM address of the user — listed as receiver by counterpart orders
 }
 
 /**
@@ -30,8 +30,8 @@ export interface MatchedOrderEntry {
   orderId: string;
   srcChain: number;
   desChain: number;
-  matchedAmount: string;    // amount consumed in this match event
-  remainingAmount: string;  // '0' if MATCHED, positive decimal string if PARTIAL
+  matchedAmount: string; // amount consumed in this match event
+  remainingAmount: string; // '0' if MATCHED, positive decimal string if PARTIAL
   status: 'MATCHED' | 'PARTIAL';
 }
 
@@ -42,7 +42,7 @@ export interface CycleMatchEntry {
   orderId: string;
   srcChain: number;
   desChain: number;
-  matchedAmount: string;  // amount exchanged in this cycle (= minW of the cycle)
+  matchedAmount: string; // amount exchanged in this cycle (= minW of the cycle)
 }
 
 /**
@@ -50,7 +50,7 @@ export interface CycleMatchEntry {
  * graph, exchanging `matchedAmount` units between them.
  */
 export interface CycleMatch {
-  matchedAmount: string;  // volume exchanged in this cycle (= minW)
+  matchedAmount: string; // volume exchanged in this cycle (= minW)
   orders: CycleMatchEntry[];
 }
 
@@ -61,7 +61,7 @@ export interface CycleMatch {
  */
 export interface MatchResult {
   matchId: string;
-  matchedAt: number;   // Unix epoch in seconds
+  matchedAt: number; // Unix epoch in seconds
   orders: MatchedOrderEntry[];
   cycles: CycleMatch[];
   rawCycles: Array<Array<{ u: number; v: number; w: number }>>;
