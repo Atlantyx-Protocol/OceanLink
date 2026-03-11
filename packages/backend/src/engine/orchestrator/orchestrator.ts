@@ -13,8 +13,8 @@ import { getAllChainConfigs } from '../../config/chains.js';
 // Consolidation model:
 //
 //   All cycles from a match result are collected into "send actions". Actions
-//   from the same sender (privateKey + srcChain) are consolidated into a
-//   single bridge order with multiple receivers / amounts.
+//   on the same chain are consolidated into a single bridge order with
+//   multiple receivers / amounts. Uses PRIVATE_KEY_ADMIN from env to sign.
 //
 //   The first consolidated group is the "presiding" order: it generates fresh
 //   secrets and returns hashlocks. Every subsequent order reuses the hashlock
@@ -27,7 +27,6 @@ import { getAllChainConfigs } from '../../config/chains.js';
 
 /** A single directed send extracted from a cycle. */
 interface SendAction {
-  privateKey: string;
   senderAddress: string;
   receiverAddress: string;
   srcChain: number;
@@ -106,7 +105,6 @@ export class Orchestrator {
         }
 
         sendActions.push({
-          privateKey: order.privateKey,
           senderAddress: order.userAddress,
           receiverAddress: receiverOrder.userAddress,
           srcChain: order.srcChain,
@@ -117,8 +115,8 @@ export class Orchestrator {
       }
     }
 
-    // -- 2. Group by (privateKey, chainKey) ---------------------------------
-    const groupKey = (a: SendAction) => `${a.privateKey}::${a.chainKey}`;
+    // -- 2. Group by chainKey ------------------------------------------------
+    const groupKey = (a: SendAction) => a.chainKey;
     const groups = new Map<string, SendAction[]>();
     for (const action of sendActions) {
       const key = groupKey(action);
@@ -155,12 +153,18 @@ export class Orchestrator {
         `receivers=[${presidingActions.map((a) => a.receiverAddress).join(', ')}]`,
     );
 
+    const adminKey = process.env.PRIVATE_KEY_ADMIN;
+    if (!adminKey) {
+      throw new Error('[Orchestrator] PRIVATE_KEY_ADMIN is not configured in environment');
+    }
+
     const presidingResult = await bridgeService.createOrder({
-      privateKey: presidingActions[0].privateKey,
+      privateKey: adminKey,
       receivers: presidingActions.map((a) => a.receiverAddress),
       amounts: presidingActions.map((a) => a.amount),
       chain: presidingActions[0].chainKey,
       isPresiding: true,
+      onBehalfOf: presidingActions[0].senderAddress,
     });
 
     console.log(
@@ -198,12 +202,13 @@ export class Orchestrator {
       );
 
       const result = await bridgeService.createOrder({
-        privateKey: actions[0].privateKey,
+        privateKey: adminKey,
         receivers: actions.map((a) => a.receiverAddress),
         amounts: actions.map((a) => a.amount),
         chain: actions[0].chainKey,
         isPresiding: false,
         hashlocks,
+        onBehalfOf: actions[0].senderAddress,
       });
 
       console.log(

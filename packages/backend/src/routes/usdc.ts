@@ -4,9 +4,20 @@ import { getChainConfig, getAllChainConfigs, CHAIN_KEYS } from '../config/chains
 
 const usdcRoutes: FastifyPluginAsync = async (fastify) => {
   // Approve USDC for all chains
-  fastify.post('/usdc/approve/all', async (request, reply) => {
+  fastify.post<{ Body: { privateKey: string; amount: string } }>('/usdc/approve/all', async (request, reply) => {
+    const body = request.body || {} as any;
+
+    if (!body.privateKey) {
+      return reply.status(400).send({ success: false, error: 'privateKey is required' });
+    }
+
+    if (!body.amount) {
+      return reply.status(400).send({ success: false, error: 'amount is required' });
+    }
+
     try {
-      const results = await approvalService.approveUSDCForAllChains();
+      const amount = BigInt(body.amount);
+      const results = await approvalService.approveUSDCForAllChains(body.privateKey, amount);
       return { success: true, results };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
@@ -16,8 +27,17 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Approve USDC for a specific chain
-  fastify.post<{ Params: { chain: string } }>('/usdc/approve/:chain', async (request, reply) => {
+  fastify.post<{ Params: { chain: string }; Body: { privateKey: string; amount: string } }>('/usdc/approve/:chain', async (request, reply) => {
     const { chain } = request.params;
+    const body = request.body || {} as any;
+
+    if (!body.privateKey) {
+      return reply.status(400).send({ success: false, error: 'privateKey is required' });
+    }
+
+    if (!body.amount) {
+      return reply.status(400).send({ success: false, error: 'amount is required' });
+    }
 
     if (!getChainConfig(chain)) {
       return reply.status(400).send({
@@ -27,7 +47,8 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
     }
 
     try {
-      const result = await approvalService.approveUSDCForSpecificChain(chain);
+      const amount = BigInt(body.amount);
+      const result = await approvalService.approveUSDCForSpecificChain(chain, body.privateKey, amount);
       return { success: true, result };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

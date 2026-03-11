@@ -97,20 +97,20 @@ check_balance() {
 
 # Create order (presiding - generates secret)
 create_order_presiding() {
-    local private_key=$1
+    local on_behalf_of=$1
     local receiver=$2
     local chain=$3
 
-    log_info "Creating order on $chain (presiding - generating secret)..."
+    log_info "Creating order on $chain (presiding - generating secret) on behalf of $on_behalf_of..."
 
     response=$(curl -s -X POST "$API_BASE/bridge/create" \
         -H "Content-Type: application/json" \
         -d "{
-            \"privateKey\": \"$private_key\",
             \"receivers\": [\"$receiver\"],
             \"amounts\": [\"$AMOUNT\"],
             \"chain\": \"$chain\",
-            \"isPresiding\": true
+            \"isPresiding\": true,
+            \"onBehalfOf\": \"$on_behalf_of\"
         }")
 
     success=$(echo "$response" | jq -r '.success')
@@ -142,22 +142,22 @@ create_order_presiding() {
 
 # Create order (responding - uses existing hashlock)
 create_order_responding() {
-    local private_key=$1
+    local on_behalf_of=$1
     local receiver=$2
     local chain=$3
     local hashlock=$4
 
-    log_info "Creating order on $chain (responding - using existing hashlock)..."
+    log_info "Creating order on $chain (responding - using existing hashlock) on behalf of $on_behalf_of..."
 
     response=$(curl -s -X POST "$API_BASE/bridge/create" \
         -H "Content-Type: application/json" \
         -d "{
-            \"privateKey\": \"$private_key\",
             \"receivers\": [\"$receiver\"],
             \"amounts\": [\"$AMOUNT\"],
             \"chain\": \"$chain\",
             \"isPresiding\": false,
-            \"hashlocks\": [\"$hashlock\"]
+            \"hashlocks\": [\"$hashlock\"],
+            \"onBehalfOf\": \"$on_behalf_of\"
         }")
 
     success=$(echo "$response" | jq -r '.success')
@@ -181,21 +181,76 @@ create_order_responding() {
     RESPONDING_FILL_ID="$fill_id"
 }
 
+# Approve USDC for HTLC contract on a specific chain
+approve_usdc() {
+    local private_key=$1
+    local chain=$2
+    local amount=$3
+    local user_name=$4
+
+    log_info "Approving $amount USDC for $user_name on $chain..."
+
+    response=$(curl -s -X POST "$API_BASE/usdc/approve/$chain" \
+        -H "Content-Type: application/json" \
+        -d "{
+            \"privateKey\": \"$private_key\",
+            \"amount\": \"$amount\"
+        }")
+
+    success=$(echo "$response" | jq -r '.success')
+
+    if [ "$success" != "true" ]; then
+        log_error "Failed to approve USDC: $response"
+        exit 1
+    fi
+
+    status=$(echo "$response" | jq -r '.result.status')
+    log_success "$user_name USDC approval on $chain: $status"
+}
+
+# Verify order exists on-chain
+verify_order() {
+    local order_id=$1
+    local chain=$2
+    local label=$3
+
+    log_info "Verifying order $order_id on $chain ($label)..."
+
+    response=$(curl -s "$API_BASE/bridge/order/$order_id?chain=$chain")
+    success=$(echo "$response" | jq -r '.success')
+
+    if [ "$success" != "true" ]; then
+        log_error "Failed to get order: $response"
+        exit 1
+    fi
+
+    status=$(echo "$response" | jq -r '.data.status')
+    fill_count=$(echo "$response" | jq -r '.data.fillCount')
+    total_amount=$(echo "$response" | jq -r '.data.totalAmount')
+    sender=$(echo "$response" | jq -r '.data.sender')
+
+    # status 1 = OPEN
+    if [ "$status" != "1" ]; then
+        log_error "Order $order_id is not OPEN (status=$status)"
+        exit 1
+    fi
+
+    log_success "$label verified — status=OPEN, fills=$fill_count, totalAmount=$total_amount, sender=$sender"
+}
+
 # Withdraw from order fill
 withdraw_order() {
-    local private_key=$1
-    local order_id=$2
-    local fill_id=$3
-    local preimage=$4
-    local chain=$5
-    local user_name=$6
+    local order_id=$1
+    local fill_id=$2
+    local preimage=$3
+    local chain=$4
+    local user_name=$5
 
     log_info "$user_name withdrawing from order on $chain..."
 
     response=$(curl -s -X POST "$API_BASE/bridge/withdraw" \
         -H "Content-Type: application/json" \
         -d "{
-            \"privateKey\": \"$private_key\",
             \"orderId\": \"$order_id\",
             \"fillId\": \"$fill_id\",
             \"preimage\": \"$preimage\",
@@ -240,12 +295,22 @@ main() {
     BALANCE_B_BEFORE=$(check_balance "baseSepolia" "$USER_B_ADDRESS" "$MIN_BALANCE")
     echo ""
 
+    # Step 1.5: Approve USDC for HTLC contract
+    echo "=========================================="
+    echo "  Step 1.5: Approve USDC for HTLC"
+    echo "=========================================="
+
+    approve_usdc "$PRIVATE_KEY_A" "sepolia" "$AMOUNT" "User A"
+    echo ""
+    approve_usdc "$PRIVATE_KEY_B" "baseSepolia" "$AMOUNT" "User B"
+    echo ""
+
     # Step 2: User A creates order on Sepolia (presiding)
     echo "=========================================="
     echo "  Step 2: User A Creates Order on Sepolia"
     echo "=========================================="
 
-    create_order_presiding "$PRIVATE_KEY_A" "$USER_B_ADDRESS" "sepolia"
+    create_order_presiding "$USER_A_ADDRESS" "$USER_B_ADDRESS" "sepolia"
     echo ""
 
     # Store important values
@@ -261,11 +326,21 @@ main() {
     echo "  Step 3: User B Creates Order on Base Sepolia"
     echo "=========================================="
 
-    create_order_responding "$PRIVATE_KEY_B" "$USER_A_ADDRESS" "baseSepolia" "$PRESIDING_HASHLOCK"
+    create_order_responding "$USER_B_ADDRESS" "$USER_A_ADDRESS" "baseSepolia" "$PRESIDING_HASHLOCK"
     echo ""
 
     echo "BASE_SEPOLIA_ORDER_ID=$RESPONDING_ORDER_ID"
     echo "BASE_SEPOLIA_FILL_ID=$RESPONDING_FILL_ID"
+    echo ""
+
+    # Step 3.5: Verify orders on-chain
+    echo "=========================================="
+    echo "  Step 3.5: Verify Orders On-Chain"
+    echo "=========================================="
+
+    verify_order "$PRESIDING_ORDER_ID" "sepolia" "Sepolia order (presiding)"
+    echo ""
+    verify_order "$RESPONDING_ORDER_ID" "baseSepolia" "Base Sepolia order (responding)"
     echo ""
 
     # Step 4: Re-check balances
@@ -286,7 +361,7 @@ main() {
     echo "  Step 5: User A Withdraws on Base Sepolia"
     echo "=========================================="
 
-    withdraw_order "$PRIVATE_KEY_A" "$RESPONDING_ORDER_ID" "$RESPONDING_FILL_ID" "$PRESIDING_SECRET" "baseSepolia" "User A"
+    withdraw_order "$RESPONDING_ORDER_ID" "$RESPONDING_FILL_ID" "$PRESIDING_SECRET" "baseSepolia" "User A"
     echo ""
 
     # Step 6: User B withdraws on Sepolia (using revealed secret)
@@ -294,7 +369,7 @@ main() {
     echo "  Step 6: User B Withdraws on Sepolia"
     echo "=========================================="
 
-    withdraw_order "$PRIVATE_KEY_B" "$PRESIDING_ORDER_ID" "$PRESIDING_FILL_ID" "$PRESIDING_SECRET" "sepolia" "User B"
+    withdraw_order "$PRESIDING_ORDER_ID" "$PRESIDING_FILL_ID" "$PRESIDING_SECRET" "sepolia" "User B"
     echo ""
 
     # Step 7: Final balance check

@@ -1,4 +1,4 @@
-import { JsonRpcProvider, Wallet, Contract, MaxUint256 } from 'ethers';
+import { JsonRpcProvider, Wallet, Contract } from 'ethers';
 import { getChainConfig, ChainConfig, getAllChains, CHAIN_KEYS } from '../../config/chains.js';
 
 const ERC20_ABI = [
@@ -21,26 +21,20 @@ export interface ApprovalResult {
 }
 
 class ApprovalService {
-  private privateKey: string;
-
-  constructor() {
-    this.privateKey = process.env.PRIVATE_KEY || '';
-  }
-
   private getProvider(rpcUrl: string): JsonRpcProvider {
     return new JsonRpcProvider(rpcUrl);
   }
 
-  private getSigner(provider: JsonRpcProvider): Wallet {
-    if (!this.privateKey) {
-      throw new Error('PRIVATE_KEY not configured in environment');
+  private getSigner(provider: JsonRpcProvider, privateKey: string): Wallet {
+    if (!privateKey) {
+      throw new Error('privateKey is required');
     }
-    return new Wallet(this.privateKey, provider);
+    return new Wallet(privateKey, provider);
   }
 
-  async checkAllowance(chainConfig: ChainConfig): Promise<bigint> {
+  async checkAllowance(chainConfig: ChainConfig, privateKey: string): Promise<bigint> {
     const provider = this.getProvider(chainConfig.rpcUrl);
-    const signer = this.getSigner(provider);
+    const signer = this.getSigner(provider, privateKey);
     const usdcContract = new Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
 
     const allowance = await usdcContract.allowance(
@@ -53,7 +47,8 @@ class ApprovalService {
 
   async approveUSDCForChain(
     chainConfig: ChainConfig,
-    amount: bigint = MaxUint256
+    privateKey: string,
+    amount: bigint
   ): Promise<ApprovalResult> {
     const result: ApprovalResult = {
       chain: chainConfig.name,
@@ -69,7 +64,7 @@ class ApprovalService {
       }
 
       const provider = this.getProvider(chainConfig.rpcUrl);
-      const signer = this.getSigner(provider);
+      const signer = this.getSigner(provider, privateKey);
       const usdcContract = new Contract(chainConfig.usdcAddress, ERC20_ABI, signer);
 
       // Check current allowance
@@ -115,14 +110,14 @@ class ApprovalService {
     return result;
   }
 
-  async approveUSDCForAllChains(amount: bigint = MaxUint256): Promise<ApprovalResult[]> {
+  async approveUSDCForAllChains(privateKey: string, amount: bigint): Promise<ApprovalResult[]> {
     const chains = getAllChains();
     const results: ApprovalResult[] = [];
 
     console.log('Starting USDC approvals for all chains...\n');
 
     for (const chainConfig of chains) {
-      const result = await this.approveUSDCForChain(chainConfig, amount);
+      const result = await this.approveUSDCForChain(chainConfig, privateKey, amount);
       results.push(result);
       console.log('');
     }
@@ -133,22 +128,23 @@ class ApprovalService {
 
   async approveUSDCForSpecificChain(
     chainKey: string,
-    amount: bigint = MaxUint256
+    privateKey: string,
+    amount: bigint
   ): Promise<ApprovalResult> {
     const chainConfig = getChainConfig(chainKey);
     if (!chainConfig) {
       throw new Error(`Unknown chain: ${chainKey}. Available: ${CHAIN_KEYS.join(', ')}`);
     }
-    return this.approveUSDCForChain(chainConfig, amount);
+    return this.approveUSDCForChain(chainConfig, privateKey, amount);
   }
 
-  async getAllAllowances(): Promise<Record<string, { chain: string; allowance: string }>> {
+  async getAllAllowances(privateKey: string): Promise<Record<string, { chain: string; allowance: string }>> {
     const chains = getAllChains();
     const allowances: Record<string, { chain: string; allowance: string }> = {};
 
     for (const chainConfig of chains) {
       try {
-        const allowance = await this.checkAllowance(chainConfig);
+        const allowance = await this.checkAllowance(chainConfig, privateKey);
         allowances[chainConfig.name] = {
           chain: chainConfig.name,
           allowance: allowance.toString(),

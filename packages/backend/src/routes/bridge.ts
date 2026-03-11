@@ -4,21 +4,23 @@ import { bridgeService } from '../engine/execution/bridge.js';
 const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   // Create order with multiple fills: approve + newOrder
   // Timelock is configured via TIME_LOCK env variable (in minutes, default 1)
+  // Uses PRIVATE_KEY_ADMIN from environment to sign transactions
   fastify.post<{
     Body: {
-      privateKey: string; // required: private key of the sender
       receivers: string[]; // required: array of receiver addresses
       amounts: string[]; // required: array of amounts (as strings for bigint)
       chain?: string; // optional, defaults to 'sepolia'
       isPresiding?: boolean; // optional, if true generate new secrets, default false
       hashlocks?: string[]; // required when isPresiding is false
+      onBehalfOf?: string; // optional: tokens are pulled from this address instead of admin
     };
   }>('/bridge/create', async (request, reply) => {
     try {
       const body = request.body || {};
 
-      if (!body.privateKey) {
-        return reply.status(400).send({ error: 'privateKey is required' });
+      const privateKey = process.env.PRIVATE_KEY_ADMIN;
+      if (!privateKey) {
+        return reply.status(500).send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
       }
 
       if (!body.receivers || !Array.isArray(body.receivers) || body.receivers.length === 0) {
@@ -57,12 +59,13 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
       const amounts = body.amounts.map((amt) => BigInt(amt));
 
       const result = await bridgeService.createOrder({
-        privateKey: body.privateKey,
+        privateKey,
         receivers: body.receivers,
         amounts,
         chain: body.chain,
         isPresiding,
         hashlocks: body.hashlocks,
+        onBehalfOf: body.onBehalfOf,
       });
 
       return {
@@ -83,19 +86,20 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Withdraw: receiver claims tokens by providing the correct preimage
+  // Uses PRIVATE_KEY_ADMIN from environment to sign transactions
   fastify.post<{
     Body: {
-      privateKey: string;
       orderId: string;
       fillId: string;
       preimage: string;
       chain?: string;
     };
   }>('/bridge/withdraw', async (request, reply) => {
-    const { privateKey, orderId, fillId, preimage, chain } = request.body || {};
+    const { orderId, fillId, preimage, chain } = request.body || {};
 
+    const privateKey = process.env.PRIVATE_KEY_ADMIN;
     if (!privateKey) {
-      return reply.status(400).send({ error: 'privateKey is required' });
+      return reply.status(500).send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
     }
 
     if (orderId === undefined || orderId === null) {
@@ -131,17 +135,18 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   });
 
   // Refund: sender reclaims tokens after timelock expires
+  // Uses PRIVATE_KEY_ADMIN from environment to sign transactions
   fastify.post<{
     Body: {
-      privateKey: string;
       orderId: string;
       chain?: string;
     };
   }>('/bridge/refund', async (request, reply) => {
-    const { privateKey, orderId, chain } = request.body || {};
+    const { orderId, chain } = request.body || {};
 
+    const privateKey = process.env.PRIVATE_KEY_ADMIN;
     if (!privateKey) {
-      return reply.status(400).send({ error: 'privateKey is required' });
+      return reply.status(500).send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
     }
 
     if (orderId === undefined || orderId === null) {

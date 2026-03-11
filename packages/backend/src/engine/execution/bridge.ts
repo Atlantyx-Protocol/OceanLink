@@ -8,7 +8,7 @@ const ERC20_ABI = [
 
 const HTLC_ABI = [
   // Write functions
-  'function newOrder((address token, uint256 totalAmount, uint256 timelock, address[] receivers, uint256[] amounts, bytes32[] hashlocks) params) external returns (uint256 orderId)',
+  'function newOrder((address token, uint256 totalAmount, uint256 timelock, address[] receivers, uint256[] amounts, bytes32[] hashlocks, address onBehalfOf) params) external returns (uint256 orderId)',
   'function withdraw(uint256 orderId, uint256 fillId, bytes32 preimage) external',
   'function refund(uint256 orderId) external',
   // Read functions
@@ -32,7 +32,6 @@ export interface FillInfo {
 }
 
 export interface CreateOrderResult {
-  approvalTxHash?: string;
   htlcTxHash: string;
   orderId: string;
   fills: FillInfo[];
@@ -78,11 +77,12 @@ class BridgeService {
     chain?: string;
     isPresiding?: boolean; // if true, generate new secrets; if false, use provided hashlocks
     hashlocks?: string[]; // required when isPresiding = false
+    onBehalfOf?: string; // optional: tokens are pulled from this address instead of msg.sender
   }): Promise<CreateOrderResult> {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey)!;
     const signer = this.getSigner(chainKey, params.privateKey);
-    const senderAddress = await signer.getAddress();
+    const senderAddress = params.onBehalfOf || await signer.getAddress();
 
     // Validate inputs
     if (params.receivers.length !== params.amounts.length) {
@@ -97,20 +97,17 @@ class BridgeService {
     // Calculate total amount
     const totalAmount = params.amounts.reduce((sum, amt) => sum + amt, BigInt(0));
 
-    // Step 1: Check and approve USDC if needed
+    // Step 1: Check USDC allowance
     const usdc = new Contract(config.usdcAddress, ERC20_ABI, signer);
     const currentAllowance = await usdc.allowance(senderAddress, config.htlcAddress);
 
-    let approvalTxHash: string | undefined;
     if (currentAllowance < totalAmount) {
-      console.log(`[${chainKey}] Approving USDC...`);
-      const approveTx = await usdc.approve(config.htlcAddress, totalAmount);
-      await approveTx.wait();
-      approvalTxHash = approveTx.hash;
-      console.log(`[${chainKey}] Approval TX: ${approvalTxHash}`);
-    } else {
-      console.log(`[${chainKey}] Already approved`);
+      throw new Error(
+        `[${chainKey}] Insufficient USDC allowance: have ${currentAllowance}, need ${totalAmount}. ` +
+        `Please approve USDC via /usdc/approve/${chainKey} first.`
+      );
     }
+    console.log(`[${chainKey}] Allowance check passed: ${currentAllowance}`);
 
     // Step 2: Generate secrets and hashlocks (only if isPresiding = true)
     const secrets: string[] = [];
@@ -147,6 +144,8 @@ class BridgeService {
     console.log(`  Receivers: ${params.receivers.length}`);
     console.log(`  Total Amount: ${totalAmount}`);
 
+    const onBehalfOf = params.onBehalfOf || ethers.ZeroAddress;
+
     const tx = await htlc.newOrder({
       token: config.usdcAddress,
       totalAmount,
@@ -154,6 +153,7 @@ class BridgeService {
       receivers: params.receivers,
       amounts: params.amounts,
       hashlocks,
+      onBehalfOf,
     });
 
     console.log(`[${chainKey}] TX sent: ${tx.hash}`);
@@ -187,7 +187,6 @@ class BridgeService {
     }
 
     return {
-      approvalTxHash,
       htlcTxHash: tx.hash,
       orderId,
       fills: fillInfos,
@@ -284,7 +283,7 @@ class BridgeService {
       totalAmount: data[2].toString(),
       remainingAmount: data[3].toString(),
       timelock: Number(data[4]),
-      status: data[5], // 0 = NONE, 1 = OPEN, 2 = REFUNDED
+      status: Number(data[5]), // 0 = NONE, 1 = OPEN, 2 = REFUNDED
       fillCount: Number(data[6]),
     };
   }

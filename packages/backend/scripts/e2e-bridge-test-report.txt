@@ -1,3 +1,4 @@
+
 ==========================================
   HTLC Bridge E2E Test (New Contract)
 ==========================================
@@ -9,83 +10,101 @@
   Step 1: Check Initial Balances
 ==========================================
 [INFO] Checking USDC balance for 0x9B55124d945B6E61c521adD7aA213433b3b1c8a2 on sepolia...
-[INFO] Balance: 999997200000000 (minimum required: 700000000)
+[INFO] Balance: 999993399999700 (minimum required: 700000000)
 [SUCCESS] Balance check passed
 
 [INFO] Checking USDC balance for 0x3ACa6E32BD6268ba2b834e6F23405e10575d19B2 on baseSepolia...
-[INFO] Balance: 98600000000 (minimum required: 700000000)
+[INFO] Balance: 195800000000 (minimum required: 700000000)
 [SUCCESS] Balance check passed
+
+==========================================
+  Step 1.5: Approve USDC for HTLC
+==========================================
+[INFO] Approving 700000000 USDC for User A on sepolia...
+[SUCCESS] User A USDC approval on sepolia: already_approved
+
+[INFO] Approving 700000000 USDC for User B on baseSepolia...
+[SUCCESS] User B USDC approval on baseSepolia: already_approved
 
 ==========================================
   Step 2: User A Creates Order on Sepolia
 ==========================================
-[INFO] Creating order on sepolia (presiding - generating secret)...
+[INFO] Creating order on sepolia (presiding - generating secret) on behalf of 0x9B55124d945B6E61c521adD7aA213433b3b1c8a2...
 [SUCCESS] Order created on sepolia
-  Order ID: 3
+  Order ID: 4
   Fill ID: 0
-  Secret: 0xe6f08c2d5361d355fea1dbbb165b27bac33061e269c2c85bd7572fad3a7cc4c7
-  Hashlock: 0x55d91e8b7b973d9830c200416b1805da605f97e048384c4451c1d951916b8c95
-  TX Hash: 0x5ed2493fda13a2a0f089870c30073950b06e3eec975d7ac1ba1bec2d24cf0811
+  Secret: 0x2d4ec5ec374537ced29fd073168e8e5f93f0863d687ff4481ad57086fcab0842
+  Hashlock: 0xcc3dff763867784b0b3a90090a2e718beb1aee3d1bcd4137c011c7d5adcde070
+  TX Hash: 0x7aa7c9fcdee0531c5eaaa75bb19f8f1088a99b38241feb97f1fa955e22b54cdc
 
 >>> IMPORTANT: Store these values <<<
-SEPOLIA_ORDER_ID=3
+SEPOLIA_ORDER_ID=4
 SEPOLIA_FILL_ID=0
-SECRET=0xe6f08c2d5361d355fea1dbbb165b27bac33061e269c2c85bd7572fad3a7cc4c7
-HASHLOCK=0x55d91e8b7b973d9830c200416b1805da605f97e048384c4451c1d951916b8c95
+SECRET=0x2d4ec5ec374537ced29fd073168e8e5f93f0863d687ff4481ad57086fcab0842
+HASHLOCK=0xcc3dff763867784b0b3a90090a2e718beb1aee3d1bcd4137c011c7d5adcde070
 
 ==========================================
   Step 3: User B Creates Order on Base Sepolia
 ==========================================
-[INFO] Creating order on baseSepolia (responding - using existing hashlock)...
+[INFO] Creating order on baseSepolia (responding - using existing hashlock) on behalf of 0x3ACa6E32BD6268ba2b834e6F23405e10575d19B2...
 [SUCCESS] Order created on baseSepolia
-  Order ID: 3
+  Order ID: 4
   Fill ID: 0
-  TX Hash: 0xca04ade63de2ec5ea80a6fdfb5581859a2a057d05e4d9b0fea4fa86a29d6b6d6
+  TX Hash: 0x2a9ff8cdce1919fcef7b35436eeee4f7d1545b892fd8f1b7baadee1e2282ce36
 
-BASE_SEPOLIA_ORDER_ID=3
+BASE_SEPOLIA_ORDER_ID=4
 BASE_SEPOLIA_FILL_ID=0
+
+==========================================
+  Step 3.5: Verify Orders On-Chain
+==========================================
+[INFO] Verifying order 4 on sepolia (Sepolia order (presiding))...
+[SUCCESS] Sepolia order (presiding) verified — status=OPEN, fills=1, totalAmount=700000000, sender=0x9B55124d945B6E61c521adD7aA213433b3b1c8a2
+
+[INFO] Verifying order 4 on baseSepolia (Base Sepolia order (responding))...
+[SUCCESS] Base Sepolia order (responding) verified — status=OPEN, fills=1, totalAmount=700000000, sender=0x3ACa6E32BD6268ba2b834e6F23405e10575d19B2
 
 ==========================================
   Step 4: Verify Balances After Lock
 ==========================================
 [INFO] Checking USDC balance for 0x9B55124d945B6E61c521adD7aA213433b3b1c8a2 on sepolia...
-[INFO] Balance: 999996500000000 (minimum required: 0)
+[INFO] Balance: 999992699999700 (minimum required: 0)
 [SUCCESS] Balance check passed
-User A balance change: 999997200000000 -> 999996500000000
+User A balance change: 999993399999700 -> 999992699999700
 
 [INFO] Checking USDC balance for 0x3ACa6E32BD6268ba2b834e6F23405e10575d19B2 on baseSepolia...
-[INFO] Balance: 98600000000 (minimum required: 0)
+[INFO] Balance: 195100000000 (minimum required: 0)
 [SUCCESS] Balance check passed
-User B balance change: 98600000000 -> 98600000000
+User B balance change: 195800000000 -> 195100000000
 
 ==========================================
   Step 5: User A Withdraws on Base Sepolia
 ==========================================
 [INFO] User A withdrawing from order on baseSepolia...
 [SUCCESS] User A successfully withdrew from baseSepolia
-  TX Hash: 0xf0c748ab91f1b5809977ef828cfe8be0b6d820a24c837eb12d2469b11831c15a
-  Block: 37227961
+  TX Hash: 0xbbba91698d9d2153ef6e6d7aef6f05c49f369061c51fb2a4aabe7188be4fe527
+  Block: 38727863
 
 ==========================================
   Step 6: User B Withdraws on Sepolia
 ==========================================
 [INFO] User B withdrawing from order on sepolia...
 [SUCCESS] User B successfully withdrew from sepolia
-  TX Hash: 0x7cd1a336949136a1d8fd956bf19f6023de02f60ef004423579ba0002984bd8db
-  Block: 10190909
+  TX Hash: 0x8273337ea327908115bff764178eb7d4dee3c9c88aa4edb1769e0d37e1a48661
+  Block: 10426170
 
 ==========================================
   Step 7: Final Balance Check
 ==========================================
 [INFO] Checking USDC balance for 0x9B55124d945B6E61c521adD7aA213433b3b1c8a2 on baseSepolia...
-[INFO] Balance: 1000002100000000 (minimum required: 0)
+[INFO] Balance: 999702800000000 (minimum required: 0)
 [SUCCESS] Balance check passed
-[INFO] User A received on Base Sepolia: 1000002100000000
+[INFO] User A received on Base Sepolia: 999702800000000
 
 [INFO] Checking USDC balance for 0x3ACa6E32BD6268ba2b834e6F23405e10575d19B2 on sepolia...
-[INFO] Balance: 2100000000 (minimum required: 0)
+[INFO] Balance: 2800000000 (minimum required: 0)
 [SUCCESS] Balance check passed
-[INFO] User B received on Sepolia: 2100000000
+[INFO] User B received on Sepolia: 2800000000
 
 ==========================================
   Test Summary
@@ -93,9 +112,9 @@ User B balance change: 98600000000 -> 98600000000
 
 [SUCCESS] E2E Bridge Test Completed Successfully!
 
-Sepolia Order ID: 3
+Sepolia Order ID: 4
 Sepolia Fill ID: 0
-Base Sepolia Order ID: 3
+Base Sepolia Order ID: 4
 Base Sepolia Fill ID: 0
-Secret (preimage): 0xe6f08c2d5361d355fea1dbbb165b27bac33061e269c2c85bd7572fad3a7cc4c7
-Hashlock: 0x55d91e8b7b973d9830c200416b1805da605f97e048384c4451c1d951916b8c95
+Secret (preimage): 0x2d4ec5ec374537ced29fd073168e8e5f93f0863d687ff4481ad57086fcab0842
+Hashlock: 0xcc3dff763867784b0b3a90090a2e718beb1aee3d1bcd4137c011c7d5adcde070
