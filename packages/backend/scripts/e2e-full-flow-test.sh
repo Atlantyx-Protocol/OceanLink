@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # E2E Full Flow Test Script
-# Tests: Submit intent orders → Match cycles → (Orchestrator creates bridge) → Withdraw → Verify
+# Tests: Submit intent orders → Match cycles → Orchestrator creates & withdraws HTLC orders → Verify
 #
 # Flow:
 #   1. Submit 4 intent orders (A: 1→2 1000, B: 2→1 500, C: 2→1 300, D: 2→1 200)
 #   2. Wait for matching engine to produce cycles
-#   3. Wait for orchestrator to create HTLC orders on-chain (automatic)
-#   4. Withdraw using execution details from API
-#   5. Verify balances for all 4 users
+#   3. Wait for orchestrator to create & withdraw HTLC orders on-chain (automatic)
+#   4. Verify balances after lock
+#   5. Verify final balances
 
 set -e
 
@@ -300,7 +300,7 @@ main() {
     EXEC_WAIT_SECS=30
     elapsed=0
 
-    log_info "Waiting 10s for orchestrator to process..."
+    log_info "Waiting 60s for orchestrator to process..."
     sleep 60
 
     log_info "Polling /api/match-execution/$MATCH_ID (timeout ${EXEC_WAIT_SECS}s)..."
@@ -346,47 +346,10 @@ main() {
     echo ""
 
     # ------------------------------------------------------------------
-    # Step 5: Withdraw (using execution data)
+    # Step 5: Verify final balances
     # ------------------------------------------------------------------
     echo "============================================"
-    echo "  Step 5: Withdraw"
-    echo "============================================"
-
-    # A withdraws on chain2 from responding orders (B, C, D)
-
-    exec_data=$(echo "$exec_response" | jq -c '.data')
-    responding_count=$(echo "$exec_data" | jq '.respondingWithdraws | length')
-
-    for i in $(seq 0 $((responding_count - 1))); do
-        order_id=$(echo "$exec_data" | jq -r ".respondingWithdraws[$i].orderId")
-        fill_id=$(echo "$exec_data" | jq -r ".respondingWithdraws[$i].fillId")
-        chain=$(echo "$exec_data" | jq -r ".respondingWithdraws[$i].chain")
-        secret=$(echo "$exec_data" | jq -r ".respondingWithdraws[$i].secret")
-        receiver=$(echo "$exec_data" | jq -r ".respondingWithdraws[$i].receiverAddress")
-        pk=$(get_private_key "$receiver")
-        withdraw_order "$pk" "$order_id" "$fill_id" "$secret" "$chain" "User A (from responding $((i+1)))"
-        echo ""
-    done
-
-    # B, C, D withdraw on chain1 from presiding order
-    presiding_order_id=$(echo "$exec_data" | jq -r '.presidingOrder.orderId')
-    presiding_chain=$(echo "$exec_data" | jq -r '.presidingOrder.chain')
-    presiding_count=$(echo "$exec_data" | jq '.presidingOrder.withdraws | length')
-
-    for i in $(seq 0 $((presiding_count - 1))); do
-        fill_id=$(echo "$exec_data" | jq -r ".presidingOrder.withdraws[$i].fillId")
-        secret=$(echo "$exec_data" | jq -r ".presidingOrder.withdraws[$i].secret")
-        receiver=$(echo "$exec_data" | jq -r ".presidingOrder.withdraws[$i].receiverAddress")
-        pk=$(get_private_key "$receiver")
-        withdraw_order "$pk" "$presiding_order_id" "$fill_id" "$secret" "$presiding_chain" "User (presiding fill $((i+1)))"
-        echo ""
-    done
-
-    # ------------------------------------------------------------------
-    # Step 6: Verify final balances
-    # ------------------------------------------------------------------
-    echo "============================================"
-    echo "  Step 6: Verify Final Balances"
+    echo "  Step 5: Verify Final Balances"
     echo "============================================"
 
     BALANCE_A_CHAIN1_FINAL=$(get_balance "$CHAIN_1_KEY" "$USER_A_ADDRESS")
@@ -446,7 +409,7 @@ main() {
     echo "  Order 4 (D, 2→1,  200): $ORDER_4"
     echo ""
     echo "Match ID: $MATCH_ID"
-    echo "Presiding order: $presiding_order_id"
+    echo "Presiding order: $(echo "$exec_response" | jq -r '.data.presidingOrder.orderId')"
     echo ""
     log_success "E2E Full Flow Test Completed Successfully!"
     echo ""
