@@ -13,6 +13,7 @@ const PORT = parseInt(process.env.PORT || '3001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 
 const fastify = Fastify({
+  disableRequestLogging: true, // suppress automatic "incoming request" / "request completed" logs
   logger: {
     level: process.env.LOG_LEVEL || 'info',
     transport: {
