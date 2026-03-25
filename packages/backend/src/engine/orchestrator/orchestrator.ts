@@ -1,8 +1,39 @@
-import { bridgeService } from '../execution/bridge.js';
+import { bridgeService, type CreateOrderResult } from '../execution/bridge.js';
 import { orderStore } from '../matching/store/orderStore.js';
 import type { OrderStore } from '../matching/store/orderStore.js';
 import type { CycleMatch, MatchResult } from '../matching/types.js';
 import { getAllChainConfigs } from '../../config/chains.js';
+
+// ---------------------------------------------------------------------------
+// Execution state — stored per matchId so the API can expose it
+// ---------------------------------------------------------------------------
+
+export interface ExecutionWithdraw {
+  fillId: string;
+  secret: string;
+  receiverAddress: string;
+}
+
+export interface ExecutionData {
+  presidingOrder: {
+    orderId: string;
+    chain: string;
+    withdraws: ExecutionWithdraw[];
+  };
+  respondingWithdraws: Array<{
+    orderId: string;
+    fillId: string;
+    chain: string;
+    secret: string;
+    receiverAddress: string;
+  }>;
+}
+
+export interface ExecutionRecord {
+  status: 'pending' | 'done' | 'error';
+  data?: ExecutionData;
+  error?: string;
+}
 
 // ---------------------------------------------------------------------------
 // Orchestrator
@@ -46,9 +77,14 @@ const buildChainIdMap = (): Map<number, string> => {
 
 export class Orchestrator {
   private readonly chainIdToKey: Map<number, string>;
+  private readonly executions = new Map<string, ExecutionRecord>();
 
   constructor(private readonly store: OrderStore) {
     this.chainIdToKey = buildChainIdMap();
+  }
+
+  getExecution(matchId: string): ExecutionRecord | undefined {
+    return this.executions.get(matchId);
   }
 
   // -------------------------------------------------------------------------
@@ -57,9 +93,12 @@ export class Orchestrator {
 
   async handleMatchResults(matchResults: MatchResult[]): Promise<void> {
     for (const result of matchResults) {
+      this.executions.set(result.matchId, { status: 'pending' });
       try {
         await this.executeConsolidated(result.cycles, result.matchId);
       } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.executions.set(result.matchId, { status: 'error', error: msg });
         console.error(
           `[Orchestrator] Consolidated execution failed (matchId=${result.matchId}):`,
           err
@@ -88,10 +127,49 @@ export class Orchestrator {
     const [presidingKey, presidingActions] = groupEntries[0];
     const presidingResult = await this.executePresidingOrder(presidingActions, adminKey);
     const cycleHashlockMap = this.buildCycleHashlockMap(presidingActions, presidingResult);
+    const cycleSecretMap = this.buildCycleSecretMap(presidingActions, presidingResult);
 
-    await this.executeNonPresidingOrders(groupEntries, presidingKey, cycleHashlockMap, adminKey);
+    const nonPresidingResults = await this.executeNonPresidingOrders(
+      groupEntries,
+      presidingKey,
+      cycleHashlockMap,
+      adminKey
+    );
+
+    await this.verifyAndWithdrawOrders(
+      presidingKey,
+      presidingActions,
+      presidingResult,
+      nonPresidingResults,
+      cycleSecretMap,
+      adminKey
+    );
 
     console.log(`[Orchestrator] All ${groupEntries.length} consolidated order(s) on-chain`);
+
+    // Build and store execution record for API access
+    const executionData: ExecutionData = {
+      presidingOrder: {
+        orderId: presidingResult.orderId,
+        chain: presidingKey,
+        withdraws: presidingResult.fills.map((fill, i) => ({
+          fillId: fill.fillId,
+          secret: fill.secret!,
+          receiverAddress: presidingActions[i].receiverAddress,
+        })),
+      },
+      respondingWithdraws: nonPresidingResults.flatMap(({ chainKey, orderId, fills, actions }) =>
+        fills.map((fill, i) => ({
+          orderId,
+          fillId: fill.fillId,
+          chain: chainKey,
+          secret: cycleSecretMap.get(actions[i].cycleIdx)!,
+          receiverAddress: actions[i].receiverAddress,
+        }))
+      ),
+    };
+
+    this.executions.set(matchId, { status: 'done', data: executionData });
   }
 
   private extractSendActionsFromCycles(cycles: CycleMatch[]): SendAction[] {
@@ -164,7 +242,7 @@ export class Orchestrator {
   private async executePresidingOrder(
     presidingActions: SendAction[],
     adminKey: string
-  ): Promise<{ fills: { hashlock: string }[]; orderId: string; htlcTxHash: string }> {
+  ): Promise<CreateOrderResult> {
     console.log(
       `[Orchestrator] Presiding order: ${presidingActions.length} fill(s) on ${presidingActions[0].chainKey}, ` +
         `receivers=[${presidingActions.map((a) => a.receiverAddress).join(', ')}]`
@@ -197,12 +275,28 @@ export class Orchestrator {
     return cycleHashlockMap;
   }
 
+  private buildCycleSecretMap(
+    presidingActions: SendAction[],
+    presidingResult: { fills: { secret?: string }[] }
+  ): Map<number, string> {
+    const cycleSecretMap = new Map<number, string>();
+    for (let i = 0; i < presidingActions.length; i++) {
+      const secret = presidingResult.fills[i].secret;
+      if (!secret) throw new Error(`[Orchestrator] No secret for presiding fill ${i}`);
+      cycleSecretMap.set(presidingActions[i].cycleIdx, secret);
+    }
+    return cycleSecretMap;
+  }
+
   private async executeNonPresidingOrders(
     groupEntries: [string, SendAction[]][],
     presidingKey: string,
     cycleHashlockMap: Map<number, string>,
     adminKey: string
-  ): Promise<void> {
+  ): Promise<{ chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[]> {
+    const results: { chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[] =
+      [];
+
     for (const [key, actions] of groupEntries) {
       if (key === presidingKey) continue;
 
@@ -232,7 +326,80 @@ export class Orchestrator {
       console.log(
         `[Orchestrator] HTLC created — orderId=${result.orderId}, txHash=${result.htlcTxHash}`
       );
+
+      results.push({
+        chainKey: key,
+        orderId: result.orderId,
+        fills: result.fills.map((f) => ({ fillId: f.fillId })),
+        actions,
+      });
     }
+
+    return results;
+  }
+
+  private async verifyAndWithdrawOrders(
+    presidingKey: string,
+    presidingActions: SendAction[],
+    presidingResult: { orderId: string; fills: { fillId: string; secret?: string }[] },
+    nonPresidingResults: { chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[],
+    cycleSecretMap: Map<number, string>,
+    adminKey: string
+  ): Promise<void> {
+    // Verify and withdraw presiding order
+    await this.verifyOrder(presidingKey, presidingResult.orderId, 'presiding');
+    for (let i = 0; i < presidingResult.fills.length; i++) {
+      const preimage = presidingResult.fills[i].secret;
+      if (!preimage) throw new Error(`[Orchestrator] No preimage for presiding fill ${i}`);
+      await this.withdrawFill(
+        presidingKey,
+        presidingResult.orderId,
+        presidingResult.fills[i].fillId,
+        preimage,
+        adminKey
+      );
+    }
+
+    // Verify and withdraw each non-presiding order
+    for (const { chainKey, orderId, fills, actions } of nonPresidingResults) {
+      await this.verifyOrder(chainKey, orderId, `non-presiding (${chainKey})`);
+      for (let i = 0; i < fills.length; i++) {
+        const preimage = cycleSecretMap.get(actions[i].cycleIdx);
+        if (!preimage) throw new Error(`[Orchestrator] No preimage for cycle ${actions[i].cycleIdx}`);
+        await this.withdrawFill(chainKey, orderId, fills[i].fillId, preimage, adminKey);
+      }
+    }
+  }
+
+  private async verifyOrder(chainKey: string, orderId: string, label: string): Promise<void> {
+    const order = await bridgeService.getOrder({ orderId, chain: chainKey });
+    if (order.status !== 1) {
+      throw new Error(
+        `[Orchestrator] Order ${orderId} on ${chainKey} (${label}) is not OPEN: status=${order.status}`
+      );
+    }
+    console.log(
+      `[Orchestrator] Verified ${label} — orderId=${orderId}, status=OPEN, fillCount=${order.fillCount}`
+    );
+  }
+
+  private async withdrawFill(
+    chainKey: string,
+    orderId: string,
+    fillId: string,
+    preimage: string,
+    adminKey: string
+  ): Promise<void> {
+    const result = await bridgeService.withdraw({
+      privateKey: adminKey,
+      orderId,
+      fillId,
+      preimage,
+      chain: chainKey,
+    });
+    console.log(
+      `[Orchestrator] Withdrew from order ${orderId} fill ${fillId} on ${chainKey} — txHash=${result.txHash}`
+    );
   }
 }
 

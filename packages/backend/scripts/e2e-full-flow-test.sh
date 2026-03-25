@@ -300,6 +300,9 @@ main() {
     EXEC_WAIT_SECS=30
     elapsed=0
 
+    log_info "Waiting 10s for orchestrator to process..."
+    sleep 60
+
     log_info "Polling /api/match-execution/$MATCH_ID (timeout ${EXEC_WAIT_SECS}s)..."
 
     while [ "$elapsed" -lt "$EXEC_WAIT_SECS" ]; do

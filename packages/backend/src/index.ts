@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import approvalRoutes from './routes/usdc.js';
 import bridgeRoutes from './routes/bridge.js';
 import intentRoutes from './engine/matching/routes/intentRoutes.js';
+import orchestratorRoutes from './engine/orchestrator/routes/orchestratorRoutes.js';
 import { matchScheduler } from './engine/matching/scheduler/matchScheduler.js';
 
 dotenv.config({ path: '../../.env' });
@@ -36,6 +37,7 @@ async function start() {
     await fastify.register(approvalRoutes, { prefix: '/api' });
     await fastify.register(bridgeRoutes, { prefix: '/api' });
     await fastify.register(intentRoutes, { prefix: '/api' });
+    await fastify.register(orchestratorRoutes, { prefix: '/api' });
 
     // Start matching engine scheduler
     matchScheduler.start();
