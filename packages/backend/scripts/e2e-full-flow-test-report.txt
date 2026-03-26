@@ -11,75 +11,67 @@
   Step 0: Check Initial Balances
 ============================================
 [0;34m[INFO][0m Checking USDC balance for User A (chain1) (0x9B55124d945B6E61c521adD7aA213433b3b1c8a2) on sepolia...
-[0;34m[INFO][0m   Balance: 999992699993700 (minimum required: 1000000000)
+[0;34m[INFO][0m   Balance: 999992699979700 (minimum required: 1000000000)
 [0;32m[SUCCESS][0m Balance check passed for User A (chain1)
-[0;34m[INFO][0m User A chain2 (before): 999702800002000
+[0;34m[INFO][0m User A chain2 (before): 999702800006800
 
 [0;34m[INFO][0m Checking USDC balance for User B (chain2) (0x3ACa6E32BD6268ba2b834e6F23405e10575d19B2) on baseSepolia...
-[0;34m[INFO][0m   Balance: 195099996000 (minimum required: 500000000)
+[0;34m[INFO][0m   Balance: 195099985500 (minimum required: 500000000)
 [0;32m[SUCCESS][0m Balance check passed for User B (chain2)
 
 [0;34m[INFO][0m Checking USDC balance for User C (chain2) (0x7CB386178D13e21093FDc988C7e77102D6464F3E) on baseSepolia...
-[0;34m[INFO][0m   Balance: 99700000000 (minimum required: 300000000)
+[0;34m[INFO][0m   Balance: 99699999400 (minimum required: 300000000)
 [0;32m[SUCCESS][0m Balance check passed for User C (chain2)
 
 [0;34m[INFO][0m Checking USDC balance for User D (chain2) (0xE08745df99d3563821b633aA93Ee02F7F883F25c) on baseSepolia...
-[0;34m[INFO][0m   Balance: 99800000000 (minimum required: 200000000)
+[0;34m[INFO][0m   Balance: 99799999800 (minimum required: 200000000)
 [0;32m[SUCCESS][0m Balance check passed for User D (chain2)
 
 ============================================
   Step 1: Submit Intent Orders
 ============================================
 [0;34m[INFO][0m Submitting order: Order 1 (A: 1→2, 1000) (11155111 -> 84532, amount 1000)...
-[0;32m[SUCCESS][0m Order submitted (Order 1 (A: 1→2, 1000)) — orderId: 70ddd0d2-f2be-4fcf-ab01-ded49490c268
+[0;32m[SUCCESS][0m Order submitted (Order 1 (A: 1→2, 1000)) — orderId: 8f1c2b03-6151-4fd1-be06-36fc1a25a40c
 
 [0;34m[INFO][0m Submitting order: Order 2 (B: 2→1, 500) (84532 -> 11155111, amount 500)...
-[0;32m[SUCCESS][0m Order submitted (Order 2 (B: 2→1, 500)) — orderId: 0cfd8540-919d-440d-890e-33291fe951eb
+[0;32m[SUCCESS][0m Order submitted (Order 2 (B: 2→1, 500)) — orderId: 538153c5-bdfa-48d7-bdde-4fec935696df
 
 [0;34m[INFO][0m Submitting order: Order 3 (C: 2→1, 300) (84532 -> 11155111, amount 300)...
-[0;32m[SUCCESS][0m Order submitted (Order 3 (C: 2→1, 300)) — orderId: 84dd7f27-39db-4fb1-9f04-e2b254e5746b
+[0;32m[SUCCESS][0m Order submitted (Order 3 (C: 2→1, 300)) — orderId: ed145922-ae85-4138-9349-227cb6d4174e
 
 [0;34m[INFO][0m Submitting order: Order 4 (D: 2→1, 200) (84532 -> 11155111, amount 200)...
-[0;32m[SUCCESS][0m Order submitted (Order 4 (D: 2→1, 200)) — orderId: b984232b-1b84-4161-a113-33efb3039acc
+[0;32m[SUCCESS][0m Order submitted (Order 4 (D: 2→1, 200)) — orderId: 047cf7e6-66eb-4c9c-8ab2-0214dd72617d
 
 ============================================
   Step 2: Wait for Match Cycles
 ============================================
+[0;34m[INFO][0m Waiting 5s for matching engine to process...
 [0;34m[INFO][0m Polling /api/matches (timeout 3s)...
-[0;34m[INFO][0m No matches yet (0s elapsed), retrying in 2s...
-[0;32m[SUCCESS][0m Found match: a90f75c4-34b1-414e-956f-9874504d9a48
+[0;32m[SUCCESS][0m Found match: 9c3ac578-c31c-4063-aeba-b85889058e36
 
 Cycle breakdown:
   Cycle 1 — matched amount: 500
-    Order 70ddd0d2…  11155111 -> 84532  amount: 500
-    Order 0cfd8540…  84532 -> 11155111  amount: 500
+    Order 8f1c2b03…  11155111 -> 84532  amount: 500
+    Order 538153c5…  84532 -> 11155111  amount: 500
   Cycle 2 — matched amount: 300
-    Order 70ddd0d2…  11155111 -> 84532  amount: 300
-    Order 84dd7f27…  84532 -> 11155111  amount: 300
+    Order 8f1c2b03…  11155111 -> 84532  amount: 300
+    Order ed145922…  84532 -> 11155111  amount: 300
   Cycle 3 — matched amount: 200
-    Order 70ddd0d2…  11155111 -> 84532  amount: 200
-    Order b984232b…  84532 -> 11155111  amount: 200
+    Order 8f1c2b03…  11155111 -> 84532  amount: 200
+    Order 047cf7e6…  84532 -> 11155111  amount: 200
 
 ============================================
   Step 3: Wait for Orchestrator (HTLC Orders)
 ============================================
-[0;34m[INFO][0m Waiting 10s for orchestrator to process...
-[0;34m[INFO][0m Polling /api/match-execution/a90f75c4-34b1-414e-956f-9874504d9a48 (timeout 30s)...
+[0;34m[INFO][0m Waiting 60s for orchestrator to process...
+[0;34m[INFO][0m Polling /api/match-execution/9c3ac578-c31c-4063-aeba-b85889058e36 (timeout 30s)...
 [0;34m[INFO][0m Orchestrator not done yet (0s elapsed), retrying in 2s...
 [0;34m[INFO][0m Orchestrator not done yet (2s elapsed), retrying in 2s...
 [0;34m[INFO][0m Orchestrator not done yet (4s elapsed), retrying in 2s...
+[0;34m[INFO][0m Orchestrator not done yet (6s elapsed), retrying in 2s...
 [0;32m[SUCCESS][0m Orchestrator created HTLC orders
 
 ============================================
   Step 4: Verify Balances After Lock
 ============================================
-[0;34m[INFO][0m User A chain1: 999992699993700 -> 999992699992700 (locked 1000)
-[0;34m[INFO][0m User B chain2: 195099996000 -> 195099995000 (locked 500)
-[0;34m[INFO][0m User C chain2: 99700000000 -> 99700000000 (locked 300)
-[0;34m[INFO][0m User D chain2: 99800000000 -> 99800000000 (locked 200)
-
-============================================
-  Step 5: Withdraw
-============================================
-[0;34m[INFO][0m User A (from responding 1) withdrawing from order on baseSepolia...
-[0;31m[ERROR][0m Failed to withdraw (User A (from responding 1)): {"error":"execution reverted (unknown custom error) (action=\"estimateGas\", data=\"0x86942c5e\", reason=null, transaction={ \"data\": \"0x3756c01100000000000000000000000000000000000000000000000000000000000000090000000000000000000000000000000000000000000000000000000000000000c10c8b861e05d22962badd619b2ae268f2e43a7eb871011191c425ee6f341dab\", \"from\": \"0x9B55124d945B6E61c521adD7aA213433b3b1c8a2\", \"to\": \"0xef9aB713BD8355DE9A42b7c4792cAe3ce2fA637e\" }, invocation=null, revert=null, code=CALL_EXCEPTION, version=6.16.0)"}
+[0;31m[ERROR][0m User A chain1 lock delta: expected ~1000000000, got 1000

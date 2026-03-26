@@ -134,6 +134,18 @@ check_balance() {
     echo "$balance"
 }
 
+assert_balance_near() {
+    local actual=$1
+    local expected=$2
+    local tolerance=$3
+    local label=$4
+
+    if [ "$actual" -lt $((expected - tolerance)) ] || [ "$actual" -gt $((expected + tolerance)) ]; then
+        log_error "$label: expected ~$expected, got $actual"
+        exit 1
+    fi
+}
+
 # Submit intent order (with privateKey and userAddress)
 submit_order() {
     local src=$1 des=$2 amount=$3 private_key=$4 user_address=$5 label=$6
@@ -250,6 +262,9 @@ main() {
     echo "  Step 2: Wait for Match Cycles"
     echo "============================================"
 
+    log_info "Waiting 5s for matching engine to process..."
+    sleep 5
+
     MAX_WAIT_SECS=$(( (MATCH_INTERVAL_MS / 1000) * 3 ))
     POLL_INTERVAL=2
     elapsed=0
@@ -339,10 +354,22 @@ main() {
     BALANCE_C_CHAIN2_AFTER_LOCK=$(get_balance "$CHAIN_2_KEY" "$USER_C_ADDRESS")
     BALANCE_D_CHAIN2_AFTER_LOCK=$(get_balance "$CHAIN_2_KEY" "$USER_D_ADDRESS")
 
+    LOCK_TOLERANCE=1000
+    DELTA_A=$((BALANCE_A_CHAIN1_BEFORE - BALANCE_A_CHAIN1_AFTER_LOCK))
+    DELTA_B=$((BALANCE_B_CHAIN2_BEFORE - BALANCE_B_CHAIN2_AFTER_LOCK))
+    DELTA_C=$((BALANCE_C_CHAIN2_BEFORE - BALANCE_C_CHAIN2_AFTER_LOCK))
+    DELTA_D=$((BALANCE_D_CHAIN2_BEFORE - BALANCE_D_CHAIN2_AFTER_LOCK))
+
+    assert_balance_near "$DELTA_A" "$MIN_BALANCE_A" "$LOCK_TOLERANCE" "User A chain1 lock delta"
+    assert_balance_near "$DELTA_B" "$MIN_BALANCE_B" "$LOCK_TOLERANCE" "User B chain2 lock delta"
+    assert_balance_near "$DELTA_C" "$MIN_BALANCE_C" "$LOCK_TOLERANCE" "User C chain2 lock delta"
+    assert_balance_near "$DELTA_D" "$MIN_BALANCE_D" "$LOCK_TOLERANCE" "User D chain2 lock delta"
+
     log_info "User A chain1: $BALANCE_A_CHAIN1_BEFORE -> $BALANCE_A_CHAIN1_AFTER_LOCK (locked 1000)"
     log_info "User B chain2: $BALANCE_B_CHAIN2_BEFORE -> $BALANCE_B_CHAIN2_AFTER_LOCK (locked 500)"
     log_info "User C chain2: $BALANCE_C_CHAIN2_BEFORE -> $BALANCE_C_CHAIN2_AFTER_LOCK (locked 300)"
     log_info "User D chain2: $BALANCE_D_CHAIN2_BEFORE -> $BALANCE_D_CHAIN2_AFTER_LOCK (locked 200)"
+    log_success "Post-lock balance checks passed"
     echo ""
 
     # ------------------------------------------------------------------
