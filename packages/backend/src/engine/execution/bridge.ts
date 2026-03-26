@@ -1,4 +1,4 @@
-import { ethers, JsonRpcProvider, Wallet, Contract } from 'ethers';
+import { ethers, JsonRpcProvider, NonceManager, Wallet, Contract } from 'ethers';
 import { getChainConfig } from '../../config/chains.js';
 
 const ERC20_ABI = [
@@ -51,15 +51,32 @@ export interface RefundResult {
   blockNumber: number;
 }
 
+
 class BridgeService {
+  private providers = new Map<string, JsonRpcProvider>();
+  private signers = new Map<string, NonceManager>();
+
   private getProvider(chainKey: string): JsonRpcProvider {
-    const config = getChainConfig(chainKey);
-    if (!config) throw new Error(`Unknown chain: ${chainKey}`);
-    return new JsonRpcProvider(config.rpcUrl);
+    let provider = this.providers.get(chainKey);
+    if (!provider) {
+      const config = getChainConfig(chainKey);
+      if (!config) throw new Error(`Unknown chain: ${chainKey}`);
+      provider = new JsonRpcProvider(config.rpcUrl);
+      this.providers.set(chainKey, provider);
+    }
+    return provider;
   }
 
-  private getSigner(chainKey: string, privateKey: string): Wallet {
-    return new Wallet(privateKey, this.getProvider(chainKey));
+  private getSigner(chainKey: string, privateKey: string): NonceManager {
+    const address = new Wallet(privateKey).address;
+    const cacheKey = `${chainKey}:${address}`;
+    let signer = this.signers.get(cacheKey);
+    if (!signer) {
+      const wallet = new Wallet(privateKey, this.getProvider(chainKey));
+      signer = new NonceManager(wallet);
+      this.signers.set(cacheKey, signer);
+    }
+    return signer;
   }
 
   // Generate 256-bit secret and SHA256 hashlock
@@ -73,7 +90,7 @@ class BridgeService {
   async createOrder(params: {
     privateKey: string;
     receivers: string[];
-    amounts: bigint[];
+    amounts: string[];
     chain?: string;
     isPresiding?: boolean; // if true, generate new secrets; if false, use provided hashlocks
     hashlocks?: string[]; // required when isPresiding = false
@@ -94,20 +111,26 @@ class BridgeService {
 
     console.log(`[${chainKey}] Creating order from ${senderAddress}`);
 
-    // Calculate total amount
-    const totalAmount = params.amounts.reduce((sum, amt) => sum + amt, BigInt(0));
+    // Convert human-readable USDC amounts to micro-USDC (6 decimals)
+    const microAmounts = params.amounts.map((a) => ethers.parseUnits(a, 6));
+    const totalAmount = microAmounts.reduce((sum, amt) => sum + amt, 0n);
 
     // Step 1: Check USDC allowance
     const usdc = new Contract(config.usdcAddress, ERC20_ABI, signer);
     const currentAllowance = await usdc.allowance(senderAddress, config.htlcAddress);
 
     if (currentAllowance < totalAmount) {
-      throw new Error(
-        `[${chainKey}] Insufficient USDC allowance: have ${currentAllowance}, need ${totalAmount}. ` +
-          `Please approve USDC via /usdc/approve/${chainKey} first.`
-      );
+      console.log(`[${chainKey}] Insufficient allowance (have ${currentAllowance}, need ${totalAmount}), approving...`);
+      console.log('privateKey', params.privateKey);
+      const approveTx = await usdc.approve(config.htlcAddress, totalAmount);
+      await approveTx.wait();
+      console.log(`[${chainKey}] USDC approved: ${totalAmount}`);
+
+      const newAllowance = await usdc.allowance(senderAddress, config.htlcAddress);
+      console.log(`[${chainKey}] New allowance: ${newAllowance}`);
+    } else {
+      console.log(`[${chainKey}] Allowance check passed: ${currentAllowance}`);
     }
-    console.log(`[${chainKey}] Allowance check passed: ${currentAllowance}`);
 
     // Step 2: Generate secrets and hashlocks (only if isPresiding = true)
     const secrets: string[] = [];
@@ -151,7 +174,7 @@ class BridgeService {
       totalAmount,
       timelock,
       receivers: params.receivers,
-      amounts: params.amounts,
+      amounts: microAmounts,
       hashlocks,
       onBehalfOf,
     });
