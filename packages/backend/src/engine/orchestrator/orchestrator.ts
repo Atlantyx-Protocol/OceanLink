@@ -62,7 +62,7 @@ interface SendAction {
   receiverAddress: string;
   srcChain: number;
   chainKey: string;
-  amount: bigint;
+  amount: string;
   cycleIdx: number;
 }
 
@@ -125,6 +125,7 @@ export class Orchestrator {
     }
 
     const [presidingKey, presidingActions] = groupEntries[0];
+    const presidingChainKey = presidingActions[0].chainKey; // actual chain, separate from group key
     const presidingResult = await this.executePresidingOrder(presidingActions, adminKey);
     const cycleHashlockMap = this.buildCycleHashlockMap(presidingActions, presidingResult);
     const cycleSecretMap = this.buildCycleSecretMap(presidingActions, presidingResult);
@@ -137,7 +138,7 @@ export class Orchestrator {
     );
 
     await this.verifyAndWithdrawOrders(
-      presidingKey,
+      presidingChainKey,
       presidingActions,
       presidingResult,
       nonPresidingResults,
@@ -151,7 +152,7 @@ export class Orchestrator {
     const executionData: ExecutionData = {
       presidingOrder: {
         orderId: presidingResult.orderId,
-        chain: presidingKey,
+        chain: presidingChainKey,
         withdraws: presidingResult.fills.map((fill, i) => ({
           fillId: fill.fillId,
           secret: fill.secret!,
@@ -200,7 +201,7 @@ export class Orchestrator {
           receiverAddress: receiverOrder.userAddress,
           srcChain: order.srcChain,
           chainKey,
-          amount: BigInt(matchedAmount),
+          amount: matchedAmount,
           cycleIdx,
         });
       }
@@ -212,7 +213,9 @@ export class Orchestrator {
   private groupActionsByChainKey(sendActions: SendAction[]): [string, SendAction[]][] {
     const groups = new Map<string, SendAction[]>();
     for (const action of sendActions) {
-      const key = action.chainKey;
+      // Key by chain + sender: same sender on same chain → one order (multiple fills)
+      // different sender on same chain → separate orders
+      const key = `${action.chainKey}:${action.senderAddress}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(action);
     }
@@ -310,7 +313,7 @@ export class Orchestrator {
 
       console.log(
         `[Orchestrator] Non-presiding order: ${actions.length} fill(s) on ${actions[0].chainKey}, ` +
-          `receivers=[${actions.map((a) => a.receiverAddress).join(', ')}]`
+          `sender=${actions[0].senderAddress}, receivers=[${actions.map((a) => a.receiverAddress).join(', ')}]`
       );
 
       const result = await bridgeService.createOrder({
@@ -328,7 +331,7 @@ export class Orchestrator {
       );
 
       results.push({
-        chainKey: key,
+        chainKey: actions[0].chainKey,
         orderId: result.orderId,
         fills: result.fills.map((f) => ({ fillId: f.fillId })),
         actions,

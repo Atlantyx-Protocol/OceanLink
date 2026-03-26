@@ -11,67 +11,97 @@
   Step 0: Check Initial Balances
 ============================================
 [0;34m[INFO][0m Checking USDC balance for User A (chain1) (0x9B55124d945B6E61c521adD7aA213433b3b1c8a2) on sepolia...
-[0;34m[INFO][0m   Balance: 999992699979700 (minimum required: 1000000000)
+[0;34m[INFO][0m   Balance: 999992699978700 (minimum required: 1000000000)
 [0;32m[SUCCESS][0m Balance check passed for User A (chain1)
-[0;34m[INFO][0m User A chain2 (before): 999702800006800
+[0;34m[INFO][0m User A chain2 (before): 999702800007800
 
 [0;34m[INFO][0m Checking USDC balance for User B (chain2) (0x3ACa6E32BD6268ba2b834e6F23405e10575d19B2) on baseSepolia...
-[0;34m[INFO][0m   Balance: 195099985500 (minimum required: 500000000)
+[0;34m[INFO][0m   Balance: 195099985000 (minimum required: 500000000)
 [0;32m[SUCCESS][0m Balance check passed for User B (chain2)
 
 [0;34m[INFO][0m Checking USDC balance for User C (chain2) (0x7CB386178D13e21093FDc988C7e77102D6464F3E) on baseSepolia...
-[0;34m[INFO][0m   Balance: 99699999400 (minimum required: 300000000)
+[0;34m[INFO][0m   Balance: 99699999100 (minimum required: 300000000)
 [0;32m[SUCCESS][0m Balance check passed for User C (chain2)
 
 [0;34m[INFO][0m Checking USDC balance for User D (chain2) (0xE08745df99d3563821b633aA93Ee02F7F883F25c) on baseSepolia...
-[0;34m[INFO][0m   Balance: 99799999800 (minimum required: 200000000)
+[0;34m[INFO][0m   Balance: 99799999600 (minimum required: 200000000)
 [0;32m[SUCCESS][0m Balance check passed for User D (chain2)
 
 ============================================
   Step 1: Submit Intent Orders
 ============================================
 [0;34m[INFO][0m Submitting order: Order 1 (A: 1→2, 1000) (11155111 -> 84532, amount 1000)...
-[0;32m[SUCCESS][0m Order submitted (Order 1 (A: 1→2, 1000)) — orderId: 8f1c2b03-6151-4fd1-be06-36fc1a25a40c
+[0;32m[SUCCESS][0m Order submitted (Order 1 (A: 1→2, 1000)) — orderId: 75a13600-2fb1-4552-91b3-d720c6972c17
 
 [0;34m[INFO][0m Submitting order: Order 2 (B: 2→1, 500) (84532 -> 11155111, amount 500)...
-[0;32m[SUCCESS][0m Order submitted (Order 2 (B: 2→1, 500)) — orderId: 538153c5-bdfa-48d7-bdde-4fec935696df
+[0;32m[SUCCESS][0m Order submitted (Order 2 (B: 2→1, 500)) — orderId: 02451d27-64fa-4716-8dab-e3aa8e2d7fc0
 
 [0;34m[INFO][0m Submitting order: Order 3 (C: 2→1, 300) (84532 -> 11155111, amount 300)...
-[0;32m[SUCCESS][0m Order submitted (Order 3 (C: 2→1, 300)) — orderId: ed145922-ae85-4138-9349-227cb6d4174e
+[0;32m[SUCCESS][0m Order submitted (Order 3 (C: 2→1, 300)) — orderId: 9f6b25f5-8754-40ed-bb72-1d6083415e5b
 
 [0;34m[INFO][0m Submitting order: Order 4 (D: 2→1, 200) (84532 -> 11155111, amount 200)...
-[0;32m[SUCCESS][0m Order submitted (Order 4 (D: 2→1, 200)) — orderId: 047cf7e6-66eb-4c9c-8ab2-0214dd72617d
+[0;32m[SUCCESS][0m Order submitted (Order 4 (D: 2→1, 200)) — orderId: 96a53e42-3f07-433c-b911-6c6599c0c5da
 
 ============================================
   Step 2: Wait for Match Cycles
 ============================================
 [0;34m[INFO][0m Waiting 5s for matching engine to process...
 [0;34m[INFO][0m Polling /api/matches (timeout 3s)...
-[0;32m[SUCCESS][0m Found match: 9c3ac578-c31c-4063-aeba-b85889058e36
+[0;32m[SUCCESS][0m Found match: 8e07795c-079d-4613-a9da-4a9bebb25ab4
 
 Cycle breakdown:
   Cycle 1 — matched amount: 500
-    Order 8f1c2b03…  11155111 -> 84532  amount: 500
-    Order 538153c5…  84532 -> 11155111  amount: 500
+    Order 75a13600…  11155111 -> 84532  amount: 500
+    Order 02451d27…  84532 -> 11155111  amount: 500
   Cycle 2 — matched amount: 300
-    Order 8f1c2b03…  11155111 -> 84532  amount: 300
-    Order ed145922…  84532 -> 11155111  amount: 300
+    Order 75a13600…  11155111 -> 84532  amount: 300
+    Order 9f6b25f5…  84532 -> 11155111  amount: 300
   Cycle 3 — matched amount: 200
-    Order 8f1c2b03…  11155111 -> 84532  amount: 200
-    Order 047cf7e6…  84532 -> 11155111  amount: 200
+    Order 75a13600…  11155111 -> 84532  amount: 200
+    Order 96a53e42…  84532 -> 11155111  amount: 200
 
 ============================================
   Step 3: Wait for Orchestrator (HTLC Orders)
 ============================================
 [0;34m[INFO][0m Waiting 60s for orchestrator to process...
-[0;34m[INFO][0m Polling /api/match-execution/9c3ac578-c31c-4063-aeba-b85889058e36 (timeout 30s)...
+[0;34m[INFO][0m Polling /api/match-execution/8e07795c-079d-4613-a9da-4a9bebb25ab4 (timeout 30s)...
 [0;34m[INFO][0m Orchestrator not done yet (0s elapsed), retrying in 2s...
 [0;34m[INFO][0m Orchestrator not done yet (2s elapsed), retrying in 2s...
 [0;34m[INFO][0m Orchestrator not done yet (4s elapsed), retrying in 2s...
 [0;34m[INFO][0m Orchestrator not done yet (6s elapsed), retrying in 2s...
+[0;34m[INFO][0m Orchestrator not done yet (8s elapsed), retrying in 2s...
 [0;32m[SUCCESS][0m Orchestrator created HTLC orders
 
 ============================================
   Step 4: Verify Balances After Lock
 ============================================
-[0;31m[ERROR][0m User A chain1 lock delta: expected ~1000000000, got 1000
+[0;34m[INFO][0m User A chain1: 999992699978700 -> 999991699978700 (locked 1000)
+[0;34m[INFO][0m User B chain2: 195099985000 -> 194599985000 (locked 500)
+[0;34m[INFO][0m User C chain2: 99699999100 -> 99399999100 (locked 300)
+[0;34m[INFO][0m User D chain2: 99799999600 -> 99599999600 (locked 200)
+[0;32m[SUCCESS][0m Post-lock balance checks passed
+
+============================================
+  Step 5: Verify Final Balances
+============================================
+[0;34m[INFO][0m User A: chain1=999991699978700 (sent 1000), chain2=999703800007800 (received 1000)
+[0;34m[INFO][0m User B: chain1=3300006500 (received 500), chain2=194599985000 (sent 500)
+[0;34m[INFO][0m User C: chain1=300003000 (received 300), chain2=99399999100 (sent 300)
+[0;34m[INFO][0m User D: chain1=200001800 (received 200), chain2=99599999600 (sent 200)
+[0;32m[SUCCESS][0m All balance verifications passed!
+
+============================================
+  Test Summary
+============================================
+
+Intent Orders:
+  Order 1 (A, 1→2, 1000): 75a13600-2fb1-4552-91b3-d720c6972c17
+  Order 2 (B, 2→1,  500): 02451d27-64fa-4716-8dab-e3aa8e2d7fc0
+  Order 3 (C, 2→1,  300): 9f6b25f5-8754-40ed-bb72-1d6083415e5b
+  Order 4 (D, 2→1,  200): 96a53e42-3f07-433c-b911-6c6599c0c5da
+
+Match ID: 8e07795c-079d-4613-a9da-4a9bebb25ab4
+Presiding order: 26
+
+[0;32m[SUCCESS][0m E2E Full Flow Test Completed Successfully!
+

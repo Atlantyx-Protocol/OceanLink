@@ -57,13 +57,10 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      // Convert amounts to bigint
-      const amounts = body.amounts.map((amt) => BigInt(amt));
-
       const result = await bridgeService.createOrder({
         privateKey,
         receivers: body.receivers,
-        amounts,
+        amounts: body.amounts.map(String),
         chain: body.chain,
         isPresiding,
         hashlocks: body.hashlocks,
