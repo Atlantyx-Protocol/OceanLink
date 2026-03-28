@@ -61,12 +61,12 @@ pnpm build
 
 ### Frontend (`@ocean-link/frontend`)
 
-- Next.js 14
-- React 18
+- Next.js 16
+- React 19
 - Wagmi & Viem for Web3
-- TailwindCSS
+- Tailwind CSS v4 + shadcn/ui
 
-**Dev**: `http://localhost:3000`
+**Dev**: `http://localhost:3001`
 
 ### Backend (`@ocean-link/backend`)
 
