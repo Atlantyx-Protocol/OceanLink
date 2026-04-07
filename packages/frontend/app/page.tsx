@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Header } from "@/components/bridge/header"
-import { BridgeCard } from "@/components/bridge/bridge-card"
-import { Footer } from "@/components/bridge/footer"
+import { Header } from "./components/bridge/header"
+import { BridgeCard } from "./components/bridge/bridge-card"
+import { Footer } from "./components/bridge/footer"
 
 export default function BridgePage() {
   const [isConnected, setIsConnected] = useState(false)
