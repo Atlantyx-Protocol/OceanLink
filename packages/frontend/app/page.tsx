@@ -1,25 +1,29 @@
 "use client"
 
-import { useState } from "react"
+import { useConnect } from "wagmi"
 import { Header } from "./components/bridge/header"
 import { BridgeCard } from "./components/bridge/bridge-card"
 import { Footer } from "./components/bridge/footer"
+import { useAuth } from "@/lib/auth-context"
 
 export default function BridgePage() {
-  const [isConnected, setIsConnected] = useState(false)
+  const { isAuthenticated } = useAuth()
+  const { connect, connectors } = useConnect()
 
+  // Fallback connect action for the in-card "Connect Wallet" button:
+  // pick the first available connector (usually injected).
   const handleConnectWallet = () => {
-    // Placeholder for wallet connection logic (wagmi, viem integration)
-    setIsConnected(!isConnected)
+    const connector = connectors[0]
+    if (connector) connect({ connector })
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Header onConnectWallet={handleConnectWallet} isConnected={isConnected} />
-      
+      <Header />
+
       <main className="flex-1 flex items-center justify-center px-4 py-8">
         <BridgeCard
-          isConnected={isConnected}
+          isConnected={isAuthenticated}
           onConnectWallet={handleConnectWallet}
         />
       </main>

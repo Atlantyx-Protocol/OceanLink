@@ -2,13 +2,9 @@
 
 import { Button } from "@/components/ui/button"
 import { Menu, Waves } from "lucide-react"
+import { ConnectWalletButton } from "./connect-wallet-button"
 
-interface HeaderProps {
-  onConnectWallet: () => void
-  isConnected: boolean
-}
-
-export function Header({ onConnectWallet, isConnected }: HeaderProps) {
+export function Header() {
   return (
     <header className="flex items-center justify-between px-4 py-4 md:px-6">
       <div className="flex items-center gap-8">
@@ -29,12 +25,7 @@ export function Header({ onConnectWallet, isConnected }: HeaderProps) {
         </nav>
       </div>
       <div className="flex items-center gap-3">
-        <Button
-          onClick={onConnectWallet}
-          className="bg-primary text-primary-foreground hover:bg-primary/90"
-        >
-          {isConnected ? "0x1234...5678" : "Connect Wallet"}
-        </Button>
+        <ConnectWalletButton />
         <Button variant="ghost" size="icon" className="md:hidden">
           <Menu className="h-5 w-5" />
         </Button>
