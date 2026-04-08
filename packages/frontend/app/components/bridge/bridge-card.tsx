@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useAccount } from "wagmi"
 import { Button } from "@/components/ui/button"
 import { InputCard } from "./input-card"
 import { ArrowDownUp } from "lucide-react"
@@ -24,12 +25,11 @@ interface BridgeCardProps {
 }
 
 export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
+  const { address: walletAddress } = useAccount()
   const [fromAmount, setFromAmount] = useState("")
   const [toAmount, setToAmount] = useState("")
   const [fromNetwork, setFromNetwork] = useState(NETWORKS[0])
   const [toNetwork, setToNetwork] = useState(NETWORKS[1])
-  const [fromAddress, setFromAddress] = useState("0x1234567890abcdef1234567890abcdef12345678")
-  const [toAddress, setToAddress] = useState("0x742d35Cc6634C0532925a3b844Bc454e4438f44e")
 
   const handleSwapDirection = () => {
     const tempNetwork = fromNetwork
@@ -69,9 +69,8 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
           networks={NETWORKS}
           onNetworkChange={setFromNetwork}
           balance={isConnected ? "1,234.56" : undefined}
-          address={fromAddress}
-          onAddressChange={setFromAddress}
-          showAddress={isConnected}
+          address={walletAddress}
+          showAddress={isConnected && !!walletAddress}
           addressLabel="From"
         />
 
@@ -98,9 +97,8 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
           networks={NETWORKS}
           onNetworkChange={setToNetwork}
           balance={isConnected ? "567.89" : undefined}
-          address={toAddress}
-          onAddressChange={setToAddress}
-          showAddress={isConnected}
+          address={walletAddress}
+          showAddress={isConnected && !!walletAddress}
           addressLabel="To"
         />
 

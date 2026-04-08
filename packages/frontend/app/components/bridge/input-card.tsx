@@ -2,8 +2,6 @@
 
 import { Input } from "@/components/ui/input"
 import { TokenSelector, type Network, type Token } from "./token-selector"
-import { Pencil } from "lucide-react"
-import { Button } from "@/components/ui/button"
 
 interface InputCardProps {
   label: string
@@ -16,7 +14,6 @@ interface InputCardProps {
   onNetworkChange: (network: Network) => void
   balance?: string
   address?: string
-  onAddressChange?: (value: string) => void
   showAddress?: boolean
   addressLabel?: string
 }
@@ -32,7 +29,6 @@ export function InputCard({
   onNetworkChange,
   balance,
   address,
-  onAddressChange,
   showAddress = false,
   addressLabel = "Address",
 }: InputCardProps) {
@@ -46,14 +42,6 @@ export function InputCard({
             <span className="font-mono text-foreground text-xs sm:text-sm">
               {address.slice(0, 6)}...{address.slice(-4)}
             </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => onAddressChange?.("")}
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
           </div>
         )}
       </div>
