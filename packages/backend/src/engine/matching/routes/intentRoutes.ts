@@ -20,6 +20,7 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
       srcChain: unknown;
       desChain: unknown;
       amount: unknown;
+      incentiveFee?: unknown;
       deadline: unknown;
       privateKey: unknown;
       userAddress: unknown;
@@ -46,6 +47,7 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
       srcChain: body.srcChain as number | string,
       desChain: body.desChain as number | string,
       amount: body.amount as string | number,
+      incentiveFee: body.incentiveFee as string | number | undefined,
       deadline: body.deadline as number | string,
       privateKey: body.privateKey as string,
       userAddress: body.userAddress as string,

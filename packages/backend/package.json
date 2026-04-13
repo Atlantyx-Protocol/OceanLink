@@ -9,9 +9,9 @@
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "clean": "rimraf dist",
-    "test": "tsx --test src/engine/matching/algorithm/algorithm.test.ts src/engine/matching/matching.test.ts",
+    "test": "tsx --test src/engine/matching/algorithm/algorithm.test.ts src/engine/matching/test/matching.test.ts",
     "test:algorithm": "tsx --test src/engine/matching/algorithm/algorithm.test.ts",
-    "test:matching": "tsx --test src/engine/matching/matching.test.ts"
+    "test:matching": "tsx --test src/engine/matching/test/matching.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^8.5.0",

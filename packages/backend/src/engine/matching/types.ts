@@ -13,7 +13,8 @@ export interface IntentOrder {
   orderId: string;
   srcChain: number; // source chainId (> 0)
   desChain: number; // destination chainId (> 0)
-  amount: string; // USDC amount as a decimal string (avoids float representation issues)
+  amount: string; // effective USDC amount (= base amount + incentiveFee if any)
+  incentiveFee?: string; // optional extra fee to boost match priority
   deadline: number; // Unix epoch in seconds — order is invalid after this
   createdAt: number; // Unix epoch in seconds — set at creation
   status: OrderStatus;
@@ -72,6 +73,7 @@ export interface CreateIntentInput {
   srcChain: number | string;
   desChain: number | string;
   amount: string | number;
+  incentiveFee?: string | number; // optional extra fee added to amount to boost match priority
   deadline: number | string;
   privateKey: string;
   userAddress: string;

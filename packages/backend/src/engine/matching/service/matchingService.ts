@@ -85,6 +85,24 @@ export class MatchingService {
     if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
       return { error: 'amount must be a positive number' };
     }
+
+    // Validate and compute incentive fee
+    let incentiveFee: string | undefined;
+    if (input.incentiveFee !== undefined && input.incentiveFee !== null) {
+      const parsedFee = Number(input.incentiveFee);
+      if (Number.isNaN(parsedFee) || parsedFee < 0) {
+        return { error: 'incentiveFee must be a non-negative number' };
+      }
+      if (parsedFee > 0) {
+        incentiveFee = String(parsedFee);
+      }
+    }
+
+    // Effective amount = base amount + incentive fee (user pays more to boost match priority)
+    const effectiveAmount = incentiveFee
+      ? String(parsedAmount + Number(incentiveFee))
+      : amount;
+
     const now = Math.floor(Date.now() / 1000);
     if (!Number.isInteger(deadline) || deadline < now) {
       return { error: 'deadline must be a Unix epoch timestamp (seconds) >= now' };
@@ -101,7 +119,8 @@ export class MatchingService {
       orderId: randomUUID(),
       srcChain,
       desChain,
-      amount,
+      amount: effectiveAmount,
+      ...(incentiveFee !== undefined && { incentiveFee }),
       deadline,
       createdAt: now,
       status: 'QUEUED',

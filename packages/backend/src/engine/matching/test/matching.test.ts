@@ -9,10 +9,10 @@
 import { describe, it, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { OrderStore } from './store/orderStore.js';
-import { MatchingService } from './service/matchingService.js';
-import type { AlgorithmFn } from './service/matchingService.js';
-import type { Edge, EdgeSnapshot } from './algorithm/algorithm.js';
+import { OrderStore } from '../store/orderStore.js';
+import { MatchingService } from '../service/matchingService.js';
+import type { AlgorithmFn } from '../service/matchingService.js';
+import type { Edge, EdgeSnapshot } from '../algorithm/algorithm.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -50,6 +50,8 @@ describe('MatchingService.createOrder', () => {
       desChain: 2,
       amount: '100',
       deadline: futureDeadline(),
+      privateKey: '0xabc',
+      userAddress: '0x123',
     });
 
     assert.ok(
@@ -84,6 +86,8 @@ describe('MatchingService.createOrder', () => {
       desChain: 2,
       amount: '50',
       deadline: pastDeadline(60), // 60 seconds ago
+      privateKey: '0xabc',
+      userAddress: '0x123',
     });
 
     assert.ok('error' in result, 'Should return an error for past deadline');
@@ -96,7 +100,7 @@ describe('MatchingService.createOrder', () => {
 
   it('returns an error when srcChain is zero or negative', () => {
     const { service } = makeSetup();
-    const base = { desChain: 2, amount: '10', deadline: futureDeadline() };
+    const base = { desChain: 2, amount: '10', deadline: futureDeadline(), privateKey: '0xabc', userAddress: '0x123' };
 
     const r1 = service.createOrder({ ...base, srcChain: 0 });
     assert.ok('error' in r1);
@@ -107,7 +111,7 @@ describe('MatchingService.createOrder', () => {
 
   it('returns an error when amount is zero or negative', () => {
     const { service } = makeSetup();
-    const base = { srcChain: 1, desChain: 2, deadline: futureDeadline() };
+    const base = { srcChain: 1, desChain: 2, deadline: futureDeadline(), privateKey: '0xabc', userAddress: '0x123' };
 
     const r1 = service.createOrder({ ...base, amount: '0' });
     assert.ok('error' in r1);
@@ -131,6 +135,8 @@ describe('OrderStore.expireStale', () => {
       desChain: 20,
       amount: '75',
       deadline: pastDeadline(1),
+      privateKey: '0xabc',
+      userAddress: '0x123',
     });
     // createOrder rejects past deadlines, so we insert directly into the store
     // to simulate an order whose deadline passes after creation.
@@ -146,6 +152,8 @@ describe('OrderStore.expireStale', () => {
       deadline: pastDeadline(1),
       createdAt: pastDeadline(120),
       status: 'QUEUED',
+      privateKey: '0xabc',
+      userAddress: '0x123',
     });
 
     assert.equal(store.getActiveOrders().length, 1);
@@ -178,6 +186,8 @@ describe('OrderStore.expireStale', () => {
       deadline: pastDeadline(5),
       createdAt: pastDeadline(600),
       status: 'QUEUED',
+      privateKey: '0xabc',
+      userAddress: '0x123',
     });
 
     const stats = service.runTick();
@@ -216,6 +226,8 @@ describe('MatchingService adapter', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
+      privateKey: '0xabc',
+      userAddress: '0x111',
     });
     store.add({
       orderId: 'order-b',
@@ -225,6 +237,8 @@ describe('MatchingService adapter', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
+      privateKey: '0xdef',
+      userAddress: '0x222',
     });
 
     service.runMatchingPass(store.getActiveOrders());
@@ -267,6 +281,8 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
+      privateKey: '0xabc',
+      userAddress: '0x111',
     });
     store.add({
       orderId: 'order-y',
@@ -276,6 +292,8 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
+      privateKey: '0xdef',
+      userAddress: '0x222',
     });
 
     const results = service.runMatchingPass(store.getActiveOrders());
@@ -326,6 +344,8 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
+      privateKey: '0xabc',
+      userAddress: '0x111',
     });
     store.add({
       orderId: 'eq-b',
@@ -335,6 +355,8 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
+      privateKey: '0xdef',
+      userAddress: '0x222',
     });
 
     service.runMatchingPass(store.getActiveOrders());
@@ -356,6 +378,8 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
+      privateKey: '0xabc',
+      userAddress: '0x111',
     });
     store.add({
       orderId: 'low-b',
@@ -365,11 +389,137 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
+      privateKey: '0xdef',
+      userAddress: '0x222',
     });
 
     const results = service.runMatchingPass(store.getActiveOrders());
     assert.equal(results.length, 0, 'No match expected when ratio < threshold');
     assert.equal(store.get('low-a')?.status, 'QUEUED');
     assert.equal(store.get('low-b')?.status, 'QUEUED');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 6 — IncentiveFee
+// ---------------------------------------------------------------------------
+
+describe('MatchingService.createOrder — incentiveFee', () => {
+  it('creates order without incentiveFee (backward compatible)', () => {
+    const { store, service } = makeSetup();
+
+    const result = service.createOrder({
+      srcChain: 1,
+      desChain: 2,
+      amount: '100',
+      deadline: futureDeadline(),
+      privateKey: '0xabc',
+      userAddress: '0x123',
+    });
+
+    assert.ok(!('error' in result));
+    const { order } = result as { order: NonNullable<ReturnType<OrderStore['get']>> };
+    assert.equal(order.amount, '100', 'amount should stay 100 without fee');
+    assert.equal(order.incentiveFee, undefined, 'incentiveFee should be undefined');
+  });
+
+  it('adds incentiveFee to amount when provided', () => {
+    const { store, service } = makeSetup();
+
+    const result = service.createOrder({
+      srcChain: 1,
+      desChain: 2,
+      amount: '100',
+      incentiveFee: '10',
+      deadline: futureDeadline(),
+      privateKey: '0xabc',
+      userAddress: '0x123',
+    });
+
+    assert.ok(!('error' in result));
+    const { order } = result as { order: NonNullable<ReturnType<OrderStore['get']>> };
+    assert.equal(order.amount, '110', 'effective amount should be 100 + 10 = 110');
+    assert.equal(order.incentiveFee, '10', 'incentiveFee should be stored');
+  });
+
+  it('rejects negative incentiveFee', () => {
+    const { service } = makeSetup();
+
+    const result = service.createOrder({
+      srcChain: 1,
+      desChain: 2,
+      amount: '100',
+      incentiveFee: '-5',
+      deadline: futureDeadline(),
+      privateKey: '0xabc',
+      userAddress: '0x123',
+    });
+
+    assert.ok('error' in result);
+    assert.match((result as { error: string }).error, /incentiveFee/i);
+  });
+
+  it('incentiveFee of 0 is treated as no fee', () => {
+    const { service } = makeSetup();
+
+    const result = service.createOrder({
+      srcChain: 1,
+      desChain: 2,
+      amount: '100',
+      incentiveFee: '0',
+      deadline: futureDeadline(),
+      privateKey: '0xabc',
+      userAddress: '0x123',
+    });
+
+    assert.ok(!('error' in result));
+    const { order } = result as { order: NonNullable<ReturnType<OrderStore['get']>> };
+    assert.equal(order.amount, '100', 'amount unchanged when fee is 0');
+    assert.equal(order.incentiveFee, undefined, 'no incentiveFee stored for 0');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 7 — IncentiveFee improves matching
+// ---------------------------------------------------------------------------
+
+describe('IncentiveFee — matching behavior', () => {
+  it('order with incentiveFee has higher effective amount in matching', () => {
+    // threshold = 0.95 — orders 100 vs 50 would NOT match (ratio 0.5).
+    // But with incentiveFee of 45 on the 50-order, effective = 95 → ratio 95/100 = 0.95.
+    // Since the algorithm uses strict > threshold, 0.95 > 0.95 is false, so still no match.
+    // Use fee of 50 → effective = 100 → ratio 1.0 > 0.95 → matches!
+    const { store, service } = makeSetup(undefined, 0.95);
+
+    store.add({
+      orderId: 'fee-a',
+      srcChain: 7,
+      desChain: 8,
+      amount: '100',
+      deadline: futureDeadline(),
+      createdAt: nowSec(),
+      status: 'QUEUED',
+      privateKey: '0xabc',
+      userAddress: '0x111',
+    });
+
+    // This order has effective amount = 50 + 50 = 100 (fee already folded in)
+    store.add({
+      orderId: 'fee-b',
+      srcChain: 8,
+      desChain: 7,
+      amount: '100', // effective amount after fee
+      incentiveFee: '50',
+      deadline: futureDeadline(),
+      createdAt: nowSec(),
+      status: 'QUEUED',
+      privateKey: '0xdef',
+      userAddress: '0x222',
+    });
+
+    const results = service.runMatchingPass(store.getActiveOrders());
+    assert.equal(results.length, 1, 'Should match with boosted amount');
+    assert.equal(store.get('fee-a')?.status, 'MATCHED');
+    assert.equal(store.get('fee-b')?.status, 'MATCHED');
   });
 });
