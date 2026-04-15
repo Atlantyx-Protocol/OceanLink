@@ -50,7 +50,7 @@ describe('MatchingService.createOrder', () => {
       desChain: 2,
       amount: '100',
       deadline: futureDeadline(),
-      privateKey: '0xabc',
+
       userAddress: '0x123',
     });
 
@@ -86,7 +86,7 @@ describe('MatchingService.createOrder', () => {
       desChain: 2,
       amount: '50',
       deadline: pastDeadline(60), // 60 seconds ago
-      privateKey: '0xabc',
+
       userAddress: '0x123',
     });
 
@@ -100,7 +100,7 @@ describe('MatchingService.createOrder', () => {
 
   it('returns an error when srcChain is zero or negative', () => {
     const { service } = makeSetup();
-    const base = { desChain: 2, amount: '10', deadline: futureDeadline(), privateKey: '0xabc', userAddress: '0x123' };
+    const base = { desChain: 2, amount: '10', deadline: futureDeadline(), userAddress: '0x123' };
 
     const r1 = service.createOrder({ ...base, srcChain: 0 });
     assert.ok('error' in r1);
@@ -111,7 +111,7 @@ describe('MatchingService.createOrder', () => {
 
   it('returns an error when amount is zero or negative', () => {
     const { service } = makeSetup();
-    const base = { srcChain: 1, desChain: 2, deadline: futureDeadline(), privateKey: '0xabc', userAddress: '0x123' };
+    const base = { srcChain: 1, desChain: 2, deadline: futureDeadline(), userAddress: '0x123' };
 
     const r1 = service.createOrder({ ...base, amount: '0' });
     assert.ok('error' in r1);
@@ -135,7 +135,7 @@ describe('OrderStore.expireStale', () => {
       desChain: 20,
       amount: '75',
       deadline: pastDeadline(1),
-      privateKey: '0xabc',
+
       userAddress: '0x123',
     });
     // createOrder rejects past deadlines, so we insert directly into the store
@@ -152,7 +152,7 @@ describe('OrderStore.expireStale', () => {
       deadline: pastDeadline(1),
       createdAt: pastDeadline(120),
       status: 'QUEUED',
-      privateKey: '0xabc',
+
       userAddress: '0x123',
     });
 
@@ -186,7 +186,7 @@ describe('OrderStore.expireStale', () => {
       deadline: pastDeadline(5),
       createdAt: pastDeadline(600),
       status: 'QUEUED',
-      privateKey: '0xabc',
+
       userAddress: '0x123',
     });
 
@@ -226,7 +226,7 @@ describe('MatchingService adapter', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xabc',
+
       userAddress: '0x111',
     });
     store.add({
@@ -237,7 +237,7 @@ describe('MatchingService adapter', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xdef',
+
       userAddress: '0x222',
     });
 
@@ -281,7 +281,7 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xabc',
+
       userAddress: '0x111',
     });
     store.add({
@@ -292,7 +292,7 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xdef',
+
       userAddress: '0x222',
     });
 
@@ -344,7 +344,7 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xabc',
+
       userAddress: '0x111',
     });
     store.add({
@@ -355,7 +355,7 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xdef',
+
       userAddress: '0x222',
     });
 
@@ -378,7 +378,7 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xabc',
+
       userAddress: '0x111',
     });
     store.add({
@@ -389,7 +389,7 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xdef',
+
       userAddress: '0x222',
     });
 
@@ -413,7 +413,7 @@ describe('MatchingService.createOrder — incentiveFee', () => {
       desChain: 2,
       amount: '100',
       deadline: futureDeadline(),
-      privateKey: '0xabc',
+
       userAddress: '0x123',
     });
 
@@ -432,7 +432,7 @@ describe('MatchingService.createOrder — incentiveFee', () => {
       amount: '100',
       incentiveFee: '10',
       deadline: futureDeadline(),
-      privateKey: '0xabc',
+
       userAddress: '0x123',
     });
 
@@ -451,7 +451,7 @@ describe('MatchingService.createOrder — incentiveFee', () => {
       amount: '100',
       incentiveFee: '-5',
       deadline: futureDeadline(),
-      privateKey: '0xabc',
+
       userAddress: '0x123',
     });
 
@@ -468,7 +468,7 @@ describe('MatchingService.createOrder — incentiveFee', () => {
       amount: '100',
       incentiveFee: '0',
       deadline: futureDeadline(),
-      privateKey: '0xabc',
+
       userAddress: '0x123',
     });
 
@@ -499,7 +499,7 @@ describe('IncentiveFee — matching behavior', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xabc',
+
       userAddress: '0x111',
     });
 
@@ -513,7 +513,7 @@ describe('IncentiveFee — matching behavior', () => {
       deadline: futureDeadline(),
       createdAt: nowSec(),
       status: 'QUEUED',
-      privateKey: '0xdef',
+
       userAddress: '0x222',
     });
 

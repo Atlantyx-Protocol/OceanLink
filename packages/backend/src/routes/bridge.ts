@@ -3,7 +3,7 @@ import { bridgeService } from '../engine/execution/bridge.js';
 
 const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   // Create order with multiple fills: approve + newOrder
-  // Timelock is configured via TIME_LOCK env variable (in minutes, default 1)
+  // Timelock is configured via TIME_LOCK env variable (in minutes, default 10)
   // Uses PRIVATE_KEY_ADMIN from environment to sign transactions
   fastify.post<{
     Body: {
@@ -17,13 +17,6 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   }>('/bridge/create', async (request, reply) => {
     try {
       const body = request.body || {};
-
-      const privateKey = process.env.PRIVATE_KEY_ADMIN;
-      if (!privateKey) {
-        return reply
-          .status(500)
-          .send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
-      }
 
       if (!body.receivers || !Array.isArray(body.receivers) || body.receivers.length === 0) {
         return reply
@@ -58,7 +51,6 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const result = await bridgeService.createOrder({
-        privateKey,
         receivers: body.receivers,
         amounts: body.amounts.map(String),
         chain: body.chain,
@@ -96,13 +88,6 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   }>('/bridge/withdraw', async (request, reply) => {
     const { orderId, fillId, preimage, chain } = request.body || {};
 
-    const privateKey = process.env.PRIVATE_KEY_ADMIN;
-    if (!privateKey) {
-      return reply
-        .status(500)
-        .send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
-    }
-
     if (orderId === undefined || orderId === null) {
       return reply.status(400).send({ error: 'orderId is required' });
     }
@@ -117,7 +102,6 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
 
     try {
       const result = await bridgeService.withdraw({
-        privateKey,
         orderId: orderId.toString(),
         fillId: fillId.toString(),
         preimage,
@@ -145,20 +129,12 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
   }>('/bridge/refund', async (request, reply) => {
     const { orderId, chain } = request.body || {};
 
-    const privateKey = process.env.PRIVATE_KEY_ADMIN;
-    if (!privateKey) {
-      return reply
-        .status(500)
-        .send({ error: 'PRIVATE_KEY_ADMIN is not configured in environment' });
-    }
-
     if (orderId === undefined || orderId === null) {
       return reply.status(400).send({ error: 'orderId is required' });
     }
 
     try {
       const result = await bridgeService.refund({
-        privateKey,
         orderId: orderId.toString(),
         chain,
       });
@@ -173,8 +149,6 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.status(500).send({ error: message });
     }
   });
-
-  // Get next order id
 
   // Get order details
   fastify.get<{

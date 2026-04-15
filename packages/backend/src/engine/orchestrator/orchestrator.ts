@@ -119,22 +119,16 @@ export class Orchestrator {
 
     this.logCycleSummary(cycles, matchId, groupEntries);
 
-    const adminKey = process.env.PRIVATE_KEY_ADMIN;
-    if (!adminKey) {
-      throw new Error('[Orchestrator] PRIVATE_KEY_ADMIN is not configured in environment');
-    }
-
     const [presidingKey, presidingActions] = groupEntries[0];
     const presidingChainKey = presidingActions[0].chainKey; // actual chain, separate from group key
-    const presidingResult = await this.executePresidingOrder(presidingActions, adminKey);
+    const presidingResult = await this.executePresidingOrder(presidingActions);
     const cycleHashlockMap = this.buildCycleHashlockMap(presidingActions, presidingResult);
     const cycleSecretMap = this.buildCycleSecretMap(presidingActions, presidingResult);
 
     const nonPresidingResults = await this.executeNonPresidingOrders(
       groupEntries,
       presidingKey,
-      cycleHashlockMap,
-      adminKey
+      cycleHashlockMap
     );
 
     await this.verifyAndWithdrawOrders(
@@ -142,8 +136,7 @@ export class Orchestrator {
       presidingActions,
       presidingResult,
       nonPresidingResults,
-      cycleSecretMap,
-      adminKey
+      cycleSecretMap
     );
 
     console.log(`[Orchestrator] All ${groupEntries.length} consolidated order(s) on-chain`);
@@ -243,8 +236,7 @@ export class Orchestrator {
   }
 
   private async executePresidingOrder(
-    presidingActions: SendAction[],
-    adminKey: string
+    presidingActions: SendAction[]
   ): Promise<CreateOrderResult> {
     console.log(
       `[Orchestrator] Presiding order: ${presidingActions.length} fill(s) on ${presidingActions[0].chainKey}, ` +
@@ -252,7 +244,6 @@ export class Orchestrator {
     );
 
     const result = await bridgeService.createOrder({
-      privateKey: adminKey,
       receivers: presidingActions.map((a) => a.receiverAddress),
       amounts: presidingActions.map((a) => a.amount),
       chain: presidingActions[0].chainKey,
@@ -294,8 +285,7 @@ export class Orchestrator {
   private async executeNonPresidingOrders(
     groupEntries: [string, SendAction[]][],
     presidingKey: string,
-    cycleHashlockMap: Map<number, string>,
-    adminKey: string
+    cycleHashlockMap: Map<number, string>
   ): Promise<{ chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[]> {
     const results: { chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[] =
       [];
@@ -317,7 +307,6 @@ export class Orchestrator {
       );
 
       const result = await bridgeService.createOrder({
-        privateKey: adminKey,
         receivers: actions.map((a) => a.receiverAddress),
         amounts: actions.map((a) => a.amount),
         chain: actions[0].chainKey,
@@ -346,8 +335,7 @@ export class Orchestrator {
     presidingActions: SendAction[],
     presidingResult: { orderId: string; fills: { fillId: string; secret?: string }[] },
     nonPresidingResults: { chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[],
-    cycleSecretMap: Map<number, string>,
-    adminKey: string
+    cycleSecretMap: Map<number, string>
   ): Promise<void> {
     // Verify and withdraw presiding order
     await this.verifyOrder(presidingKey, presidingResult.orderId, 'presiding');
@@ -358,8 +346,7 @@ export class Orchestrator {
         presidingKey,
         presidingResult.orderId,
         presidingResult.fills[i].fillId,
-        preimage,
-        adminKey
+        preimage
       );
     }
 
@@ -369,7 +356,7 @@ export class Orchestrator {
       for (let i = 0; i < fills.length; i++) {
         const preimage = cycleSecretMap.get(actions[i].cycleIdx);
         if (!preimage) throw new Error(`[Orchestrator] No preimage for cycle ${actions[i].cycleIdx}`);
-        await this.withdrawFill(chainKey, orderId, fills[i].fillId, preimage, adminKey);
+        await this.withdrawFill(chainKey, orderId, fills[i].fillId, preimage);
       }
     }
   }
@@ -390,11 +377,9 @@ export class Orchestrator {
     chainKey: string,
     orderId: string,
     fillId: string,
-    preimage: string,
-    adminKey: string
+    preimage: string
   ): Promise<void> {
     const result = await bridgeService.withdraw({
-      privateKey: adminKey,
       orderId,
       fillId,
       preimage,

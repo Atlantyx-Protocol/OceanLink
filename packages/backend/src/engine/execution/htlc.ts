@@ -1,5 +1,5 @@
 import { ethers, JsonRpcProvider, Wallet, Contract } from 'ethers';
-import { getChainConfig, ChainConfig } from '../../config/chains.js';
+import { getChainConfig } from '../../config/chains.js';
 
 const HTLC_ABI = [
   // Write functions
@@ -66,10 +66,10 @@ export interface RefundResult {
 }
 
 class HTLCService {
-  private privateKey: string;
-
-  constructor() {
-    this.privateKey = process.env.PRIVATE_KEY || '';
+  private getAdminKey(): string {
+    const key = process.env.PRIVATE_KEY_ADMIN;
+    if (!key) throw new Error('PRIVATE_KEY_ADMIN is not configured in environment');
+    return key;
   }
 
   private getProvider(chainKey: string): JsonRpcProvider {
@@ -79,8 +79,7 @@ class HTLCService {
   }
 
   private getSigner(chainKey: string): Wallet {
-    if (!this.privateKey) throw new Error('PRIVATE_KEY not configured');
-    return new Wallet(this.privateKey, this.getProvider(chainKey));
+    return new Wallet(this.getAdminKey(), this.getProvider(chainKey));
   }
 
   private getHTLCContract(chainKey: string): Contract {

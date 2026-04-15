@@ -22,7 +22,6 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
       amount: unknown;
       incentiveFee?: unknown;
       deadline: unknown;
-      privateKey: unknown;
       userAddress: unknown;
     };
   }>('/intent', async (request, reply) => {
@@ -34,7 +33,6 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
       'desChain',
       'amount',
       'deadline',
-      'privateKey',
       'userAddress',
     ] as const;
     for (const field of required) {
@@ -49,7 +47,6 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
       amount: body.amount as string | number,
       incentiveFee: body.incentiveFee as string | number | undefined,
       deadline: body.deadline as number | string,
-      privateKey: body.privateKey as string,
       userAddress: body.userAddress as string,
     });
 

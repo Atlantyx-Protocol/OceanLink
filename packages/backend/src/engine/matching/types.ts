@@ -18,7 +18,6 @@ export interface IntentOrder {
   deadline: number; // Unix epoch in seconds — order is invalid after this
   createdAt: number; // Unix epoch in seconds — set at creation
   status: OrderStatus;
-  privateKey: string; // private key of the user on srcChain (used to sign HTLC tx)
   userAddress: string; // EVM address of the user — listed as receiver by counterpart orders
 }
 
@@ -75,7 +74,6 @@ export interface CreateIntentInput {
   amount: string | number;
   incentiveFee?: string | number; // optional extra fee added to amount to boost match priority
   deadline: number | string;
-  privateKey: string;
   userAddress: string;
 }
 

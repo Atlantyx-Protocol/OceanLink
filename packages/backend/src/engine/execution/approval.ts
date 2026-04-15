@@ -1,165 +1,16 @@
-import { JsonRpcProvider, Wallet, Contract } from 'ethers';
-import { getChainConfig, ChainConfig, getAllChains, CHAIN_KEYS } from '../../config/chains.js';
+import { JsonRpcProvider, Contract } from 'ethers';
+import { getChainConfig, getAllChains, CHAIN_KEYS } from '../../config/chains.js';
 
 const ERC20_ABI = [
-  'function approve(address spender, uint256 amount) external returns (bool)',
   'function allowance(address owner, address spender) external view returns (uint256)',
   'function balanceOf(address account) external view returns (uint256)',
   'function decimals() external view returns (uint8)',
   'function symbol() external view returns (string)',
 ];
 
-export interface ApprovalResult {
-  chain: string;
-  chainId: number;
-  usdcAddress: string;
-  htlcAddress: string;
-  txHash?: string;
-  status: 'success' | 'failed' | 'already_approved';
-  error?: string;
-  allowance?: string;
-}
-
 class ApprovalService {
   private getProvider(rpcUrl: string): JsonRpcProvider {
     return new JsonRpcProvider(rpcUrl);
-  }
-
-  private getSigner(provider: JsonRpcProvider, privateKey: string): Wallet {
-    if (!privateKey) {
-      throw new Error('privateKey is required');
-    }
-    return new Wallet(privateKey, provider);
-  }
-
-  async checkAllowance(chainConfig: ChainConfig, privateKey: string): Promise<bigint> {
-    const provider = this.getProvider(chainConfig.rpcUrl);
-    const signer = this.getSigner(provider, privateKey);
-    const usdcContract = new Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
-
-    const allowance = await usdcContract.allowance(
-      await signer.getAddress(),
-      chainConfig.htlcAddress
-    );
-
-    return allowance;
-  }
-
-  async approveUSDCForChain(
-    chainConfig: ChainConfig,
-    privateKey: string,
-    amount: bigint
-  ): Promise<ApprovalResult> {
-    const result: ApprovalResult = {
-      chain: chainConfig.name,
-      chainId: chainConfig.chainId,
-      usdcAddress: chainConfig.usdcAddress,
-      htlcAddress: chainConfig.htlcAddress,
-      status: 'failed',
-    };
-
-    try {
-      if (!chainConfig.rpcUrl) {
-        throw new Error(`RPC URL not configured for ${chainConfig.name}`);
-      }
-
-      const provider = this.getProvider(chainConfig.rpcUrl);
-      const signer = this.getSigner(provider, privateKey);
-      const usdcContract = new Contract(chainConfig.usdcAddress, ERC20_ABI, signer);
-
-      // Check current allowance
-      const currentAllowance = await usdcContract.allowance(
-        await signer.getAddress(),
-        chainConfig.htlcAddress
-      );
-
-      result.allowance = currentAllowance.toString();
-
-      // If already approved with max amount, skip
-      if (currentAllowance >= amount) {
-        result.status = 'already_approved';
-        console.log(`[${chainConfig.name}] Already approved. Allowance: ${currentAllowance}`);
-        return result;
-      }
-
-      console.log(`[${chainConfig.name}] Approving USDC for HTLC contract...`);
-      console.log(`  USDC: ${chainConfig.usdcAddress}`);
-      console.log(`  HTLC: ${chainConfig.htlcAddress}`);
-
-      const tx = await usdcContract.approve(chainConfig.htlcAddress, amount);
-      console.log(`[${chainConfig.name}] Transaction sent: ${tx.hash}`);
-
-      const receipt = await tx.wait();
-      console.log(`[${chainConfig.name}] Transaction confirmed in block ${receipt.blockNumber}`);
-
-      result.txHash = tx.hash;
-      result.status = 'success';
-
-      // Update allowance after approval
-      const newAllowance = await usdcContract.allowance(
-        await signer.getAddress(),
-        chainConfig.htlcAddress
-      );
-      result.allowance = newAllowance.toString();
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      result.error = errorMessage;
-      console.error(`[${chainConfig.name}] Approval failed:`, errorMessage);
-    }
-
-    return result;
-  }
-
-  async approveUSDCForAllChains(privateKey: string, amount: bigint): Promise<ApprovalResult[]> {
-    const chains = getAllChains();
-    const results: ApprovalResult[] = [];
-
-    console.log('Starting USDC approvals for all chains...\n');
-
-    for (const chainConfig of chains) {
-      const result = await this.approveUSDCForChain(chainConfig, privateKey, amount);
-      results.push(result);
-      console.log('');
-    }
-
-    console.log('Approval process completed.');
-    return results;
-  }
-
-  async approveUSDCForSpecificChain(
-    chainKey: string,
-    privateKey: string,
-    amount: bigint
-  ): Promise<ApprovalResult> {
-    const chainConfig = getChainConfig(chainKey);
-    if (!chainConfig) {
-      throw new Error(`Unknown chain: ${chainKey}. Available: ${CHAIN_KEYS.join(', ')}`);
-    }
-    return this.approveUSDCForChain(chainConfig, privateKey, amount);
-  }
-
-  async getAllAllowances(
-    privateKey: string
-  ): Promise<Record<string, { chain: string; allowance: string }>> {
-    const chains = getAllChains();
-    const allowances: Record<string, { chain: string; allowance: string }> = {};
-
-    for (const chainConfig of chains) {
-      try {
-        const allowance = await this.checkAllowance(chainConfig, privateKey);
-        allowances[chainConfig.name] = {
-          chain: chainConfig.name,
-          allowance: allowance.toString(),
-        };
-      } catch (error) {
-        allowances[chainConfig.name] = {
-          chain: chainConfig.name,
-          allowance: 'error',
-        };
-      }
-    }
-
-    return allowances;
   }
 
   async getBalance(
@@ -203,6 +54,32 @@ class ApprovalService {
       allowance: allowance.toString(),
       htlcAddress: chainConfig.htlcAddress,
     };
+  }
+
+  async getAllAllowances(
+    address: string
+  ): Promise<Record<string, { chain: string; allowance: string }>> {
+    const chains = getAllChains();
+    const allowances: Record<string, { chain: string; allowance: string }> = {};
+
+    for (const chainConfig of chains) {
+      try {
+        const provider = this.getProvider(chainConfig.rpcUrl);
+        const usdcContract = new Contract(chainConfig.usdcAddress, ERC20_ABI, provider);
+        const allowance = await usdcContract.allowance(address, chainConfig.htlcAddress);
+        allowances[chainConfig.name] = {
+          chain: chainConfig.name,
+          allowance: allowance.toString(),
+        };
+      } catch {
+        allowances[chainConfig.name] = {
+          chain: chainConfig.name,
+          allowance: 'error',
+        };
+      }
+    }
+
+    return allowances;
   }
 }
 

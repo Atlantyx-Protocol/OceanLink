@@ -56,6 +56,12 @@ class BridgeService {
   private providers = new Map<string, JsonRpcProvider>();
   private signers = new Map<string, NonceManager>();
 
+  private getAdminKey(): string {
+    const key = process.env.PRIVATE_KEY_ADMIN;
+    if (!key) throw new Error('PRIVATE_KEY_ADMIN is not configured in environment');
+    return key;
+  }
+
   private getProvider(chainKey: string): JsonRpcProvider {
     let provider = this.providers.get(chainKey);
     if (!provider) {
@@ -67,12 +73,13 @@ class BridgeService {
     return provider;
   }
 
-  private getSigner(chainKey: string, privateKey: string): NonceManager {
-    const address = new Wallet(privateKey).address;
+  private getSigner(chainKey: string): NonceManager {
+    const adminKey = this.getAdminKey();
+    const address = new Wallet(adminKey).address;
     const cacheKey = `${chainKey}:${address}`;
     let signer = this.signers.get(cacheKey);
     if (!signer) {
-      const wallet = new Wallet(privateKey, this.getProvider(chainKey));
+      const wallet = new Wallet(adminKey, this.getProvider(chainKey));
       signer = new NonceManager(wallet);
       this.signers.set(cacheKey, signer);
     }
@@ -86,9 +93,8 @@ class BridgeService {
     return { secret, hashlock };
   }
 
-  // Create order with multiple fills
+  // Create order with multiple fills (signed by admin)
   async createOrder(params: {
-    privateKey: string;
     receivers: string[];
     amounts: string[];
     chain?: string;
@@ -98,7 +104,7 @@ class BridgeService {
   }): Promise<CreateOrderResult> {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey)!;
-    const signer = this.getSigner(chainKey, params.privateKey);
+    const signer = this.getSigner(chainKey);
     const senderAddress = params.onBehalfOf || (await signer.getAddress());
 
     // Validate inputs
@@ -121,7 +127,6 @@ class BridgeService {
 
     if (currentAllowance < totalAmount) {
       console.log(`[${chainKey}] Insufficient allowance (have ${currentAllowance}, need ${totalAmount}), approving...`);
-      console.log('privateKey', params.privateKey);
       const approveTx = await usdc.approve(config.htlcAddress, totalAmount);
       await approveTx.wait();
       console.log(`[${chainKey}] USDC approved: ${totalAmount}`);
@@ -153,7 +158,7 @@ class BridgeService {
       console.log(`[${chainKey}] Using provided hashlocks`);
     }
 
-    // Step 3: Calculate timelock (TIME_LOCK env is in minutes, default 1 minute)
+    // Step 3: Calculate timelock (TIME_LOCK env is in minutes, default 10 minutes)
     const timelockMinutes = parseInt(process.env.TIME_LOCK || '10', 10);
     const timelock = Math.floor(Date.now() / 1000) + timelockMinutes * 60;
     console.log(
@@ -219,9 +224,8 @@ class BridgeService {
     };
   }
 
-  // Withdraw from a specific fill with preimage
+  // Withdraw from a specific fill with preimage (signed by admin)
   async withdraw(params: {
-    privateKey: string;
     orderId: string;
     fillId: string;
     preimage: string;
@@ -230,7 +234,7 @@ class BridgeService {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey);
     if (!config) throw new Error(`Unknown chain: ${chainKey}`);
-    const signer = this.getSigner(chainKey, params.privateKey);
+    const signer = this.getSigner(chainKey);
 
     console.log(`[${chainKey}] Withdrawing from order...`);
     console.log(`  Order ID: ${params.orderId}`);
@@ -249,16 +253,15 @@ class BridgeService {
     };
   }
 
-  // Refund order after timelock expires
+  // Refund order after timelock expires (signed by admin)
   async refund(params: {
-    privateKey: string;
     orderId: string;
     chain?: string;
   }): Promise<RefundResult> {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey);
     if (!config) throw new Error(`Unknown chain: ${chainKey}`);
-    const signer = this.getSigner(chainKey, params.privateKey);
+    const signer = this.getSigner(chainKey);
 
     console.log(`[${chainKey}] Refunding order...`);
     console.log(`  Order ID: ${params.orderId}`);
@@ -291,7 +294,7 @@ class BridgeService {
     };
   }
 
-  // Get order details
+  // Get order details (read-only, no signer needed)
   async getOrder(params: { orderId: string; chain?: string }) {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey);
@@ -311,7 +314,7 @@ class BridgeService {
     };
   }
 
-  // Get fill details
+  // Get fill details (read-only)
   async getFill(params: { orderId: string; fillId: string; chain?: string }) {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey);
@@ -328,7 +331,7 @@ class BridgeService {
     };
   }
 
-  // Get all fills for an order
+  // Get all fills for an order (read-only)
   async getOrderFills(params: { orderId: string; chain?: string }) {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey);
