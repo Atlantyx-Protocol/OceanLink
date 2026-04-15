@@ -99,9 +99,7 @@ export class MatchingService {
     }
 
     // Effective amount = base amount + incentive fee (user pays more to boost match priority)
-    const effectiveAmount = incentiveFee
-      ? String(parsedAmount + Number(incentiveFee))
-      : amount;
+    const effectiveAmount = incentiveFee ? String(parsedAmount + Number(incentiveFee)) : amount;
 
     const now = Math.floor(Date.now() / 1000);
     if (!Number.isInteger(deadline) || deadline < now) {

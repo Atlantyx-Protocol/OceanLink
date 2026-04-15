@@ -28,13 +28,7 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
     const body = request.body as Record<string, unknown>;
 
     // Coarse presence check before passing to service validation
-    const required = [
-      'srcChain',
-      'desChain',
-      'amount',
-      'deadline',
-      'userAddress',
-    ] as const;
+    const required = ['srcChain', 'desChain', 'amount', 'deadline', 'userAddress'] as const;
     for (const field of required) {
       if (body[field] === undefined || body[field] === null) {
         return reply.code(400).send({ error: `Missing required field: ${field}` });

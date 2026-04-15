@@ -51,7 +51,6 @@ export interface RefundResult {
   blockNumber: number;
 }
 
-
 class BridgeService {
   private providers = new Map<string, JsonRpcProvider>();
   private signers = new Map<string, NonceManager>();
@@ -126,7 +125,9 @@ class BridgeService {
     const currentAllowance = await usdc.allowance(senderAddress, config.htlcAddress);
 
     if (currentAllowance < totalAmount) {
-      console.log(`[${chainKey}] Insufficient allowance (have ${currentAllowance}, need ${totalAmount}), approving...`);
+      console.log(
+        `[${chainKey}] Insufficient allowance (have ${currentAllowance}, need ${totalAmount}), approving...`
+      );
       const approveTx = await usdc.approve(config.htlcAddress, totalAmount);
       await approveTx.wait();
       console.log(`[${chainKey}] USDC approved: ${totalAmount}`);
@@ -254,10 +255,7 @@ class BridgeService {
   }
 
   // Refund order after timelock expires (signed by admin)
-  async refund(params: {
-    orderId: string;
-    chain?: string;
-  }): Promise<RefundResult> {
+  async refund(params: { orderId: string; chain?: string }): Promise<RefundResult> {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey);
     if (!config) throw new Error(`Unknown chain: ${chainKey}`);

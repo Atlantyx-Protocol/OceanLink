@@ -235,9 +235,7 @@ export class Orchestrator {
     }
   }
 
-  private async executePresidingOrder(
-    presidingActions: SendAction[]
-  ): Promise<CreateOrderResult> {
+  private async executePresidingOrder(presidingActions: SendAction[]): Promise<CreateOrderResult> {
     console.log(
       `[Orchestrator] Presiding order: ${presidingActions.length} fill(s) on ${presidingActions[0].chainKey}, ` +
         `receivers=[${presidingActions.map((a) => a.receiverAddress).join(', ')}]`
@@ -286,9 +284,15 @@ export class Orchestrator {
     groupEntries: [string, SendAction[]][],
     presidingKey: string,
     cycleHashlockMap: Map<number, string>
-  ): Promise<{ chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[]> {
-    const results: { chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[] =
-      [];
+  ): Promise<
+    { chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[]
+  > {
+    const results: {
+      chainKey: string;
+      orderId: string;
+      fills: { fillId: string }[];
+      actions: SendAction[];
+    }[] = [];
 
     for (const [key, actions] of groupEntries) {
       if (key === presidingKey) continue;
@@ -334,7 +338,12 @@ export class Orchestrator {
     presidingKey: string,
     presidingActions: SendAction[],
     presidingResult: { orderId: string; fills: { fillId: string; secret?: string }[] },
-    nonPresidingResults: { chainKey: string; orderId: string; fills: { fillId: string }[]; actions: SendAction[] }[],
+    nonPresidingResults: {
+      chainKey: string;
+      orderId: string;
+      fills: { fillId: string }[];
+      actions: SendAction[];
+    }[],
     cycleSecretMap: Map<number, string>
   ): Promise<void> {
     // Verify and withdraw presiding order
@@ -355,7 +364,8 @@ export class Orchestrator {
       await this.verifyOrder(chainKey, orderId, `non-presiding (${chainKey})`);
       for (let i = 0; i < fills.length; i++) {
         const preimage = cycleSecretMap.get(actions[i].cycleIdx);
-        if (!preimage) throw new Error(`[Orchestrator] No preimage for cycle ${actions[i].cycleIdx}`);
+        if (!preimage)
+          throw new Error(`[Orchestrator] No preimage for cycle ${actions[i].cycleIdx}`);
         await this.withdrawFill(chainKey, orderId, fills[i].fillId, preimage);
       }
     }

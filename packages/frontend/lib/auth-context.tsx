@@ -1,12 +1,7 @@
-"use client"
+'use client';
 
-import {
-  createContext,
-  useContext,
-  useMemo,
-  type ReactNode,
-} from "react"
-import { useAccount } from "wagmi"
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { useAccount } from 'wagmi';
 
 /**
  * Wallet-only auth/session context.
@@ -19,22 +14,21 @@ import { useAccount } from "wagmi"
  */
 
 interface AuthContextValue {
-  walletAddress: `0x${string}` | null
-  walletAddressLower: string | null
-  chainId: number | null
-  isAuthenticated: boolean
-  isConnecting: boolean
-  isReconnecting: boolean
+  walletAddress: `0x${string}` | null;
+  walletAddressLower: string | null;
+  chainId: number | null;
+  isAuthenticated: boolean;
+  isConnecting: boolean;
+  isReconnecting: boolean;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null)
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { address, chainId, isConnecting, isReconnecting } =
-    useAccount()
+  const { address, chainId, isConnecting, isReconnecting } = useAccount();
 
   const value = useMemo<AuthContextValue>(() => {
-    const walletAddress = address ?? null
+    const walletAddress = address ?? null;
     return {
       walletAddress,
       walletAddressLower: walletAddress ? walletAddress.toLowerCase() : null,
@@ -42,16 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(walletAddress),
       isConnecting,
       isReconnecting,
-    }
-  }, [address, chainId, isConnecting, isReconnecting])
+    };
+  }, [address, chainId, isConnecting, isReconnecting]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
+  const ctx = useContext(AuthContext);
   if (!ctx) {
-    throw new Error("useAuth must be used within <AuthProvider>")
+    throw new Error('useAuth must be used within <AuthProvider>');
   }
-  return ctx
+  return ctx;
 }

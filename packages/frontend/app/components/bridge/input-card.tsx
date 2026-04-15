@@ -1,22 +1,22 @@
-"use client"
+'use client';
 
-import { Input } from "@/components/ui/input"
-import { TokenSelector, type Network, type Token } from "./token-selector"
+import { Input } from '@/components/ui/input';
+import { TokenSelector, type Network, type Token } from './token-selector';
 
 interface InputCardProps {
-  label: string
-  amount: string
-  onAmountChange: (value: string) => void
-  equivalentValue: string
-  token: Token
-  network: Network
-  networks: Network[]
-  onNetworkChange: (network: Network) => void
-  balance?: string
-  address?: string
-  showAddress?: boolean
-  addressLabel?: string
-  disabled?: boolean
+  label: string;
+  amount: string;
+  onAmountChange: (value: string) => void;
+  equivalentValue: string;
+  token: Token;
+  network: Network;
+  networks: Network[];
+  onNetworkChange: (network: Network) => void;
+  balance?: string;
+  address?: string;
+  showAddress?: boolean;
+  addressLabel?: string;
+  disabled?: boolean;
 }
 
 export function InputCard({
@@ -31,7 +31,7 @@ export function InputCard({
   balance,
   address,
   showAddress = false,
-  addressLabel = "Address",
+  addressLabel = 'Address',
   disabled = false,
 }: InputCardProps) {
   return (
@@ -56,9 +56,9 @@ export function InputCard({
             value={amount}
             disabled={disabled}
             onChange={(e) => {
-              const value = e.target.value
+              const value = e.target.value;
               if (/^\d*\.?\d*$/.test(value)) {
-                onAmountChange(value)
+                onAmountChange(value);
               }
             }}
             className="border-0 bg-transparent text-3xl md:text-4xl font-semibold text-foreground placeholder:text-muted-foreground/50 p-0 h-auto focus-visible:ring-0"
@@ -74,5 +74,5 @@ export function InputCard({
         />
       </div>
     </div>
-  )
+  );
 }

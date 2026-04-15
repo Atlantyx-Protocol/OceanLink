@@ -7,18 +7,18 @@
  */
 
 export const config = {
-  network: (process.env.NEXT_PUBLIC_NETWORK_MODE ?? "testnet") as "testnet" | "mainnet",
+  network: (process.env.NEXT_PUBLIC_NETWORK_MODE ?? 'testnet') as 'testnet' | 'mainnet',
 
   across: {
     /** Server-only — never shipped to the browser. */
-    apiKey: process.env.NEXT_PUBLIC_ACROSS_API_KEY ?? "",
-    integratorId: process.env.NEXT_PUBLIC_ACROSS_INTEGRATOR_ID ?? "0x00d9",
+    apiKey: process.env.NEXT_PUBLIC_ACROSS_API_KEY ?? '',
+    integratorId: process.env.NEXT_PUBLIC_ACROSS_INTEGRATOR_ID ?? '0x00d9',
   },
 
   ethereum: {
-    httpEndpoint: process.env.NEXT_PUBLIC_ETHEREUM_RPC ?? "",
+    httpEndpoint: process.env.NEXT_PUBLIC_ETHEREUM_RPC ?? '',
   },
   arbitrum: {
-    httpEndpoint: process.env.NEXT_PUBLIC_ARBITRUM_RPC ?? "",
+    httpEndpoint: process.env.NEXT_PUBLIC_ARBITRUM_RPC ?? '',
   },
-} as const
+} as const;

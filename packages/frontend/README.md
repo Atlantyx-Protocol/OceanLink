@@ -48,12 +48,12 @@ Open [http://localhost:3001](http://localhost:3001) in your browser.
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start development server on port 3000 |
-| `pnpm build` | Build for production |
+| Command      | Description                              |
+| ------------ | ---------------------------------------- |
+| `pnpm dev`   | Start development server on port 3000    |
+| `pnpm build` | Build for production                     |
 | `pnpm start` | Start production server (requires build) |
-| `pnpm lint` | Run ESLint |
+| `pnpm lint`  | Run ESLint                               |
 
 ## Project Structure
 
@@ -80,9 +80,9 @@ packages/frontend/
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_BACKEND_URL` | Backend API base URL | Yes |
+| Variable                  | Description          | Required |
+| ------------------------- | -------------------- | -------- |
+| `NEXT_PUBLIC_BACKEND_URL` | Backend API base URL | Yes      |
 
 ## Adding shadcn/ui Components
 

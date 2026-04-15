@@ -1,32 +1,32 @@
-"use client"
+'use client';
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ChevronDown } from "lucide-react"
+} from '@/components/ui/dropdown-menu';
+import { ChevronDown } from 'lucide-react';
 
 export interface Network {
-  id: string
-  name: string
-  icon: string
+  id: string;
+  name: string;
+  icon: string;
 }
 
 export interface Token {
-  symbol: string
-  name: string
-  icon: string
+  symbol: string;
+  name: string;
+  icon: string;
 }
 
 interface TokenSelectorProps {
-  token: Token
-  network: Network
-  networks: Network[]
-  onNetworkChange: (network: Network) => void
-  balance?: string
+  token: Token;
+  network: Network;
+  networks: Network[];
+  onNetworkChange: (network: Network) => void;
+  balance?: string;
 }
 
 export function TokenSelector({
@@ -49,7 +49,9 @@ export function TokenSelector({
             </div>
             <div className="flex flex-col items-start">
               <span className="text-sm font-semibold text-foreground">{token.symbol}</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[100px]">{network.name}</span>
+              <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+                {network.name}
+              </span>
             </div>
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
           </Button>
@@ -66,9 +68,7 @@ export function TokenSelector({
             >
               <span className="text-lg">{net.icon}</span>
               <span>{net.name}</span>
-              {net.id === network.id && (
-                <span className="ml-auto text-accent">●</span>
-              )}
+              {net.id === network.id && <span className="ml-auto text-accent">●</span>}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
@@ -79,5 +79,5 @@ export function TokenSelector({
         </span>
       )}
     </div>
-  )
+  );
 }

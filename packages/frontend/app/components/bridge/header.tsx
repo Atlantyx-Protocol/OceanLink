@@ -1,8 +1,8 @@
-"use client"
+'use client';
 
-import { Button } from "@/components/ui/button"
-import { Menu, Waves } from "lucide-react"
-import { ConnectWalletButton } from "./connect-wallet-button"
+import { Button } from '@/components/ui/button';
+import { Menu, Waves } from 'lucide-react';
+import { ConnectWalletButton } from './connect-wallet-button';
 
 export function Header() {
   return (
@@ -15,10 +15,7 @@ export function Header() {
           <span className="text-lg font-semibold text-foreground">OceanLink</span>
         </div>
         <nav className="hidden md:flex items-center gap-1">
-          <Button
-            variant="ghost"
-            className="relative text-foreground hover:bg-secondary"
-          >
+          <Button variant="ghost" className="relative text-foreground hover:bg-secondary">
             Bridge
             <span className="absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 bg-accent rounded-full" />
           </Button>
@@ -31,5 +28,5 @@ export function Header() {
         </Button>
       </div>
     </header>
-  )
+  );
 }

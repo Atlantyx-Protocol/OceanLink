@@ -1,5 +1,5 @@
-import Link from "next/link"
-import { Twitter, Github, MessageCircle } from "lucide-react"
+import Link from 'next/link';
+import { Twitter, Github, MessageCircle } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -37,5 +37,5 @@ export function Footer() {
         Powered by OceanLink Protocol
       </div>
     </footer>
-  )
+  );
 }

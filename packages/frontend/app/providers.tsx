@@ -1,10 +1,10 @@
-"use client"
+'use client';
 
-import { useState, type ReactNode } from "react"
-import { WagmiProvider } from "wagmi"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { wagmiConfig } from "@/lib/wagmi"
-import { AuthProvider } from "@/lib/auth-context"
+import { useState, type ReactNode } from 'react';
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { wagmiConfig } from '@/lib/wagmi';
+import { AuthProvider } from '@/lib/auth-context';
 
 export function Providers({ children }: { children: ReactNode }) {
   // QueryClient must be created inside a client component so each browser
@@ -19,8 +19,8 @@ export function Providers({ children }: { children: ReactNode }) {
             refetchOnWindowFocus: false,
           },
         },
-      }),
-  )
+      })
+  );
 
   return (
     <WagmiProvider config={wagmiConfig}>
@@ -28,5 +28,5 @@ export function Providers({ children }: { children: ReactNode }) {
         <AuthProvider>{children}</AuthProvider>
       </QueryClientProvider>
     </WagmiProvider>
-  )
+  );
 }
