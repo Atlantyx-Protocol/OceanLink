@@ -127,7 +127,7 @@ export function useAcrossBridge(): UseAcrossBridgeReturn {
     } finally {
       inflightRef.current = false;
     }
-  }, []);
+  }, [walletClient]);
 
   return { ...state, bridge, reset };
 }

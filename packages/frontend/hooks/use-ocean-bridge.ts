@@ -171,7 +171,7 @@ export function useOceanBridge() {
     } finally {
       inflightRef.current = false;
     }
-  }, []);
+  }, [walletClient]);
 
   return { ...state, bridge, reset };
 }
