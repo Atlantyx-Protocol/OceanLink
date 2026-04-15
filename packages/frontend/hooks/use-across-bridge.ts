@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react"
 import type { PublicClient } from "viem"
-import { getWalletClient } from "@/lib/walletClient"
+import { useWalletClient } from "wagmi"
 import {
   createOriginPublicClient,
   executeApproval,
@@ -65,6 +65,7 @@ const INITIAL_STATE: BridgeState = {
 
 export function useAcrossBridge(): UseAcrossBridgeReturn {
   const [state, setState] = useState<BridgeState>(INITIAL_STATE)
+  const { data: walletClient } = useWalletClient()
 
   // Guard against double-submits
   const inflightRef = useRef(false)
@@ -103,7 +104,7 @@ export function useAcrossBridge(): UseAcrossBridgeReturn {
       // --- Step 2: Approve ----------------------------------------------
       setState((s) => ({ ...s, step: "approving", quote }))
 
-      const walletClient = getWalletClient()
+      if (!walletClient) throw new Error("Wallet not connected")
       publicClient = createOriginPublicClient(originChain)
 
       await executeApproval(quote, walletClient, publicClient)

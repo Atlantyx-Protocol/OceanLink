@@ -1,23 +1,47 @@
 "use client"
 
-import { useState } from "react"
-import { useAccount } from "wagmi"
+import { useEffect, useState } from "react"
+import {
+  useAccount,
+  useReadContract,
+  useSwitchChain,
+} from "wagmi"
+import { erc20Abi, formatUnits } from "viem"
 import { Button } from "@/components/ui/button"
 import { InputCard } from "./input-card"
-import { ArrowDownUp } from "lucide-react"
+import { BridgeStatus } from "./bridge-status"
+import { ArrowDownUp, Loader2 } from "lucide-react"
 import type { Network, Token } from "./token-selector"
+import { useOceanBridge } from "@/hooks/use-ocean-bridge"
+import {
+  getChainId,
+  getUsdcAddress,
+  type SupportedChain,
+} from "@/lib/web3/web3"
+import type { wagmiConfig } from "@/lib/wagmi"
+
+type ConfiguredChainId = (typeof wagmiConfig)["chains"][number]["id"]
+import { USDC_DECIMALS } from "@/hooks/funds/constants"
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const NETWORKS: Network[] = [
-  { id: "ethereum-sepolia", name: "Ethereum Sepolia", icon: "⟠" },
-  { id: "arbitrum-sepolia", name: "Arbitrum Sepolia", icon: "🔵" },
-  { id: "base-sepolia", name: "Base Sepolia", icon: "🔷" },
+  { id: "ethereum-sepolia", name: "Ethereum Sepolia", icon: "\u27E0" },
+  { id: "arbitrum-sepolia", name: "Arbitrum Sepolia", icon: "\uD83D\uDD35" },
+  { id: "base-sepolia", name: "Base Sepolia", icon: "\uD83D\uDD37" },
 ]
 
 const USDC_TOKEN: Token = {
   symbol: "USDC",
   name: "USD Coin",
-  icon: "💲",
+  icon: "\uD83D\uDCB2",
 }
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 
 interface BridgeCardProps {
   isConnected: boolean
@@ -25,13 +49,101 @@ interface BridgeCardProps {
 }
 
 export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
-  const { address: walletAddress } = useAccount()
+  const { address: walletAddress, chainId: connectedChainId } = useAccount()
+  const { switchChain } = useSwitchChain()
+
   const [fromAmount, setFromAmount] = useState("")
   const [toAmount, setToAmount] = useState("")
   const [fromNetwork, setFromNetwork] = useState(NETWORKS[0])
   const [toNetwork, setToNetwork] = useState(NETWORKS[1])
 
+  const {
+    step,
+    orderId,
+    approvalTxHash,
+    error,
+    isLoading,
+    bridge,
+    reset,
+  } = useOceanBridge()
+
+  // ---- Derived state --------------------------------------------------------
+
+  const srcChain = fromNetwork.id as SupportedChain
+  const desChain = toNetwork.id as SupportedChain
+  const srcChainId = getChainId(srcChain) as ConfiguredChainId
+  const isOnCorrectChain = connectedChainId === srcChainId
+  const parsedAmount = parseFloat(fromAmount) || 0
+  const hasValidAmount = parsedAmount > 0
+
+  // ---- Read USDC balance on source chain ------------------------------------
+
+  const usdcAddress = getUsdcAddress(srcChain)
+
+  const { data: rawBalance } = useReadContract({
+    address: usdcAddress,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: walletAddress ? [walletAddress] : undefined,
+    chainId: srcChainId,
+    query: {
+      enabled: isConnected && !!walletAddress,
+      refetchInterval: 15_000,
+    },
+  })
+
+  const formattedBalance =
+    rawBalance !== undefined
+      ? parseFloat(formatUnits(rawBalance, USDC_DECIMALS)).toLocaleString(
+          "en-US",
+          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+        )
+      : undefined
+
+  // Read balance on destination chain
+  const desChainId = getChainId(desChain) as ConfiguredChainId
+  const desUsdcAddress = getUsdcAddress(desChain)
+
+  const { data: rawDesBalance } = useReadContract({
+    address: desUsdcAddress,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: walletAddress ? [walletAddress] : undefined,
+    chainId: desChainId,
+    query: {
+      enabled: isConnected && !!walletAddress,
+      refetchInterval: 15_000,
+    },
+  })
+
+  const formattedDesBalance =
+    rawDesBalance !== undefined
+      ? parseFloat(formatUnits(rawDesBalance, USDC_DECIMALS)).toLocaleString(
+          "en-US",
+          { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+        )
+      : undefined
+
+  // ---- Reset bridge status when form changes --------------------------------
+
+  useEffect(() => {
+    if (step === "done" || step === "error") {
+      // Don't auto-dismiss — user uses the X button
+    }
+  }, [fromAmount, fromNetwork, toNetwork])
+
+  // Reset form after successful bridge
+  useEffect(() => {
+    if (step === "done") {
+      setFromAmount("")
+      setToAmount("")
+    }
+  }, [step])
+
+  // ---- Handlers -------------------------------------------------------------
+
   const handleSwapDirection = () => {
+    if (isLoading) return
     const tempNetwork = fromNetwork
     const tempAmount = fromAmount
     setFromNetwork(toNetwork)
@@ -42,7 +154,6 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
 
   const handleFromAmountChange = (value: string) => {
     setFromAmount(value)
-    // In a real app, this would calculate based on exchange rates/fees
     setToAmount(value)
   }
 
@@ -51,10 +162,63 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
     setFromAmount(value)
   }
 
+  const handleBridge = async () => {
+    if (!walletAddress || !hasValidAmount) return
+
+    // Switch chain if needed
+    if (!isOnCorrectChain) {
+      switchChain({ chainId: srcChainId as ConfiguredChainId })
+      return
+    }
+
+    await bridge({
+      amount: fromAmount,
+      srcChain,
+      desChain,
+      userAddress: walletAddress,
+    })
+  }
+
   const formatUsdValue = (amount: string) => {
     const num = parseFloat(amount) || 0
-    return `≈ $${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    return `\u2248 $${num.toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
   }
+
+  // ---- Button label & state -------------------------------------------------
+
+  const getButtonContent = () => {
+    if (!isConnected) return null // handled by Connect Wallet button
+
+    if (isLoading) {
+      const labels: Record<string, string> = {
+        checking: "Checking allowance...",
+        approving: "Waiting for approval...",
+        submitting: "Submitting order...",
+      }
+      return (
+        <span className="flex items-center justify-center gap-2">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          {labels[step] ?? "Processing..."}
+        </span>
+      )
+    }
+
+    if (!hasValidAmount) return "Enter an amount"
+    if (fromNetwork.id === toNetwork.id) return "Select different networks"
+    if (!isOnCorrectChain) return `Switch to ${fromNetwork.name}`
+
+    return "Bridge"
+  }
+
+  const isButtonDisabled =
+    isLoading ||
+    !hasValidAmount ||
+    fromNetwork.id === toNetwork.id
+
+  // ---- Render ---------------------------------------------------------------
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -67,11 +231,14 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
           token={USDC_TOKEN}
           network={fromNetwork}
           networks={NETWORKS}
-          onNetworkChange={setFromNetwork}
-          balance={isConnected ? "1,234.56" : undefined}
+          onNetworkChange={(n) => {
+            if (!isLoading) setFromNetwork(n)
+          }}
+          balance={isConnected ? formattedBalance : undefined}
           address={walletAddress}
           showAddress={isConnected && !!walletAddress}
           addressLabel="From"
+          disabled={isLoading}
         />
 
         <div className="relative py-2">
@@ -80,6 +247,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
               variant="secondary"
               size="icon"
               onClick={handleSwapDirection}
+              disabled={isLoading}
               className="h-10 w-10 rounded-xl bg-secondary hover:bg-secondary/80 border border-border shadow-lg transition-transform hover:scale-105"
             >
               <ArrowDownUp className="h-4 w-4 text-foreground" />
@@ -95,22 +263,26 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
           token={USDC_TOKEN}
           network={toNetwork}
           networks={NETWORKS}
-          onNetworkChange={setToNetwork}
-          balance={isConnected ? "567.89" : undefined}
+          onNetworkChange={(n) => {
+            if (!isLoading) setToNetwork(n)
+          }}
+          balance={isConnected ? formattedDesBalance : undefined}
           address={walletAddress}
           showAddress={isConnected && !!walletAddress}
           addressLabel="To"
+          disabled={isLoading}
         />
 
+        {/* Bridge / Connect button */}
         <div className="mt-4">
           {isConnected ? (
             <Button
               className="w-full h-14 text-base font-semibold rounded-xl bg-accent hover:bg-accent/90 text-accent-foreground"
-              disabled={!fromAmount || parseFloat(fromAmount) <= 0}
+              disabled={isButtonDisabled}
+              onClick={handleBridge}
+              aria-busy={isLoading}
             >
-              {!fromAmount || parseFloat(fromAmount) <= 0
-                ? "Enter an amount"
-                : "Bridge"}
+              {getButtonContent()}
             </Button>
           ) : (
             <Button
@@ -121,6 +293,15 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
             </Button>
           )}
         </div>
+
+        {/* Status feedback */}
+        <BridgeStatus
+          step={step}
+          orderId={orderId}
+          approvalTxHash={approvalTxHash}
+          error={error}
+          onDismiss={reset}
+        />
       </div>
     </div>
   )

@@ -3,15 +3,10 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
   type ReactNode,
 } from "react"
 import { useAccount } from "wagmi"
-import {
-  clearWalletClient,
-  setWalletClientFromConnector,
-} from "./walletClient"
 
 /**
  * Wallet-only auth/session context.
@@ -35,28 +30,8 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { address, chainId, connector, status, isConnecting, isReconnecting } =
+  const { address, chainId, isConnecting, isReconnecting } =
     useAccount()
-
-  // Bind the module-level WalletClient to the active connector whenever the
-  // account or chain changes. Clear it on disconnect so stale signers can't
-  // sign for the wrong address.
-  useEffect(() => {
-    let cancelled = false
-
-    if (status === "connected" && connector) {
-      setWalletClientFromConnector(connector).catch((err) => {
-        console.error("Failed to bind WalletClient:", err)
-      })
-    } else {
-      clearWalletClient()
-    }
-
-    return () => {
-      cancelled = true
-      if (cancelled) clearWalletClient()
-    }
-  }, [status, connector, address, chainId])
 
   const value = useMemo<AuthContextValue>(() => {
     const walletAddress = address ?? null

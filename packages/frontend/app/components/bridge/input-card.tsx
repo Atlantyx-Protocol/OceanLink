@@ -16,6 +16,7 @@ interface InputCardProps {
   address?: string
   showAddress?: boolean
   addressLabel?: string
+  disabled?: boolean
 }
 
 export function InputCard({
@@ -31,6 +32,7 @@ export function InputCard({
   address,
   showAddress = false,
   addressLabel = "Address",
+  disabled = false,
 }: InputCardProps) {
   return (
     <div className="rounded-2xl bg-card p-4 md:p-5">
@@ -52,6 +54,7 @@ export function InputCard({
             inputMode="decimal"
             placeholder="0.00"
             value={amount}
+            disabled={disabled}
             onChange={(e) => {
               const value = e.target.value
               if (/^\d*\.?\d*$/.test(value)) {
