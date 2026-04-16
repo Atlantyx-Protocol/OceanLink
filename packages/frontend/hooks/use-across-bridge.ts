@@ -66,6 +66,8 @@ const INITIAL_STATE: BridgeState = {
 export function useAcrossBridge(): UseAcrossBridgeReturn {
   const [state, setState] = useState<BridgeState>(INITIAL_STATE);
   const { data: walletClient } = useWalletClient();
+  const walletClientRef = useRef(walletClient);
+  walletClientRef.current = walletClient;
 
   // Guard against double-submits
   const inflightRef = useRef(false);
@@ -104,15 +106,16 @@ export function useAcrossBridge(): UseAcrossBridgeReturn {
       // --- Step 2: Approve ----------------------------------------------
       setState((s) => ({ ...s, step: 'approving', quote }));
 
-      if (!walletClient) throw new Error('Wallet not connected');
+      const wc = walletClientRef.current;
+      if (!wc) throw new Error('Wallet not connected');
       publicClient = createOriginPublicClient(originChain);
 
-      await executeApproval(quote, walletClient, publicClient);
+      await executeApproval(quote, wc, publicClient);
 
       // --- Step 3: Bridge ------------------------------------------------
       setState((s) => ({ ...s, step: 'bridging' }));
 
-      const txHash = await executeQuote(quote, walletClient, publicClient);
+      const txHash = await executeQuote(quote, wc, publicClient);
 
       // --- Done ----------------------------------------------------------
       setState((s) => ({ ...s, step: 'done', txHash, isLoading: false }));
@@ -127,7 +130,7 @@ export function useAcrossBridge(): UseAcrossBridgeReturn {
     } finally {
       inflightRef.current = false;
     }
-  }, [walletClient]);
+  }, []);
 
   return { ...state, bridge, reset };
 }

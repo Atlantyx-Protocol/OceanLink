@@ -12,6 +12,7 @@ import {
   type SupportedChain,
 } from '@/lib/web3/web3';
 import { USDC_DECIMALS } from '@/hooks/funds/constants';
+import { toast } from '@/hooks/use-toast';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,6 +51,9 @@ const INITIAL_STATE: OceanBridgeState = {
 /** Intent orders are valid for 30 minutes. */
 const INTENT_DEADLINE_SECONDS = 30 * 60;
 
+/** Timeout for the intent submission request (30 seconds). */
+const INTENT_SUBMIT_TIMEOUT_MS = 30_000;
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -57,6 +61,9 @@ const INTENT_DEADLINE_SECONDS = 30 * 60;
 export function useOceanBridge() {
   const [state, setState] = useState<OceanBridgeState>(INITIAL_STATE);
   const { data: walletClient } = useWalletClient();
+  const walletClientRef = useRef(walletClient);
+  walletClientRef.current = walletClient;
+
   const inflightRef = useRef(false);
 
   const reset = useCallback(() => {
@@ -103,9 +110,10 @@ export function useOceanBridge() {
       if (currentAllowance < amountWei) {
         setState((s) => ({ ...s, step: 'approving' }));
 
-        if (!walletClient) throw new Error('Wallet not connected');
+        const wc = walletClientRef.current;
+        if (!wc) throw new Error('Wallet not connected');
 
-        const hash = await walletClient.writeContract({
+        const hash = await wc.writeContract({
           address: usdcAddress,
           abi: erc20Abi,
           functionName: 'approve',
@@ -117,11 +125,14 @@ export function useOceanBridge() {
         approvalTxHash = hash;
 
         setState((s) => ({ ...s, approvalTxHash: hash }));
+        toast({ title: 'Approval sent', description: `TX: ${hash.slice(0, 10)}...${hash.slice(-8)}` });
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
         if (receipt.status === 'reverted') {
           throw new Error('USDC approval transaction reverted');
         }
+
+        toast({ title: 'Approval confirmed' });
       }
 
       // ----- Step 3: Submit intent order to backend -------------------------
@@ -140,11 +151,25 @@ export function useOceanBridge() {
         body.incentiveFee = params.incentiveFee;
       }
 
-      const res = await fetch('/api/intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), INTENT_SUBMIT_TIMEOUT_MS);
+
+      let res: Response;
+      try {
+        res = await fetch('/api/intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          throw new Error('Intent submission timed out — please try again');
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       const data = await res.json().catch(() => ({ error: 'Invalid response' }));
 
@@ -160,6 +185,8 @@ export function useOceanBridge() {
         error: null,
         isLoading: false,
       });
+
+      toast({ title: 'Bridge order submitted', description: `Order ID: ${data.order?.orderId ?? 'N/A'}` });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Bridge transaction failed';
       setState((s) => ({
@@ -168,10 +195,12 @@ export function useOceanBridge() {
         error: message,
         isLoading: false,
       }));
+
+      toast({ title: 'Bridge failed', description: message, variant: 'destructive' });
     } finally {
       inflightRef.current = false;
     }
-  }, [walletClient]);
+  }, []);
 
   return { ...state, bridge, reset };
 }
