@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Menu, Waves } from 'lucide-react';
 import { ConnectWalletButton } from './connect-wallet-button';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
 
 export function Header() {
   return (
@@ -22,6 +23,7 @@ export function Header() {
         </nav>
       </div>
       <div className="flex items-center gap-3">
+        <ThemeToggle />
         <ConnectWalletButton />
         <Button variant="ghost" size="icon" className="md:hidden">
           <Menu className="h-5 w-5" />

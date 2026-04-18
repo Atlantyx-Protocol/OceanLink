@@ -35,20 +35,25 @@ export function InputCard({
   disabled = false,
 }: InputCardProps) {
   return (
-    <div className="rounded-2xl bg-card p-4 md:p-5">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-muted-foreground">{label}</span>
+    <div className="rounded-2xl bg-card border border-border/50 p-4 md:p-5 transition-colors duration-200 focus-within:border-accent/40">
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
         {showAddress && address && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="hidden sm:inline">{addressLabel}:</span>
-            <span className="font-mono text-foreground text-xs sm:text-sm">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-muted-foreground">
+            <span className="hidden sm:inline">{addressLabel}</span>
+            <span className="font-mono text-foreground">
               {address.slice(0, 6)}...{address.slice(-4)}
             </span>
-          </div>
+          </span>
         )}
       </div>
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-col gap-1 flex-1 min-w-0">
+
+      {/* Input + Token selector */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
           <Input
             type="text"
             inputMode="decimal"
@@ -61,9 +66,9 @@ export function InputCard({
                 onAmountChange(value);
               }
             }}
-            className="border-0 bg-transparent text-3xl md:text-4xl font-semibold text-foreground placeholder:text-muted-foreground/50 p-0 h-auto focus-visible:ring-0"
+            className="border-0 bg-transparent text-3xl md:text-4xl font-bold text-foreground placeholder:text-muted-foreground/30 p-0 h-auto focus-visible:ring-0 transition-colors"
           />
-          <span className="text-sm text-muted-foreground">{equivalentValue}</span>
+          <span className="text-xs text-muted-foreground/70">{equivalentValue}</span>
         </div>
         <TokenSelector
           token={token}
@@ -71,6 +76,7 @@ export function InputCard({
           networks={networks}
           onNetworkChange={onNetworkChange}
           balance={balance}
+          onMaxClick={balance ? () => onAmountChange(balance.replace(/,/g, '')) : undefined}
         />
       </div>
     </div>

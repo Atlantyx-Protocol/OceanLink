@@ -27,6 +27,7 @@ interface TokenSelectorProps {
   networks: Network[];
   onNetworkChange: (network: Network) => void;
   balance?: string;
+  onMaxClick?: () => void;
 }
 
 export function TokenSelector({
@@ -35,14 +36,15 @@ export function TokenSelector({
   networks,
   onNetworkChange,
   balance,
+  onMaxClick,
 }: TokenSelectorProps) {
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-end gap-2">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="secondary"
-            className="flex items-center gap-2 h-auto py-2 px-3 hover:bg-secondary/80 rounded-xl border border-border"
+            className="flex items-center gap-2 h-auto py-2 px-3 hover:bg-secondary/80 rounded-xl border border-border transition-colors"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-background text-base">
               {token.icon}
@@ -74,9 +76,20 @@ export function TokenSelector({
         </DropdownMenuContent>
       </DropdownMenu>
       {balance && (
-        <span className="text-xs text-muted-foreground">
-          Bal: <span className="text-foreground">{balance}</span>
-        </span>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span>
+            Bal: <span className="text-foreground font-medium">{balance}</span>
+          </span>
+          {onMaxClick && (
+            <button
+              type="button"
+              onClick={onMaxClick}
+              className="font-semibold text-accent hover:text-accent/80 transition-colors cursor-pointer"
+            >
+              MAX
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
