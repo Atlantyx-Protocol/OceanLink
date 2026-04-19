@@ -4,7 +4,7 @@ include .env
 export
 endif
 
-.PHONY: help install dev build e2e-test e2e-matching-test e2e-full-flow-test approve-usdc-all backend frontend
+.PHONY: help install dev build e2e-test e2e-matching-test e2e-liquidity-test e2e-full-flow-test approve-usdc-all backend frontend
 
 help:
 	@echo "Available commands:"
@@ -16,6 +16,7 @@ help:
 	@echo "  make approve-usdc-all        - Approve USDC on all chains (defaults to AMOUNT=max)"
 	@echo "  make e2e-bridge-test          - Run E2E bridge test"
 	@echo "  make e2e-matching-test - Run E2E matching engine test"
+	@echo "  make e2e-liquidity-test - Run E2E liquidity market service test"
 	@echo "  make e2e-full-flow-test - Run E2E full flow (intent→match→bridge→verify)"
 	@echo ""
 	@echo "E2E Test: Loads PRIVATE_KEY_A/B from .env (full-flow also needs C/D)"
@@ -46,6 +47,10 @@ e2e-bridge-test:
 
 e2e-matching-test:
 	./packages/backend/scripts/e2e-matching-engine-test.sh
+
+e2e-liquidity-test:
+	@if [ -z "$$PRIVATE_KEY_TESTER" ]; then echo "Error: PRIVATE_KEY_TESTER not set"; exit 1; fi
+	./packages/backend/scripts/e2e-liquidity-test.sh
 
 e2e-full-flow-test:
 	@if [ -z "$$PRIVATE_KEY_A" ]; then echo "Error: PRIVATE_KEY_A not set"; exit 1; fi
