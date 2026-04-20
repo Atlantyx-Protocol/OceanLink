@@ -51,23 +51,25 @@ async function start() {
       const liquidityService = new LiquidityService(matchingService, orderStore, lpConfigs);
       liquidityService.start();
 
-      const shutdown = () => {
+      const shutdown = async () => {
         liquidityService.stop();
-        void fastify.close();
+        await fastify.close();
+        process.exit(0);
       };
-      process.once('SIGINT', shutdown);
-      process.once('SIGTERM', shutdown);
+      process.once('SIGINT', () => void shutdown());
+      process.once('SIGTERM', () => void shutdown());
     } catch {
       // No LP keys — fall back to the default match scheduler (user↔user matching only)
       console.warn('[LiquidityService] LP keys not found — falling back to default scheduler');
       matchScheduler.start();
 
-      const shutdown = () => {
+      const shutdown = async () => {
         matchScheduler.stop();
-        void fastify.close();
+        await fastify.close();
+        process.exit(0);
       };
-      process.once('SIGINT', shutdown);
-      process.once('SIGTERM', shutdown);
+      process.once('SIGINT', () => void shutdown());
+      process.once('SIGTERM', () => void shutdown());
     }
 
     // Start server
