@@ -123,8 +123,18 @@ class BridgeService {
     // Step 1: Check USDC allowance
     const usdc = new Contract(config.usdcAddress, ERC20_ABI, signer);
     const currentAllowance = await usdc.allowance(senderAddress, config.htlcAddress);
+    const signerAddress = await signer.getAddress();
 
     if (currentAllowance < totalAmount) {
+      // The admin signer can only approve tokens it owns. If senderAddress is a
+      // different wallet (onBehalfOf), approvals must be pre-arranged off-path.
+      if (senderAddress.toLowerCase() !== signerAddress.toLowerCase()) {
+        throw new Error(
+          `[${chainKey}] ${senderAddress} has insufficient allowance ` +
+            `(have=${currentAllowance}, need=${totalAmount}) — pre-approval required`
+        );
+      }
+
       console.log(
         `[${chainKey}] Insufficient allowance (have ${currentAllowance}, need ${totalAmount}), approving...`
       );

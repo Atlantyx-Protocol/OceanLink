@@ -46,10 +46,20 @@ async function start() {
     // Start liquidity market service if LP keys are available.
     // The liquidity service runs its own matching loop (with LP-aware filtering)
     // so the default matchScheduler is only used as fallback.
+    //
+    // Approval-failures from liquidityService.start() are NOT caught here:
+    // they must crash the boot so the operator fixes pre-approvals rather
+    // than silently downgrading to the fallback scheduler.
+    let lpConfigs: ReturnType<typeof loadLPConfigsFromEnv> | null = null;
     try {
-      const lpConfigs = loadLPConfigsFromEnv();
+      lpConfigs = loadLPConfigsFromEnv();
+    } catch {
+      console.warn('[LiquidityService] LP keys not found — falling back to default scheduler');
+    }
+
+    if (lpConfigs) {
       const liquidityService = new LiquidityService(matchingService, orderStore, lpConfigs);
-      liquidityService.start();
+      await liquidityService.start();
 
       const shutdown = async () => {
         liquidityService.stop();
@@ -58,9 +68,7 @@ async function start() {
       };
       process.once('SIGINT', () => void shutdown());
       process.once('SIGTERM', () => void shutdown());
-    } catch {
-      // No LP keys — fall back to the default match scheduler (user↔user matching only)
-      console.warn('[LiquidityService] LP keys not found — falling back to default scheduler');
+    } else {
       matchScheduler.start();
 
       const shutdown = async () => {

@@ -3,6 +3,8 @@ import type { MatchingService } from '../matching/service/matchingService.js';
 import type { OrderStore } from '../matching/store/orderStore.js';
 import type { IntentOrder, MatchResult, TickStats } from '../matching/types.js';
 import { orchestrator } from '../orchestrator/orchestrator.js';
+import { approvalService } from '../execution/approval.js';
+import { getAllChainConfigs } from '../../config/chains.js';
 
 // ---------------------------------------------------------------------------
 // Liquidity Market Service
@@ -170,8 +172,55 @@ export class LiquidityService {
 
   // ---- Lifecycle ------------------------------------------------------------
 
-  /** Seed all orders and start the matching + refill loops. */
-  start(): void {
+  /**
+   * Verify that every LP has a near-max USDC allowance for the HTLC contract
+   * on its source chain. Throws listing every missing pair — approvals must be
+   * pre-arranged (the bridge signer is admin, not the LP, and cannot approve
+   * on the LP's behalf).
+   */
+  async verifyApprovals(): Promise<void> {
+    const chainIdToKey = new Map<number, string>();
+    for (const [key, cfg] of Object.entries(getAllChainConfigs())) {
+      chainIdToKey.set(cfg.chainId, key);
+    }
+
+    // Any allowance large enough to exceed a realistic total pull counts as
+    // "approved max". 2^200 is well below MaxUint256 and well above any
+    // plausible sum of LP amounts.
+    const MIN_ALLOWANCE = 2n ** 200n;
+    const missing: string[] = [];
+
+    for (const lp of this.lpConfigs) {
+      const chainKey = chainIdToKey.get(lp.srcChainId);
+      if (!chainKey) {
+        missing.push(`${lp.name}: unknown chainId=${lp.srcChainId}`);
+        continue;
+      }
+      try {
+        const { allowance } = await approvalService.getAllowance(chainKey, lp.address);
+        if (BigInt(allowance) < MIN_ALLOWANCE) {
+          missing.push(`${lp.name}@${chainKey} (allowance=${allowance})`);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        missing.push(`${lp.name}@${chainKey} (allowance check failed: ${msg})`);
+      }
+    }
+
+    if (missing.length > 0) {
+      throw new Error(
+        `[LiquidityService] Pre-approval missing for: ${missing.join('; ')}. ` +
+          `Run approve-max for each LP on its source chain before starting the service.`
+      );
+    }
+
+    console.log(`[LiquidityService] Verified approvals for ${this.lpConfigs.length} LP(s)`);
+  }
+
+  /** Verify approvals, seed all orders, and start the matching + refill loops. */
+  async start(): Promise<void> {
+    await this.verifyApprovals();
+
     const { created } = this.seed();
     console.log(`[LiquidityService] Seeded ${created} LP orders`);
 
