@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { matchingService } from '../service/matchingService.js';
 import { orderStore } from '../store/orderStore.js';
+import { orderEvents, type OrderEvent } from '../../events/orderEvents.js';
 
 // ---------------------------------------------------------------------------
 // Intent & Match Routes
@@ -60,6 +61,41 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
       return reply.code(404).send({ error: 'Order not found' });
     }
     return reply.send({ order });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /orders/:id/events
+  // Server-Sent Events stream of lifecycle events for a single order.
+  // The stream auto-closes after a 'done' or 'error' event.
+  // -------------------------------------------------------------------------
+  fastify.get<{ Params: { id: string } }>('/orders/:id/events', async (request, reply) => {
+    const { id } = request.params;
+
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+      'Access-Control-Allow-Origin': request.headers.origin ?? '*',
+      'Access-Control-Allow-Credentials': 'true',
+    });
+    reply.hijack();
+
+    // Nudge the client to consider the stream "open" immediately.
+    reply.raw.write(': connected\n\n');
+
+    const listener = (event: OrderEvent) => {
+      if (event.orderId !== id) return;
+      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+      if (event.type === 'done' || event.type === 'error') {
+        reply.raw.end();
+      }
+    };
+
+    orderEvents.on('order', listener);
+
+    request.raw.on('close', () => {
+      orderEvents.off('order', listener);
+    });
   });
 
   // -------------------------------------------------------------------------

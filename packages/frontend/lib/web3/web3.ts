@@ -22,10 +22,16 @@ const CHAIN_MAP: Record<SupportedChain, Chain> = {
   [SUPPORTED_CHAINS.BASE]: baseSepolia,
 };
 
-const USDC_ADDRESSES: Record<SupportedChain, `0x${string}`> = {
-  [SUPPORTED_CHAINS.ETHEREUM]: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-  [SUPPORTED_CHAINS.ARBITRUM]: '0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d',
-  [SUPPORTED_CHAINS.BASE]: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+const USDC_ADDRESSES: Record<SupportedChain, `0x${string}` | undefined> = {
+  [SUPPORTED_CHAINS.ETHEREUM]: process.env.NEXT_PUBLIC_USDC_ADDRESS_SEPOLIA as
+    | `0x${string}`
+    | undefined,
+  [SUPPORTED_CHAINS.ARBITRUM]: process.env.NEXT_PUBLIC_USDC_ADDRESS_ARBITRUM_SEPOLIA as
+    | `0x${string}`
+    | undefined,
+  [SUPPORTED_CHAINS.BASE]: process.env.NEXT_PUBLIC_USDC_ADDRESS_BASE_SEPOLIA as
+    | `0x${string}`
+    | undefined,
 };
 
 export function getChain(id: SupportedChain): Chain {
@@ -36,7 +42,7 @@ export function getChain(id: SupportedChain): Chain {
 
 export function getUsdcAddress(id: SupportedChain): `0x${string}` {
   const addr = USDC_ADDRESSES[id];
-  if (!addr) throw new Error(`No USDC address for chain: ${id}`);
+  if (!addr) throw new Error(`Missing NEXT_PUBLIC_USDC_ADDRESS_* env for chain: ${id}`);
   return addr;
 }
 

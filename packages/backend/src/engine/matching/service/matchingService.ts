@@ -3,6 +3,7 @@ import { runAlgorithm } from '../algorithm/algorithm.js';
 import type { Edge, EdgeSnapshot } from '../algorithm/algorithm.js';
 import { orderStore } from '../store/orderStore.js';
 import type { OrderStore } from '../store/orderStore.js';
+import { orderEvents } from '../../events/orderEvents.js';
 import type {
   IntentOrder,
   MatchResult,
@@ -123,6 +124,14 @@ export class MatchingService {
     };
 
     this.store.add(order);
+
+    orderEvents.publish({
+      orderId: order.orderId,
+      type: 'queued',
+      message: `Order queued (${order.srcChain} → ${order.desChain}, amount=${order.amount})`,
+      data: { srcChain: order.srcChain, desChain: order.desChain, amount: order.amount },
+    });
+
     return { order };
   }
 
@@ -280,6 +289,21 @@ export class MatchingService {
       rawCycles,
     };
     this.store.addMatchResult(result);
+
+    for (const entry of matchedEntries) {
+      orderEvents.publish({
+        orderId: entry.orderId,
+        type: 'matched',
+        message: `Order matched (${entry.status}, matchedAmount=${entry.matchedAmount})`,
+        data: {
+          matchId: result.matchId,
+          status: entry.status,
+          matchedAmount: entry.matchedAmount,
+          remainingAmount: entry.remainingAmount,
+        },
+      });
+    }
+
     return [result];
   }
 

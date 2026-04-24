@@ -54,6 +54,54 @@ const INTENT_DEADLINE_SECONDS = 30 * 60;
 /** Timeout for the intent submission request (30 seconds). */
 const INTENT_SUBMIT_TIMEOUT_MS = 30_000;
 
+/** Backend base URL — SSE must hit the backend directly (not via Next.js proxy). */
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
+
+interface ServerOrderEvent {
+  orderId: string;
+  type: 'queued' | 'matched' | 'htlc_created' | 'withdrawn' | 'done' | 'error';
+  message: string;
+  data?: Record<string, unknown>;
+  timestamp: number;
+}
+
+/**
+ * Open an SSE stream for the given orderId, log every server event, and
+ * toast each one. The stream auto-closes when the server sends a 'done'
+ * or 'error' event.
+ */
+function subscribeToOrderEvents(orderId: string): void {
+  const url = `${BACKEND_URL}/api/orders/${orderId}/events`;
+  const es = new EventSource(url);
+
+  console.log('[OceanBridge:server] 🔌 subscribing', { url, orderId });
+
+  es.onmessage = (e) => {
+    let event: ServerOrderEvent;
+    try {
+      event = JSON.parse(e.data);
+    } catch {
+      console.warn('[OceanBridge:server] non-JSON message', e.data);
+      return;
+    }
+    console.log(`[OceanBridge:server] ⟵ ${event.type}`, event);
+    toast({
+      title: `Bridge: ${event.type}`,
+      description: event.message,
+      variant: event.type === 'error' ? 'destructive' : undefined,
+    });
+    if (event.type === 'done' || event.type === 'error') {
+      es.close();
+      console.log('[OceanBridge:server] 🔌 stream closed');
+    }
+  };
+
+  es.onerror = (err) => {
+    console.error('[OceanBridge:server] SSE error', err);
+    es.close();
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -77,6 +125,14 @@ export function useOceanBridge() {
 
     const { amount, srcChain, desChain, userAddress } = params;
 
+    console.log('[OceanBridge] ▶ bridge() start', {
+      amount,
+      srcChain,
+      desChain,
+      userAddress,
+      incentiveFee: params.incentiveFee,
+    });
+
     try {
       // ----- Step 1: Check current USDC allowance ---------------------------
       setState({
@@ -97,6 +153,12 @@ export function useOceanBridge() {
       const htlcAddress = getHtlcAddress(srcChain);
       const amountWei = parseUnits(amount, USDC_DECIMALS);
 
+      console.log('[OceanBridge] step=checking — reading USDC allowance', {
+        usdcAddress,
+        htlcAddress,
+        amountWei: amountWei.toString(),
+      });
+
       const currentAllowance = await publicClient.readContract({
         address: usdcAddress,
         abi: erc20Abi,
@@ -104,11 +166,17 @@ export function useOceanBridge() {
         args: [userAddress, htlcAddress],
       });
 
+      console.log('[OceanBridge] allowance result', {
+        currentAllowance: currentAllowance.toString(),
+        needsApproval: currentAllowance < amountWei,
+      });
+
       // ----- Step 2: Approve HTLC if allowance is insufficient ---------------
       let approvalTxHash: `0x${string}` | null = null;
 
       if (currentAllowance < amountWei) {
         setState((s) => ({ ...s, step: 'approving' }));
+        console.log('[OceanBridge] step=approving — requesting approve()');
 
         const wc = walletClientRef.current;
         if (!wc) throw new Error('Wallet not connected');
@@ -123,11 +191,18 @@ export function useOceanBridge() {
         });
 
         approvalTxHash = hash;
+        console.log('[OceanBridge] approval tx sent', { hash });
 
         setState((s) => ({ ...s, approvalTxHash: hash }));
         toast({ title: 'Approval sent', description: `TX: ${hash.slice(0, 10)}...${hash.slice(-8)}` });
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        console.log('[OceanBridge] approval receipt', {
+          status: receipt.status,
+          blockNumber: receipt.blockNumber.toString(),
+          gasUsed: receipt.gasUsed.toString(),
+        });
+
         if (receipt.status === 'reverted') {
           throw new Error('USDC approval transaction reverted');
         }
@@ -151,6 +226,8 @@ export function useOceanBridge() {
         body.incentiveFee = params.incentiveFee;
       }
 
+      console.log('[OceanBridge] step=submitting — POST /api/intent', body);
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), INTENT_SUBMIT_TIMEOUT_MS);
 
@@ -172,23 +249,36 @@ export function useOceanBridge() {
       }
 
       const data = await res.json().catch(() => ({ error: 'Invalid response' }));
+      console.log('[OceanBridge] /api/intent response', { status: res.status, ok: res.ok, data });
 
       if (!res.ok) {
         throw new Error(data.error || `Intent submission failed (${res.status})`);
       }
 
       // ----- Done -----------------------------------------------------------
+      const submittedOrderId = data.order?.orderId ?? null;
       setState({
         step: 'done',
         approvalTxHash,
-        orderId: data.order?.orderId ?? null,
+        orderId: submittedOrderId,
         error: null,
         isLoading: false,
       });
 
-      toast({ title: 'Bridge order submitted', description: `Order ID: ${data.order?.orderId ?? 'N/A'}` });
+      console.log('[OceanBridge] ✅ step=done — order submitted', {
+        orderId: submittedOrderId,
+        approvalTxHash,
+        order: data.order,
+      });
+
+      toast({ title: 'Bridge order submitted', description: `Order ID: ${submittedOrderId ?? 'N/A'}` });
+
+      if (submittedOrderId) {
+        subscribeToOrderEvents(submittedOrderId);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Bridge transaction failed';
+      console.error('[OceanBridge] ❌ step=error', { message, error: err });
       setState((s) => ({
         ...s,
         step: 'error',
