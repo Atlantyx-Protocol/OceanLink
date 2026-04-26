@@ -1,27 +1,8 @@
-import { ethers, JsonRpcProvider, NonceManager, Wallet, Contract } from 'ethers';
+import { ethers, Contract } from 'ethers';
 import { getChainConfig } from '../../config/chains.js';
-
-const ERC20_ABI = [
-  'function approve(address spender, uint256 amount) external returns (bool)',
-  'function allowance(address owner, address spender) external view returns (uint256)',
-];
-
-const HTLC_ABI = [
-  // Write functions
-  'function newOrder((address token, uint256 totalAmount, uint256 timelock, address[] receivers, uint256[] amounts, bytes32[] hashlocks, address onBehalfOf) params) external returns (uint256 orderId)',
-  'function withdraw(uint256 orderId, uint256 fillId, bytes32 preimage) external',
-  'function refund(uint256 orderId) external',
-  // Read functions
-  'function getOrder(uint256 orderId) external view returns (tuple(address sender, address token, uint256 totalAmount, uint256 remainingAmount, uint256 timelock, uint8 status, uint256 fillCount))',
-  'function getFill(uint256 orderId, uint256 fillId) external view returns (tuple(address receiver, uint256 amount, bytes32 hashlock, bool claimed))',
-  'function getOrderFills(uint256 orderId) external view returns (tuple(address receiver, uint256 amount, bytes32 hashlock, bool claimed)[])',
-  'function nextOrderId() external view returns (uint256)',
-  // Events
-  'event OrderCreated(uint256 indexed orderId, address indexed sender, address indexed token, uint256 totalAmount, uint256 timelock, uint256 fillCount)',
-  'event FillCreated(uint256 indexed orderId, uint256 indexed fillId, address indexed receiver, uint256 amount, bytes32 hashlock)',
-  'event FillWithdrawn(uint256 indexed orderId, uint256 indexed fillId, address indexed receiver, bytes32 preimage)',
-  'event OrderRefunded(uint256 indexed orderId, uint256 refundedAmount)',
-];
+import { getTimelockMinutes, USDC_DECIMALS } from '../../config/constants.js';
+import { ERC20_ABI, HTLC_ABI } from './abi.js';
+import { getProvider, getAdminSigner, getHTLCContract } from './provider.js';
 
 export interface FillInfo {
   fillId: string;
@@ -52,39 +33,6 @@ export interface RefundResult {
 }
 
 class BridgeService {
-  private providers = new Map<string, JsonRpcProvider>();
-  private signers = new Map<string, NonceManager>();
-
-  private getAdminKey(): string {
-    const key = process.env.PRIVATE_KEY_ADMIN;
-    if (!key) throw new Error('PRIVATE_KEY_ADMIN is not configured in environment');
-    return key;
-  }
-
-  private getProvider(chainKey: string): JsonRpcProvider {
-    let provider = this.providers.get(chainKey);
-    if (!provider) {
-      const config = getChainConfig(chainKey);
-      if (!config) throw new Error(`Unknown chain: ${chainKey}`);
-      provider = new JsonRpcProvider(config.rpcUrl);
-      this.providers.set(chainKey, provider);
-    }
-    return provider;
-  }
-
-  private getSigner(chainKey: string): NonceManager {
-    const adminKey = this.getAdminKey();
-    const address = new Wallet(adminKey).address;
-    const cacheKey = `${chainKey}:${address}`;
-    let signer = this.signers.get(cacheKey);
-    if (!signer) {
-      const wallet = new Wallet(adminKey, this.getProvider(chainKey));
-      signer = new NonceManager(wallet);
-      this.signers.set(cacheKey, signer);
-    }
-    return signer;
-  }
-
   // Generate 256-bit secret and SHA256 hashlock
   generateSecret(): { secret: string; hashlock: string } {
     const secret = ethers.hexlify(ethers.randomBytes(32));
@@ -103,7 +51,7 @@ class BridgeService {
   }): Promise<CreateOrderResult> {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey)!;
-    const signer = this.getSigner(chainKey);
+    const signer = getAdminSigner(chainKey);
     const senderAddress = params.onBehalfOf || (await signer.getAddress());
 
     // Validate inputs
@@ -116,8 +64,8 @@ class BridgeService {
 
     console.log(`[${chainKey}] Creating order from ${senderAddress}`);
 
-    // Convert human-readable USDC amounts to micro-USDC (6 decimals)
-    const microAmounts = params.amounts.map((a) => ethers.parseUnits(a, 6));
+    // Convert human-readable USDC amounts to micro-USDC
+    const microAmounts = params.amounts.map((a) => ethers.parseUnits(a, USDC_DECIMALS));
     const totalAmount = microAmounts.reduce((sum, amt) => sum + amt, 0n);
 
     // Step 1: Check USDC allowance
@@ -126,8 +74,6 @@ class BridgeService {
     const signerAddress = await signer.getAddress();
 
     if (currentAllowance < totalAmount) {
-      // The admin signer can only approve tokens it owns. If senderAddress is a
-      // different wallet (onBehalfOf), approvals must be pre-arranged off-path.
       if (senderAddress.toLowerCase() !== signerAddress.toLowerCase()) {
         throw new Error(
           `[${chainKey}] ${senderAddress} has insufficient allowance ` +
@@ -169,15 +115,15 @@ class BridgeService {
       console.log(`[${chainKey}] Using provided hashlocks`);
     }
 
-    // Step 3: Calculate timelock (TIME_LOCK env is in minutes, default 10 minutes)
-    const timelockMinutes = parseInt(process.env.TIME_LOCK || '10', 10);
+    // Step 3: Calculate timelock
+    const timelockMinutes = getTimelockMinutes();
     const timelock = Math.floor(Date.now() / 1000) + timelockMinutes * 60;
     console.log(
       `[${chainKey}] Timelock: ${new Date(timelock * 1000).toISOString()} (${timelockMinutes} minutes)`
     );
 
     // Step 4: Create order
-    const htlc = new Contract(config.htlcAddress, HTLC_ABI, signer);
+    const htlc = getHTLCContract(chainKey, signer);
 
     console.log(`[${chainKey}] Creating order...`);
     console.log(`  Receivers: ${params.receivers.length}`);
@@ -243,15 +189,13 @@ class BridgeService {
     chain?: string;
   }): Promise<WithdrawResult> {
     const chainKey = params.chain || 'sepolia';
-    const config = getChainConfig(chainKey);
-    if (!config) throw new Error(`Unknown chain: ${chainKey}`);
-    const signer = this.getSigner(chainKey);
+    const signer = getAdminSigner(chainKey);
 
     console.log(`[${chainKey}] Withdrawing from order...`);
     console.log(`  Order ID: ${params.orderId}`);
     console.log(`  Fill ID: ${params.fillId}`);
 
-    const htlc = new Contract(config.htlcAddress, HTLC_ABI, signer);
+    const htlc = getHTLCContract(chainKey, signer);
     const tx = await htlc.withdraw(BigInt(params.orderId), BigInt(params.fillId), params.preimage);
 
     console.log(`  TX sent: ${tx.hash}`);
@@ -267,14 +211,12 @@ class BridgeService {
   // Refund order after timelock expires (signed by admin)
   async refund(params: { orderId: string; chain?: string }): Promise<RefundResult> {
     const chainKey = params.chain || 'sepolia';
-    const config = getChainConfig(chainKey);
-    if (!config) throw new Error(`Unknown chain: ${chainKey}`);
-    const signer = this.getSigner(chainKey);
+    const signer = getAdminSigner(chainKey);
 
     console.log(`[${chainKey}] Refunding order...`);
     console.log(`  Order ID: ${params.orderId}`);
 
-    const htlc = new Contract(config.htlcAddress, HTLC_ABI, signer);
+    const htlc = getHTLCContract(chainKey, signer);
     const tx = await htlc.refund(BigInt(params.orderId));
 
     console.log(`  TX sent: ${tx.hash}`);
@@ -305,10 +247,7 @@ class BridgeService {
   // Get order details (read-only, no signer needed)
   async getOrder(params: { orderId: string; chain?: string }) {
     const chainKey = params.chain || 'sepolia';
-    const config = getChainConfig(chainKey);
-    if (!config) throw new Error(`Unknown chain: ${chainKey}`);
-
-    const htlc = new Contract(config.htlcAddress, HTLC_ABI, this.getProvider(chainKey));
+    const htlc = getHTLCContract(chainKey);
     const data = await htlc.getOrder(BigInt(params.orderId));
 
     return {
@@ -325,10 +264,7 @@ class BridgeService {
   // Get fill details (read-only)
   async getFill(params: { orderId: string; fillId: string; chain?: string }) {
     const chainKey = params.chain || 'sepolia';
-    const config = getChainConfig(chainKey);
-    if (!config) throw new Error(`Unknown chain: ${chainKey}`);
-
-    const htlc = new Contract(config.htlcAddress, HTLC_ABI, this.getProvider(chainKey));
+    const htlc = getHTLCContract(chainKey);
     const data = await htlc.getFill(BigInt(params.orderId), BigInt(params.fillId));
 
     return {
@@ -342,10 +278,7 @@ class BridgeService {
   // Get all fills for an order (read-only)
   async getOrderFills(params: { orderId: string; chain?: string }) {
     const chainKey = params.chain || 'sepolia';
-    const config = getChainConfig(chainKey);
-    if (!config) throw new Error(`Unknown chain: ${chainKey}`);
-
-    const htlc = new Contract(config.htlcAddress, HTLC_ABI, this.getProvider(chainKey));
+    const htlc = getHTLCContract(chainKey);
     const fills = await htlc.getOrderFills(BigInt(params.orderId));
 
     return fills.map((fill: any, index: number) => ({
@@ -355,6 +288,32 @@ class BridgeService {
       hashlock: fill[2],
       claimed: fill[3],
     }));
+  }
+
+  // Check if order exists (read-only)
+  async orderExists(params: { orderId: string; chain?: string }): Promise<boolean> {
+    const chainKey = params.chain || 'sepolia';
+    const htlc = getHTLCContract(chainKey);
+    return await htlc.orderExistsCheck(BigInt(params.orderId));
+  }
+
+  // Get next order ID (read-only)
+  async getNextOrderId(params: { chain?: string }): Promise<string> {
+    const chainKey = params.chain || 'sepolia';
+    const htlc = getHTLCContract(chainKey);
+    const id = await htlc.nextOrderId();
+    return id.toString();
+  }
+
+  // Get claim status for an order (read-only)
+  async getClaimStatus(params: {
+    orderId: string;
+    chain?: string;
+  }): Promise<{ claimed: string; total: string }> {
+    const chainKey = params.chain || 'sepolia';
+    const htlc = getHTLCContract(chainKey);
+    const [claimed, total] = await htlc.getClaimStatus(BigInt(params.orderId));
+    return { claimed: claimed.toString(), total: total.toString() };
   }
 }
 

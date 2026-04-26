@@ -4,6 +4,9 @@ import type { Edge, EdgeSnapshot } from '../algorithm/algorithm.js';
 import { orderStore } from '../store/orderStore.js';
 import type { OrderStore } from '../store/orderStore.js';
 import { orderEvents } from '../../events/orderEvents.js';
+import { getMatchThreshold } from '../../../config/constants.js';
+import { validateAndCreateOrder } from './orderValidator.js';
+import { buildCycleMatches } from './cycleMapper.js';
 import type {
   IntentOrder,
   MatchResult,
@@ -59,7 +62,7 @@ export class MatchingService {
      *   min_amount / max_amount  >  threshold
      * ENV: MATCH_THRESHOLD (default 0)
      */
-    private readonly threshold: number = parseFloat(process.env.MATCH_THRESHOLD ?? '0')
+    private readonly threshold: number = getMatchThreshold()
   ) {}
 
   // -------------------------------------------------------------------------
@@ -71,58 +74,10 @@ export class MatchingService {
    * Returns { error } on validation failure.
    */
   createOrder(input: CreateIntentInput): { order: IntentOrder } | { error: string } {
-    const srcChain = Number(input.srcChain);
-    const desChain = Number(input.desChain);
-    const amount = String(input.amount);
-    const deadline = Number(input.deadline);
+    const result = validateAndCreateOrder(input);
+    if ('error' in result) return result;
 
-    if (!Number.isInteger(srcChain) || srcChain <= 0) {
-      return { error: 'srcChain must be a positive integer' };
-    }
-    if (!Number.isInteger(desChain) || desChain <= 0) {
-      return { error: 'desChain must be a positive integer' };
-    }
-    const parsedAmount = Number(amount);
-    if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
-      return { error: 'amount must be a positive number' };
-    }
-
-    // Validate and compute incentive fee
-    let incentiveFee: string | undefined;
-    if (input.incentiveFee !== undefined && input.incentiveFee !== null) {
-      const parsedFee = Number(input.incentiveFee);
-      if (Number.isNaN(parsedFee) || parsedFee < 0) {
-        return { error: 'incentiveFee must be a non-negative number' };
-      }
-      if (parsedFee > 0) {
-        incentiveFee = String(parsedFee);
-      }
-    }
-
-    // Effective amount = base amount + incentive fee (user pays more to boost match priority)
-    const effectiveAmount = incentiveFee ? String(parsedAmount + Number(incentiveFee)) : amount;
-
-    const now = Math.floor(Date.now() / 1000);
-    if (!Number.isInteger(deadline) || deadline < now) {
-      return { error: 'deadline must be a Unix epoch timestamp (seconds) >= now' };
-    }
-
-    if (!input.userAddress) {
-      return { error: 'userAddress is required' };
-    }
-
-    const order: IntentOrder = {
-      orderId: randomUUID(),
-      srcChain,
-      desChain,
-      amount: effectiveAmount,
-      ...(incentiveFee !== undefined && { incentiveFee }),
-      deadline,
-      createdAt: now,
-      status: 'QUEUED',
-      userAddress: input.userAddress,
-    };
-
+    const { order } = result;
     this.store.add(order);
 
     orderEvents.publish({
@@ -278,7 +233,7 @@ export class MatchingService {
     if (matchedEntries.length === 0) return [];
 
     // -- Step 5: build per-cycle breakdown --------------------------------
-    const cycles = this.buildCycleMatches(activeOrders, chainToVertex, rawCycles);
+    const cycles = buildCycleMatches(activeOrders, chainToVertex, rawCycles);
 
     // -- Step 6: build and persist the MatchResult -----------------------
     const result: MatchResult = {
@@ -307,82 +262,6 @@ export class MatchingService {
     return [result];
   }
 
-  // -------------------------------------------------------------------------
-  // Internal — per-cycle order mapping
-  // -------------------------------------------------------------------------
-
-  /**
-   * Replays the algorithm's weight-mutation steps to map each EdgeSnapshot
-   * back to a concrete IntentOrder, producing one CycleMatch per raw cycle.
-   *
-   * The algorithm mutates the edge list in place (splice + subtract), so we
-   * maintain a parallel `simEdges` map that mirrors those mutations as we
-   * iterate through each captured cycle.
-   */
-  private buildCycleMatches(
-    activeOrders: IntentOrder[],
-    chainToVertex: Map<number, number>,
-    rawCycles: Array<Array<{ u: number; v: number; w: number }>>
-  ): CycleMatch[] {
-    // Working copy of edge weights keyed by order index (= edge.id).
-    const simEdges = new Map<number, { u: number; v: number; w: number }>(
-      activeOrders.map((order, idx) => [
-        idx,
-        {
-          u: chainToVertex.get(order.srcChain)!,
-          v: chainToVertex.get(order.desChain)!,
-          w: Number(order.amount),
-        },
-      ])
-    );
-
-    return rawCycles.map((snapshot) => {
-      const minW = Math.min(...snapshot.map((s) => s.w));
-      const minSnapIdx = snapshot.findIndex((s) => s.w === minW);
-
-      // Map each snapshot entry {u, v, w} to the matching edge id in simEdges.
-      // w is the weight BEFORE the cycle's mutation, which is exactly what
-      // simEdges holds at this point (we apply mutations after, below).
-      const usedIds = new Set<number>();
-      const matchedIds: (number | undefined)[] = snapshot.map(({ u, v, w }) => {
-        for (const [id, edge] of simEdges) {
-          if (!usedIds.has(id) && edge.u === u && edge.v === v && edge.w === w) {
-            usedIds.add(id);
-            return id;
-          }
-        }
-        return undefined;
-      });
-
-      // Build the per-cycle order entries.
-      const orders: CycleMatchEntry[] = matchedIds
-        .map((id) => {
-          if (id === undefined) return null;
-          const order = activeOrders[id]!;
-          return {
-            orderId: order.orderId,
-            srcChain: order.srcChain,
-            desChain: order.desChain,
-            matchedAmount: String(minW),
-          };
-        })
-        .filter((e): e is CycleMatchEntry => e !== null);
-
-      // Replay the algorithm's mutation so the next cycle sees updated weights.
-      // The min-weight edge is removed; every other edge in the cycle is reduced.
-      for (let i = 0; i < matchedIds.length; i++) {
-        const id = matchedIds[i];
-        if (id === undefined) continue;
-        if (i === minSnapIdx) {
-          simEdges.delete(id);
-        } else {
-          simEdges.get(id)!.w -= minW;
-        }
-      }
-
-      return { matchedAmount: String(minW), orders };
-    });
-  }
 }
 
 /** Application-level singleton. */

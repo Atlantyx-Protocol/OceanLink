@@ -1,6 +1,7 @@
 import { matchingService } from '../service/matchingService.js';
 import type { MatchingService } from '../service/matchingService.js';
 import { orchestrator } from '../../orchestrator/orchestrator.js';
+import { getMatchIntervalMs, getMatchThreshold } from '../../../config/constants.js';
 
 // ---------------------------------------------------------------------------
 // MatchScheduler
@@ -20,7 +21,7 @@ export class MatchScheduler {
 
   constructor(
     private readonly service: MatchingService,
-    private readonly intervalMs: number = parseInt(process.env.MATCH_INTERVAL_MS ?? '5000', 10)
+    private readonly intervalMs: number = getMatchIntervalMs()
   ) {}
 
   /** Starts the scheduler.  Idempotent — safe to call multiple times. */
@@ -30,7 +31,7 @@ export class MatchScheduler {
       void this.tick();
     }, this.intervalMs);
     console.log(
-      `[MatchScheduler] Started — interval=${this.intervalMs}ms, threshold=${process.env.MATCH_THRESHOLD ?? '0.8'}`
+      `[MatchScheduler] Started — interval=${this.intervalMs}ms, threshold=${getMatchThreshold()}`
     );
   }
 

@@ -1,13 +1,6 @@
 import { JsonRpcProvider, Contract, Wallet, MaxUint256 } from 'ethers';
 import { getChainConfig, getAllChains, CHAIN_KEYS } from '../../config/chains.js';
-
-const ERC20_ABI = [
-  'function allowance(address owner, address spender) external view returns (uint256)',
-  'function approve(address spender, uint256 amount) external returns (bool)',
-  'function balanceOf(address account) external view returns (uint256)',
-  'function decimals() external view returns (uint8)',
-  'function symbol() external view returns (string)',
-];
+import { ERC20_ABI } from './abi.js';
 
 class ApprovalService {
   private getProvider(rpcUrl: string): JsonRpcProvider {

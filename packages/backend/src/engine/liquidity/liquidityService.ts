@@ -4,7 +4,13 @@ import type { OrderStore } from '../matching/store/orderStore.js';
 import type { IntentOrder, MatchResult, TickStats } from '../matching/types.js';
 import { orchestrator } from '../orchestrator/orchestrator.js';
 import { approvalService } from '../execution/approval.js';
-import { getAllChainConfigs } from '../../config/chains.js';
+import { getAllChainConfigs, getChainConfig } from '../../config/chains.js';
+import {
+  LP_DEADLINE_SECONDS,
+  getMatchIntervalMs,
+  getLpRefillIntervalMs,
+} from '../../config/constants.js';
+import { selectLpOrdersForUsers } from './lpSelector.js';
 
 // ---------------------------------------------------------------------------
 // Liquidity Market Service
@@ -23,17 +29,14 @@ import { getAllChainConfigs } from '../../config/chains.js';
 // by only including LP counter-orders for routes that have user orders.
 // ---------------------------------------------------------------------------
 
-// Chain IDs
-const SEPOLIA = 11155111;
-const BASE_SEPOLIA = 84532;
-const ARBITRUM_SEPOLIA = 421614;
+// Chain IDs derived from chain config
+const SEPOLIA = getChainConfig('sepolia')!.chainId;
+const BASE_SEPOLIA = getChainConfig('baseSepolia')!.chainId;
+const ARBITRUM_SEPOLIA = getChainConfig('arbitrumSepolia')!.chainId;
 
 // Powers of 2 from 2^0 to 2^13  (all <= 10 000)
 // Sum = 16 383, so any integer amount in [1, 10 000] can be covered.
 export const POWER_OF_TWO_AMOUNTS = Array.from({ length: 14 }, (_, i) => 2 ** i);
-
-// LP orders live for 24 h; the refill loop recreates them when expired.
-const LP_DEADLINE_SECONDS = 24 * 60 * 60;
 
 export interface LPConfig {
   name: string;
@@ -70,10 +73,7 @@ export class LiquidityService {
     private readonly service: MatchingService,
     private readonly store: OrderStore,
     private readonly lpConfigs: LPConfig[],
-    private readonly refillIntervalMs: number = parseInt(
-      process.env.LP_REFILL_INTERVAL_MS ?? '10000',
-      10
-    )
+    private readonly refillIntervalMs: number = getLpRefillIntervalMs()
   ) {
     this.lpAddresses = new Set(lpConfigs.map((lp) => lp.address));
   }
@@ -152,7 +152,7 @@ export class LiquidityService {
     let matchResults: MatchResult[] = [];
 
     if (userOrders.length > 0) {
-      const selectedLpOrders = this.selectLpOrdersForUsers(userOrders, allActive);
+      const selectedLpOrders = selectLpOrdersForUsers(userOrders, allActive, this.lpAddresses);
       matchResults = this.service.runMatchingPass([...userOrders, ...selectedLpOrders]);
     }
 
@@ -224,7 +224,7 @@ export class LiquidityService {
     const { created } = this.seed();
     console.log(`[LiquidityService] Seeded ${created} LP orders`);
 
-    const matchIntervalMs = parseInt(process.env.MATCH_INTERVAL_MS ?? '5000', 10);
+    const matchIntervalMs = getMatchIntervalMs();
 
     if (this.matchTimer === null) {
       this.matchTimer = setInterval(() => {
@@ -274,63 +274,6 @@ export class LiquidityService {
   }
 
   // ---- Internal -------------------------------------------------------------
-
-  /**
-   * For each user order, pick LP counter-orders whose amounts are the binary
-   * decomposition of the user's amount (largest bit first). Reserves picked
-   * LP orders so two user orders in the same tick cannot claim the same slot.
-   *
-   * Only QUEUED LP orders with exact power-of-2 amounts are considered — a
-   * PARTIAL LP order has a non-power-of-2 remainder that wouldn't fit any bit.
-   */
-  private selectLpOrdersForUsers(
-    userOrders: IntentOrder[],
-    allActive: IntentOrder[]
-  ): IntentOrder[] {
-    // route key = `${src}-${des}` → amount → QUEUED LP orders
-    const lpByRouteAmount = new Map<string, Map<number, IntentOrder[]>>();
-    for (const o of allActive) {
-      if (!this.lpAddresses.has(o.userAddress)) continue;
-      if (o.status !== 'QUEUED') continue;
-      const route = `${o.srcChain}-${o.desChain}`;
-      const amount = Number(o.amount);
-      let byAmount = lpByRouteAmount.get(route);
-      if (!byAmount) {
-        byAmount = new Map();
-        lpByRouteAmount.set(route, byAmount);
-      }
-      let pool = byAmount.get(amount);
-      if (!pool) {
-        pool = [];
-        byAmount.set(amount, pool);
-      }
-      pool.push(o);
-    }
-
-    const selected: IntentOrder[] = [];
-    const reserved = new Set<string>();
-
-    for (const user of userOrders) {
-      const reverseRoute = `${user.desChain}-${user.srcChain}`;
-      const byAmount = lpByRouteAmount.get(reverseRoute);
-      if (!byAmount) continue;
-
-      const amount = Number(user.amount);
-      for (let i = POWER_OF_TWO_AMOUNTS.length - 1; i >= 0; i--) {
-        const pow = POWER_OF_TWO_AMOUNTS[i];
-        if ((amount & pow) === 0) continue;
-
-        const pool = byAmount.get(pow);
-        const pick = pool?.find((o) => !reserved.has(o.orderId));
-        if (pick) {
-          reserved.add(pick.orderId);
-          selected.push(pick);
-        }
-      }
-    }
-
-    return selected;
-  }
 
   /**
    * Creates an LP order if the slot is not currently covered by an active order.
