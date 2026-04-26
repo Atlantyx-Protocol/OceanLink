@@ -1,0 +1,29 @@
+# LaTeX build artifacts (docs/thesis/)
+build/
+*.aux
+*.log
+*.toc
+*.lof
+*.lot
+*.out
+*.bbl
+*.blg
+*.synctex.gz
+*.synctex(busy)
+*.fdb_latexmk
+*.fls
+*.run.xml
+*.bcf
+*.nav
+*.snm
+*.vrb
+*.idx
+*.ilg
+*.ind
+*.tdo
+
+# Built PDF (build artifact, not source)
+thesis/*.pdf
+
+# macOS
+.DS_Store

@@ -1,0 +1,14 @@
+# latexmkrc for UET thesis template
+# Engine: pdflatex (required by \usepackage[utf8]{vietnam})
+# Bibliography: bibtex + natbib
+
+$pdf_mode = 1;
+$pdflatex = 'pdflatex -synctex=1 -interaction=nonstopmode -file-line-error %O %S';
+$bibtex_use = 2;
+
+$out_dir = 'build';
+$aux_dir = 'build';
+
+@default_files = ('thesis.tex');
+
+$clean_ext = 'synctex.gz synctex.gz(busy) run.xml tex.bak bbl bcf fdb_latexmk run tdo';

@@ -1,0 +1,60 @@
+\chapter{Bridge p2p intent-based}
+\label{chap:method}
+
+Chương này kiến trúc một hệ thống bridge dựa trên intent theo mô hình nhiều lớp, nhằm giải quyết bài toán tối ưu đồng thời chi phí, tốc độ thực thi và xác suất hoàn tất giao dịch trong môi trường cross-chain. Trước khi trình bày chi tiết kiến trúc đề xuất, cần đặt bài toán này trong bối cảnh các mô hình bridge hiện tại, chủ yếu dựa trên hai hướng tiếp cận chính là \textbf{liquidity networks} và \textbf{state validating protocols}.
+
+Trong mô hình liquidity network, tài sản được nạp vào một pool thanh khoản trên chain nguồn và người dùng nhận lại tài sản tương ứng từ pool trên chain đích. Cách tiếp cận này giúp đạt được tốc độ thực thi nhanh và trải nghiệm người dùng mượt mà, tuy nhiên lại phụ thuộc lớn vào thanh khoản được cung cấp bởi các liquidity provider (LP) hoặc market maker. Điều này dẫn đến chi phí cao hơn do phải trả phí cho thanh khoản, đồng thời tạo ra các rủi ro liên quan đến mất cân bằng pool, slippage và phụ thuộc vào bên trung gian. Một hướng mở rộng tự nhiên của mô hình này là thay vì sử dụng pool tập trung, hệ thống có thể tận dụng \textbf{mạng lưới peer-to-peer (P2P) của chính người dùng để cung cấp thanh khoản}, trong đó các intent đối ứng có thể tự bù trừ cho nhau mà không cần LP truyền thống.
+
+Ở chiều ngược lại, \textbf{state validating protocols} dựa trên các giả định bảo mật của chính mạng lưới blockchain nền tảng, đặc biệt phổ biến trong các bridge giữa L1 và L2, nơi L1 đóng vai trò là nguồn chân lý duy nhất (single source of truth). Cách tiếp cận này mang lại mức độ bảo mật cao, vì tính đúng đắn của trạng thái được đảm bảo bởi cơ chế đồng thuận của mạng lưới. Tuy nhiên, nhược điểm là chi phí và độ trễ thường cao, đồng thời phạm vi ứng dụng còn hạn chế, đặc biệt đối với các trường hợp cross-chain giữa các mạng độc lập. Trong thực tế, hiện chưa có nhiều bridge đạt được mức độ bảo mật lý tưởng mà vẫn duy trì được hiệu năng cao, cho thấy sự đánh đổi rõ rệt giữa security và efficiency.
+
+Giải pháp được đề xuất trong chương này tận dụng các ưu điểm cốt lõi của cả hai hướng tiếp cận trên để xây dựng một mô hình bridge hiệu quả hơn. Cụ thể, hệ thống sử dụng mạng lưới peer-to-peer của chính người dùng như một nguồn thanh khoản tự nhiên cho quá trình bridge, thay vì phụ thuộc vào các liquidity pool hoặc market maker truyền thống, từ đó giúp giảm chi phí và hạn chế các vấn đề liên quan đến slippage hoặc mất cân bằng thanh khoản. Đồng thời, hệ thống khai thác các đặc tính về trạng thái và cơ chế đồng thuận của các blockchain nền tảng để đảm bảo tính toàn vẹn và an toàn của giao dịch, qua đó nâng cao mức độ bảo mật mà không cần dựa vào các bên trung gian. Nhờ sự kết hợp này, giải pháp không chỉ giảm sự phụ thuộc vào hạ tầng bên thứ ba mà còn đạt được sự cân bằng tốt hơn giữa hiệu quả kinh tế, tốc độ thực thi và độ tin cậy của hệ thống.
+
+Cụ thể, hệ thống được tổ chức thành ba lớp chính: Netting Layer, Intent Accelerator Layer và Fallback Bridge Aggregator. Các lớp này phối hợp với nhau theo thứ tự ưu tiên từ tối ưu chi phí đến tối ưu khả năng hoàn tất giao dịch, tạo thành một pipeline thực thi tuần tự nhưng linh hoạt. Thay vì phụ thuộc hoàn toàn vào một cơ chế duy nhất như các bridge truyền thống, hệ thống có khả năng thích nghi theo điều kiện thị trường và trạng thái intent, từ đó đạt được sự cân bằng tốt hơn giữa hiệu quả kinh tế và độ tin cậy của quá trình thực thi.
+
+\section{Netting Layer}
+
+Netting Layer đóng vai trò là lớp đầu tiên và cũng là lớp có chi phí thấp nhất trong toàn bộ hệ thống. Tại đây, protocol cố gắng thực hiện việc matching các intent nội bộ, tức là tìm kiếm các dòng giao dịch có thể bù trừ trực tiếp cho nhau mà không cần sử dụng thanh khoản từ bên ngoài. Ý tưởng cốt lõi của cơ chế này là nếu tồn tại hai hoặc nhiều intent có hướng chuyển đổi tài sản đối ứng, hệ thống có thể thực hiện một giao dịch hoán đổi nội bộ, từ đó loại bỏ hoàn toàn nhu cầu bridge hoặc market maker.
+
+Ưu điểm lớn nhất của Netting Layer nằm ở việc chi phí gần như bằng không, do không phát sinh phí thanh khoản hoặc phí dịch vụ từ bên thứ ba. Đồng thời, vì không phụ thuộc vào solver hay các thực thể trung gian, mức độ trust-minimized của hệ thống được đảm bảo cao hơn. Trong trường hợp matching thành công, chất lượng thực thi cũng đạt mức tối ưu vì không bị ảnh hưởng bởi trượt giá hay điều kiện thị trường. Tuy nhiên, hạn chế của phương pháp này là không đảm bảo luôn tồn tại intent đối ứng. Do đó, hệ thống có thể phải chờ trong một khoảng thời gian nhất định để tìm match, dẫn đến latency cao hơn. Ngoài ra, kết quả trong ngắn hạn mang tính không xác định, bởi việc có match hay không phụ thuộc vào trạng thái thị trường và dòng intent tại thời điểm đó.
+
+\subsection{Matching Engine}
+
+Matching Engine là thành phần trung tâm của Netting Layer, chịu trách nhiệm thu thập, phân tích và xác định các intent có khả năng match với nhau. Về bản chất, bài toán matching có thể được mô hình hóa dưới dạng một đồ thị có hướng, trong đó các node đại diện cho trạng thái tài sản trên các chain, còn các cạnh biểu diễn dòng chuyển đổi tài sản tương ứng với từng intent. Một matching hợp lệ xảy ra khi tồn tại một chu trình hoặc một tập hợp các dòng chảy sao cho tổng tài sản đầu vào và đầu ra được cân bằng, đồng thời thỏa mãn các ràng buộc về token, số lượng và điều kiện thực thi.
+
+Quá trình hoạt động của matching engine bao gồm việc nhóm các intent theo đặc tính tương đồng, xây dựng cấu trúc đồ thị từ các swap hoặc transfer event, và sau đó tìm kiếm các chu trình khả thi thông qua các thuật toán duyệt đồ thị. Khi phát hiện một chu trình thỏa mãn điều kiện lợi nhuận và tính hợp lệ, hệ thống sẽ tạo ra một execution plan tương ứng để thực hiện giao dịch.
+
+\subsection{Thuật toán HTLC}
+
+% TODO: figure - HTLC 4-phase sequence diagram (from the original PDF).
+% Place image at figures/c3/htlc-sequence.png and uncomment below.
+% \begin{figure}[H]
+%   \begin{center}
+%   \includegraphics[width=\linewidth]{figures/c3/htlc-sequence}
+%   \end{center}
+%   \caption{Giao thức HTLC cho cross-chain atomic swap: 4 giai đoạn initiate, respond, claim A, claim B}
+%   \label{fig:htlc-sequence}
+% \end{figure}
+
+Để đảm bảo tính nguyên tử (atomicity) và loại bỏ nhu cầu tin tưởng giữa các bên tham gia, hệ thống áp dụng cơ chế Hashed Timelock Contract (HTLC). Theo đó, mỗi bên sẽ khóa tài sản của mình vào một hợp đồng với cùng một giá trị hashlock. Giao dịch chỉ được hoàn tất khi một bên cung cấp đúng preimage tương ứng với hash đã cam kết. Nếu điều kiện này không được thỏa mãn trong khoảng thời gian quy định, toàn bộ giao dịch sẽ bị hoàn tác.
+
+Việc sử dụng HTLC trong bối cảnh netting cho phép thực hiện các giao dịch cross-chain theo cách an toàn mà không cần trung gian. Đồng thời, nó đảm bảo rằng không có trường hợp thực thi một phần, tức là hoặc tất cả các bên đều nhận được tài sản như kỳ vọng, hoặc không bên nào bị thiệt hại. Đây là yếu tố quan trọng giúp Netting Layer duy trì được tính trust-minimized trong môi trường phi tập trung.
+
+\section{Intent Accelerator Layer}
+
+Trong trường hợp Netting Layer không thể tìm được match trong một khoảng thời gian hợp lý, intent sẽ được chuyển sang Intent Accelerator Layer. Tại đây, intent được broadcast ra thị trường cho các solver, filler hoặc market maker, những thực thể có khả năng cung cấp thanh khoản và thực thi giao dịch một cách nhanh chóng. Cơ chế này giúp tăng đáng kể xác suất hoàn tất giao dịch, đặc biệt trong các tình huống thị trường không có đủ thanh khoản nội bộ.
+
+Ưu điểm nổi bật của layer này là tốc độ thực thi cao, gần như tức thời, do tận dụng được thanh khoản sẵn có từ bên ngoài. Đồng thời, việc mở rộng ra thị trường giúp tăng khả năng match intent, từ đó cải thiện trải nghiệm người dùng. Tuy nhiên, chi phí thực thi sẽ cao hơn do phải trả incentive cho solver. Ngoài ra, hệ thống cũng phải đối mặt với các rủi ro liên quan đến hành vi chiến lược của các bên thứ ba, chẳng hạn như selective fill, sandwich logic hoặc việc solver từ chối tham gia nếu điều kiện không đủ hấp dẫn.
+
+Một cải tiến quan trọng trong layer này là cơ chế incentive tăng dần theo thời gian, có thể được xem như một dạng Dutch auction. Thay vì yêu cầu người dùng trả phí cao ngay từ đầu, hệ thống thiết kế incentive như một hàm tăng theo thời gian. Ban đầu, incentive gần như bằng không và sẽ tăng dần cho đến một mức tối đa. Cơ chế này tạo ra một bài toán chiến lược cho solver, trong đó họ phải cân nhắc giữa việc thực thi sớm với phần thưởng thấp nhưng chắc chắn, hoặc chờ đợi để nhận phần thưởng cao hơn nhưng đối mặt với rủi ro mất cơ hội do solver khác hoặc do intent được match ở layer trước.
+
+Cách tiếp cận này mang lại nhiều lợi ích quan trọng. Trước hết, nó giúp giảm thiểu việc người dùng phải trả phí quá cao trong những trường hợp không cần thiết. Đồng thời, nó tạo ra một môi trường cạnh tranh tự nhiên giữa các solver, buộc họ phải bộc lộ khả năng thực thi và mức độ chấp nhận rủi ro của mình. Về mặt cơ chế, đây là một thiết kế hiệu quả trong việc cân bằng giữa chi phí và tốc độ, đồng thời hạn chế các hành vi khai thác không công bằng.
+
+\section{Fallback Bridge Aggregator}
+
+Nếu cả Netting Layer và Intent Accelerator Layer đều không thể thực hiện intent, hệ thống sẽ chuyển sang lớp cuối cùng là Fallback Bridge Aggregator. Đây là lớp đảm bảo rằng giao dịch vẫn có thể được hoàn tất bằng cách sử dụng các bridge truyền thống hoặc các hệ thống thanh khoản bên ngoài. Mặc dù chi phí và độ phức tạp cao hơn, lớp này đóng vai trò quan trọng trong việc đảm bảo tính ổn định và độ tin cậy của toàn hệ thống.
+
+Ưu điểm chính của Fallback Layer là khả năng đảm bảo completion gần như tuyệt đối, từ đó cải thiện trải nghiệm người dùng và giảm thiểu các trường hợp thất bại. Tuy nhiên, đổi lại, chi phí thực thi thường cao hơn do phải đi qua nhiều bước trung gian và phụ thuộc vào hạ tầng bên ngoài. Ngoài ra, execution path cũng dài hơn, làm tăng độ trễ và mức độ phức tạp trong việc theo dõi giao dịch.
+
+Trong tổng thể kiến trúc, Fallback Bridge Aggregator đóng vai trò như một lớp bảo hiểm cuối cùng, đảm bảo rằng mọi intent đều có thể được thực hiện, ngay cả trong những điều kiện thị trường không thuận lợi. Nhờ đó, hệ thống đạt được sự cân bằng giữa hiệu quả và độ tin cậy, khi vừa tối ưu chi phí trong trường hợp lý tưởng, vừa đảm bảo khả năng hoàn tất trong mọi tình huống.
+
+Tổng thể, kiến trúc ba lớp được trình bày trong chương này cho thấy một cách tiếp cận linh hoạt và hiệu quả đối với bài toán bridge dựa trên intent. Bằng việc kết hợp Netting Layer, Intent Accelerator Layer và Fallback Bridge Aggregator, hệ thống có thể thích nghi với nhiều điều kiện thị trường khác nhau, từ đó tối ưu hóa cả chi phí, tốc độ và độ tin cậy. Cách thiết kế này không chỉ cải thiện hiệu năng thực thi mà còn mở ra hướng phát triển mới cho các giao thức DeFi dựa trên intent, nơi quá trình execution trở thành một cơ chế động và có thể tối ưu theo thời gian thay vì cố định như trước đây.
