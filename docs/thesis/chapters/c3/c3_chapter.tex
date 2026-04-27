@@ -25,15 +25,13 @@ Quá trình hoạt động của matching engine bao gồm việc nhóm các int
 
 \subsection{Thuật toán HTLC}
 
-% TODO: figure - HTLC 4-phase sequence diagram (from the original PDF).
-% Place image at figures/c3/htlc-sequence.png and uncomment below.
-% \begin{figure}[H]
-%   \begin{center}
-%   \includegraphics[width=\linewidth]{figures/c3/htlc-sequence}
-%   \end{center}
-%   \caption{Giao thức HTLC cho cross-chain atomic swap: 4 giai đoạn initiate, respond, claim A, claim B}
-%   \label{fig:htlc-sequence}
-% \end{figure}
+\begin{figure}[H]
+  \begin{center}
+  \includegraphics[width=\linewidth]{figures/c3/htlc-sequence}
+  \end{center}
+  \caption{Giao thức HTLC cho cross-chain atomic swap: 4 giai đoạn initiate, respond, claim A, claim B}
+  \label{fig:htlc-sequence}
+\end{figure}
 
 Để đảm bảo tính nguyên tử (atomicity) và loại bỏ nhu cầu tin tưởng giữa các bên tham gia, hệ thống áp dụng cơ chế Hashed Timelock Contract (HTLC). Theo đó, mỗi bên sẽ khóa tài sản của mình vào một hợp đồng với cùng một giá trị hashlock. Giao dịch chỉ được hoàn tất khi một bên cung cấp đúng preimage tương ứng với hash đã cam kết. Nếu điều kiện này không được thỏa mãn trong khoảng thời gian quy định, toàn bộ giao dịch sẽ bị hoàn tác.
 
