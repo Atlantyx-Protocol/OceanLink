@@ -261,7 +261,6 @@ export class MatchingService {
 
     return [result];
   }
-
 }
 
 /** Application-level singleton. */

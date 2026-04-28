@@ -45,21 +45,21 @@ Setup reference for this UET thesis template. Generated 2026-04-24.
 
 ## Metadata to fill in
 
-| Field | Location |
-|---|---|
-| Title command | `thesis.tex:65` (`\title{}`) |
-| Author command | `thesis.tex:66` (`\author{}`) |
-| Cover name (VI) | `cover.tex:23`, `cover.tex:55` |
-| Cover name (EN) | `cover.tex:92` |
-| Cover title (VI) | `cover.tex:26`, `cover.tex:58` |
-| Cover title (EN) | `cover.tex:95` |
-| Supervisor | `cover.tex:65` |
-| Co-supervisor | `cover.tex:66` |
-| Year | `cover.tex:33`, `cover.tex:69`, `cover.tex:106` |
-| Class ID / assurance text | `chapters/assurance.tex` |
-| Abstract (VI) | `chapters/abtract_vi.tex` (note: "abtract" — misspelled in upstream template) |
-| Abstract (EN) | `chapters/abtract_en.tex` |
-| Acknowledgement | `chapters/acknowledgement.tex` |
+| Field                     | Location                                                                      |
+| ------------------------- | ----------------------------------------------------------------------------- |
+| Title command             | `thesis.tex:65` (`\title{}`)                                                  |
+| Author command            | `thesis.tex:66` (`\author{}`)                                                 |
+| Cover name (VI)           | `cover.tex:23`, `cover.tex:55`                                                |
+| Cover name (EN)           | `cover.tex:92`                                                                |
+| Cover title (VI)          | `cover.tex:26`, `cover.tex:58`                                                |
+| Cover title (EN)          | `cover.tex:95`                                                                |
+| Supervisor                | `cover.tex:65`                                                                |
+| Co-supervisor             | `cover.tex:66`                                                                |
+| Year                      | `cover.tex:33`, `cover.tex:69`, `cover.tex:106`                               |
+| Class ID / assurance text | `chapters/assurance.tex`                                                      |
+| Abstract (VI)             | `chapters/abtract_vi.tex` (note: "abtract" — misspelled in upstream template) |
+| Abstract (EN)             | `chapters/abtract_en.tex`                                                     |
+| Acknowledgement           | `chapters/acknowledgement.tex`                                                |
 
 ## Chapter ordering (thesis.tex body)
 
@@ -88,6 +88,6 @@ Front matter → chapters → back matter. Order is load-bearing; don't reorder:
 ## Quirks of upstream template
 
 1. **Typo'd filenames:** `abtract_vi.tex` / `abtract_en.tex` (should be "abstract"). `\input` calls match, so leave alone.
-2. **Duplicate `\bibliographystyle`:** line 43 sets `unsrt`; line 167 sets `plain` *after* `\bibliography{}` — dead code. Only `unsrt` applies.
+2. **Duplicate `\bibliographystyle`:** line 43 sets `unsrt`; line 167 sets `plain` _after_ `\bibliography{}` — dead code. Only `unsrt` applies.
 3. **Leftover malware example content** in `chapters/c5/c5_detection.tex` and `chapters/c5/c5_classification.tex` references `figures/c5/*` images that don't exist. Not `\input`'d from the active `c5_chapter.tex`. Do not wire in.
 4. **`thesis.lof` / `thesis.lot` in source tree:** these are build artifacts the upstream shipped by mistake. They'll be regenerated each compile. Left in place per "preserve template files" rule; gitignore excludes the regenerated versions.

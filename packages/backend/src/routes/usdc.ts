@@ -12,12 +12,20 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
       const { address } = (request as any).query;
 
       if (!address) {
-        return reply.status(400).send({ success: false, error: 'address query parameter is required' });
+        return reply
+          .status(400)
+          .send({ success: false, error: 'address query parameter is required' });
       }
       if (!validateChainKey(chain, reply)) return;
 
       const result = await approvalService.getAllowance(chain, address);
-      return { success: true, chain, address, allowance: result.allowance, htlcAddress: result.htlcAddress };
+      return {
+        success: true,
+        chain,
+        address,
+        allowance: result.allowance,
+        htlcAddress: result.htlcAddress,
+      };
     })
   );
 
@@ -29,7 +37,9 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
       const { address } = (request as any).query;
 
       if (!address) {
-        return reply.status(400).send({ success: false, error: 'address query parameter is required' });
+        return reply
+          .status(400)
+          .send({ success: false, error: 'address query parameter is required' });
       }
       if (!validateChainKey(chain, reply)) return;
 

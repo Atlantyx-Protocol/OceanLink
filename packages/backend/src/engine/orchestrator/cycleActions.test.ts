@@ -10,9 +10,30 @@ import {
 describe('groupActionsByChainKey', () => {
   it('groups actions by chain key + sender', () => {
     const actions: SendAction[] = [
-      { senderAddress: '0xA', receiverAddress: '0xB', srcChain: 1, chainKey: 'sepolia', amount: '10', cycleIdx: 0 },
-      { senderAddress: '0xA', receiverAddress: '0xC', srcChain: 1, chainKey: 'sepolia', amount: '10', cycleIdx: 1 },
-      { senderAddress: '0xB', receiverAddress: '0xA', srcChain: 2, chainKey: 'arbitrumSepolia', amount: '10', cycleIdx: 0 },
+      {
+        senderAddress: '0xA',
+        receiverAddress: '0xB',
+        srcChain: 1,
+        chainKey: 'sepolia',
+        amount: '10',
+        cycleIdx: 0,
+      },
+      {
+        senderAddress: '0xA',
+        receiverAddress: '0xC',
+        srcChain: 1,
+        chainKey: 'sepolia',
+        amount: '10',
+        cycleIdx: 1,
+      },
+      {
+        senderAddress: '0xB',
+        receiverAddress: '0xA',
+        srcChain: 2,
+        chainKey: 'arbitrumSepolia',
+        amount: '10',
+        cycleIdx: 0,
+      },
     ];
 
     const groups = groupActionsByChainKey(actions);
@@ -34,8 +55,22 @@ describe('groupActionsByChainKey', () => {
 
   it('separates different senders on the same chain', () => {
     const actions: SendAction[] = [
-      { senderAddress: '0xA', receiverAddress: '0xB', srcChain: 1, chainKey: 'sepolia', amount: '10', cycleIdx: 0 },
-      { senderAddress: '0xC', receiverAddress: '0xD', srcChain: 1, chainKey: 'sepolia', amount: '10', cycleIdx: 1 },
+      {
+        senderAddress: '0xA',
+        receiverAddress: '0xB',
+        srcChain: 1,
+        chainKey: 'sepolia',
+        amount: '10',
+        cycleIdx: 0,
+      },
+      {
+        senderAddress: '0xC',
+        receiverAddress: '0xD',
+        srcChain: 1,
+        chainKey: 'sepolia',
+        amount: '10',
+        cycleIdx: 1,
+      },
     ];
 
     const groups = groupActionsByChainKey(actions);
@@ -46,8 +81,22 @@ describe('groupActionsByChainKey', () => {
 describe('buildCycleHashlockMap', () => {
   it('maps cycleIdx to hashlock from fills', () => {
     const actions: SendAction[] = [
-      { senderAddress: '0xA', receiverAddress: '0xB', srcChain: 1, chainKey: 'sepolia', amount: '10', cycleIdx: 0 },
-      { senderAddress: '0xA', receiverAddress: '0xC', srcChain: 1, chainKey: 'sepolia', amount: '10', cycleIdx: 1 },
+      {
+        senderAddress: '0xA',
+        receiverAddress: '0xB',
+        srcChain: 1,
+        chainKey: 'sepolia',
+        amount: '10',
+        cycleIdx: 0,
+      },
+      {
+        senderAddress: '0xA',
+        receiverAddress: '0xC',
+        srcChain: 1,
+        chainKey: 'sepolia',
+        amount: '10',
+        cycleIdx: 1,
+      },
     ];
     const result = { fills: [{ hashlock: '0xhash0' }, { hashlock: '0xhash1' }] };
 
@@ -61,7 +110,14 @@ describe('buildCycleHashlockMap', () => {
 describe('buildCycleSecretMap', () => {
   it('maps cycleIdx to secret from fills', () => {
     const actions: SendAction[] = [
-      { senderAddress: '0xA', receiverAddress: '0xB', srcChain: 1, chainKey: 'sepolia', amount: '10', cycleIdx: 0 },
+      {
+        senderAddress: '0xA',
+        receiverAddress: '0xB',
+        srcChain: 1,
+        chainKey: 'sepolia',
+        amount: '10',
+        cycleIdx: 0,
+      },
     ];
     const result = { fills: [{ secret: '0xsecret0' }] };
 
@@ -71,7 +127,14 @@ describe('buildCycleSecretMap', () => {
 
   it('throws when secret is missing', () => {
     const actions: SendAction[] = [
-      { senderAddress: '0xA', receiverAddress: '0xB', srcChain: 1, chainKey: 'sepolia', amount: '10', cycleIdx: 0 },
+      {
+        senderAddress: '0xA',
+        receiverAddress: '0xB',
+        srcChain: 1,
+        chainKey: 'sepolia',
+        amount: '10',
+        cycleIdx: 0,
+      },
     ];
     const result = { fills: [{ secret: undefined }] };
 

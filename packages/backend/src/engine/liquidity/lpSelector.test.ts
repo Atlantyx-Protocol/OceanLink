@@ -89,10 +89,7 @@ describe('selectLpOrdersForUsers', () => {
   it('handles exact power-of-2 user amount', () => {
     const userOrders = [makeOrder('user1', 1, 2, '16', USER_ADDR)];
 
-    const allActive = [
-      ...userOrders,
-      makeOrder('lp16', 2, 1, '16', LP_ADDR),
-    ];
+    const allActive = [...userOrders, makeOrder('lp16', 2, 1, '16', LP_ADDR)];
 
     const selected = selectLpOrdersForUsers(userOrders, allActive, lpAddresses);
     assert.equal(selected.length, 1);

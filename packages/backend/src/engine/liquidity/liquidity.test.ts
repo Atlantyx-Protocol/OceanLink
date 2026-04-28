@@ -150,9 +150,7 @@ describe('LiquidityService.refill', () => {
 
     // After tick (which includes refill), the 1024 slot should be covered again
     const afterRefill = store.getByPair(SEPOLIA, BASE_SEPOLIA);
-    const restored = afterRefill.some(
-      (o) => Number(o.amount) === 1024 && o.status === 'QUEUED'
-    );
+    const restored = afterRefill.some((o) => Number(o.amount) === 1024 && o.status === 'QUEUED');
     assert.ok(restored, '1024 order should be restored after refill');
   });
 

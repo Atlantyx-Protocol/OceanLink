@@ -1,9 +1,5 @@
 import { pgTable, text, integer, jsonb } from 'drizzle-orm/pg-core';
-import type {
-  MatchedOrderEntry,
-  CycleMatch,
-  OrderStatus,
-} from '../engine/matching/types.js';
+import type { MatchedOrderEntry, CycleMatch, OrderStatus } from '../engine/matching/types.js';
 import type { ExecutionData } from '../engine/orchestrator/executionStore.js';
 
 // ---------------------------------------------------------------------------

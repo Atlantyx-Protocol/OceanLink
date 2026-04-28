@@ -125,7 +125,11 @@ export class Orchestrator {
     orderEvents.publishMany(orderIds, {
       type: 'htlc_created',
       message: `HTLC created on ${presidingChainKey} (presiding)`,
-      data: { chain: presidingChainKey, orderId: presidingResult.orderId, txHash: presidingResult.htlcTxHash },
+      data: {
+        chain: presidingChainKey,
+        orderId: presidingResult.orderId,
+        txHash: presidingResult.htlcTxHash,
+      },
     });
 
     const cycleHashlockMap = buildCycleHashlockMap(presidingActions, presidingResult);

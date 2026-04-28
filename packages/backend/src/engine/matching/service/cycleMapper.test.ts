@@ -18,10 +18,7 @@ function makeOrder(id: string, src: number, des: number, amount: string): Intent
 
 describe('buildCycleMatches', () => {
   it('maps a single cycle with 2 orders', () => {
-    const orders = [
-      makeOrder('A', 1, 2, '10'),
-      makeOrder('B', 2, 1, '15'),
-    ];
+    const orders = [makeOrder('A', 1, 2, '10'), makeOrder('B', 2, 1, '15')];
 
     const chainToVertex = new Map<number, number>([
       [1, 0],

@@ -194,7 +194,10 @@ export function useOceanBridge() {
         console.log('[OceanBridge] approval tx sent', { hash });
 
         setState((s) => ({ ...s, approvalTxHash: hash }));
-        toast({ title: 'Approval sent', description: `TX: ${hash.slice(0, 10)}...${hash.slice(-8)}` });
+        toast({
+          title: 'Approval sent',
+          description: `TX: ${hash.slice(0, 10)}...${hash.slice(-8)}`,
+        });
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
         console.log('[OceanBridge] approval receipt', {
@@ -271,7 +274,10 @@ export function useOceanBridge() {
         order: data.order,
       });
 
-      toast({ title: 'Bridge order submitted', description: `Order ID: ${submittedOrderId ?? 'N/A'}` });
+      toast({
+        title: 'Bridge order submitted',
+        description: `Order ID: ${submittedOrderId ?? 'N/A'}`,
+      });
 
       if (submittedOrderId) {
         subscribeToOrderEvents(submittedOrderId);

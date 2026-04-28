@@ -48,16 +48,16 @@ the caches are rehydrated from the DB on startup.
 
 ### Make targets (recommended)
 
-| Target            | Description                                                          |
-| ----------------- | -------------------------------------------------------------------- |
-| `make dev`        | Boot Postgres + apply schema + run frontend & backend.               |
-| `make dev-app`    | Run apps only (use when Postgres is already running elsewhere).      |
-| `make db-up`      | Start the `oceanlink-pg` container (idempotent).                     |
-| `make db-down`    | Stop & remove the container.                                         |
-| `make db-logs`    | Tail container logs.                                                 |
-| `make db-push`    | Apply the Drizzle schema to the running database.                    |
-| `make db-studio`  | Open Drizzle Studio in the browser.                                  |
-| `make db-reset`   | Drop + recreate the container + reapply schema (DESTROYS DATA).      |
+| Target           | Description                                                     |
+| ---------------- | --------------------------------------------------------------- |
+| `make dev`       | Boot Postgres + apply schema + run frontend & backend.          |
+| `make dev-app`   | Run apps only (use when Postgres is already running elsewhere). |
+| `make db-up`     | Start the `oceanlink-pg` container (idempotent).                |
+| `make db-down`   | Stop & remove the container.                                    |
+| `make db-logs`   | Tail container logs.                                            |
+| `make db-push`   | Apply the Drizzle schema to the running database.               |
+| `make db-studio` | Open Drizzle Studio in the browser.                             |
+| `make db-reset`  | Drop + recreate the container + reapply schema (DESTROYS DATA). |
 
 Defaults can be overridden inline, e.g. `make db-up PG_PORT=5433`.
 Variables: `PG_CONTAINER`, `PG_IMAGE`, `PG_PORT`, `PG_USER`,

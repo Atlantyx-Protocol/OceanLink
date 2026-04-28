@@ -19,7 +19,9 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
       const body = (request.body as any) || {};
 
       if (!body.receivers || !Array.isArray(body.receivers) || body.receivers.length === 0) {
-        return reply.status(400).send({ error: 'receivers array is required and must not be empty' });
+        return reply
+          .status(400)
+          .send({ error: 'receivers array is required and must not be empty' });
       }
 
       if (!body.amounts || !Array.isArray(body.amounts) || body.amounts.length === 0) {
