@@ -44,6 +44,11 @@ export class Orchestrator {
     this.chainIdToKey = buildChainIdMap();
   }
 
+  /** Loads persisted execution records into memory. Call once on boot. */
+  async hydrate(): Promise<void> {
+    await this.executionStore.hydrate();
+  }
+
   getExecution(matchId: string): ExecutionRecord | undefined {
     return this.executionStore.get(matchId);
   }

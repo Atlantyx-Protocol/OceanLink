@@ -9,6 +9,7 @@ import { matchScheduler } from './engine/matching/scheduler/matchScheduler.js';
 import { LiquidityService, loadLPConfigsFromEnv } from './engine/liquidity/liquidityService.js';
 import { matchingService } from './engine/matching/service/matchingService.js';
 import { orderStore } from './engine/matching/store/orderStore.js';
+import { orchestrator } from './engine/orchestrator/orchestrator.js';
 
 dotenv.config({ path: '../../.env' });
 
@@ -31,6 +32,14 @@ const fastify = Fastify({
 
 async function start() {
   try {
+    // Hydrate in-memory stores from Postgres before the scheduler starts,
+    // so any orders/matches/executions persisted in a previous run are
+    // restored. Failure here is fatal — better to crash than silently lose
+    // pending bridge state.
+    await orderStore.hydrate();
+    await orchestrator.hydrate();
+    fastify.log.info('Stores hydrated from Postgres');
+
     // Register CORS
     await fastify.register(cors, {
       origin: process.env.FRONTEND_URL || 'http://localhost:3000',
