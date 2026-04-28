@@ -1,22 +1,14 @@
-\chapter{Phân tích hệ thống và thiết kế}
-\label{chap:design}
+\chapter{Cài đặt, kiểm thử và triển khai hệ thống}
+\label{chap:implementation}
 
-\section{Tổng quan thiết kế hệ thống}
-
-% TODO: Mô tả kiến trúc tổng thể của hệ thống, bao gồm các thành phần on-chain
-% và off-chain, luồng xử lý intent từ khi người dùng khởi tạo đến khi hoàn tất.
-
-\subsection{On-chain}
-
-% TODO: Mô tả các smart contract, Settlement Contract, Escrow, HTLC,
-% và các hàm tương tác với người dùng.
-
-\subsection{Off-chain}
-
-% TODO: Mô tả các thành phần off-chain: matching engine, P2P intent relay,
-% solver registry, order store, scheduler.
-
-\section{Đánh giá}
-
-% TODO: Đánh giá định tính về thiết kế đề xuất: trust assumption,
-% security properties, kinh tế học của incentive mechanism.
+% TODO: Chương này trình bày cài đặt thực tế của hệ thống (OceanLink Protocol),
+% các kịch bản kiểm thử và quy trình triển khai, bao gồm:
+% - Môi trường triển khai (Sepolia, Arbitrum Sepolia, Base Sepolia)
+% - Cài đặt matching engine (Fastify + TypeScript, thuật toán cycle-reduction)
+% - Liquidity provider service
+% - Smart contract HTLC trên các chain EVM
+% - Tích hợp Fallback bridge (Chainlink CCIP / LayerZero)
+% - Kịch bản kiểm thử end-to-end: netting match, solver fill, fallback bridge
+% - Kết quả đo performance: latency, throughput, success rate
+% - Quy trình deploy
+% - Phân tích và thảo luận
