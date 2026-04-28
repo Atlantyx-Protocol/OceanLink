@@ -35,9 +35,15 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Run backend tests
         run: pnpm --filter @ocean-link/backend test
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test
 
   frontend:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_USDC_ADDRESS_SEPOLIA: '0x0000000000000000000000000000000000000000'
+      NEXT_PUBLIC_USDC_ADDRESS_ARBITRUM_SEPOLIA: '0x0000000000000000000000000000000000000000'
+      NEXT_PUBLIC_USDC_ADDRESS_BASE_SEPOLIA: '0x0000000000000000000000000000000000000000'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
