@@ -54,8 +54,9 @@ flowchart TB
     OS <-->|"persist"| PG
     ALGO -->|"MatchResult"| ORCH
     ORCH <-->|"persist"| PG
-    ORCH -->|"publish events"| EV
-    OS -->|"publish events"| EV
+    ORCH -.->|"publish events"| EV
+    OS -.->|"publish events"| EV
+    EV -.->|"subscribe (SSE)"| APIG
     LP -->|"seed LP orders"| OS
     LP -->|"pre-approve USDC"| EXEC
   end
@@ -73,7 +74,8 @@ flowchart TB
   EXEC -->|"HTLC tx"| HTLC_E
   EXEC -->|"HTLC tx"| HTLC_A
   EXEC -->|"HTLC tx"| HTLC_B
-  UI <-->|"HTTP / SSE"| APIG
+  UI -->|"HTTP request"| APIG
+  APIG -.->|"SSE event stream"| UI
 
   classDef onchain fill:#cfe2ff,stroke:#0d6efd,color:#000
   classDef offchainBox fill:#f8d7da,stroke:#dc3545,color:#000

@@ -6,10 +6,14 @@
 
 \begin{small}
 
-Tóm tắt nội dung KL tốt nghiệp: Bài toán, phương pháp giải quyết, kết quả đạt được 
+Trong khoảng thời gian gần đây, sự phát triển của nhiều nền tảng blockchain độc lập đã dẫn đến tình trạng phân mảnh tài sản và thanh khoản, khiến nhu cầu tương tác xuyên chuỗi (cross-chain) trở nên cấp thiết.
+Tuy nhiên, các bridge truyền thống vẫn tồn tại nhiều hạn chế về chi phí, độ trễ và bảo mật, minh chứng qua các vụ tấn công nghiêm trọng như Ronin hay Wormhole.
 
+Lấy cảm hứng từ mô hình netting nội bộ của Wise (TransferWise), dự án đề xuất và xây dựng \textit{OceanLink Protocol} - một hệ thống bridge cross-chain theo hướng \textit{intent-based} kết hợp mạng ngang hàng (P2P). 
+Thay vì chuyển tài sản trực tiếp cho từng giao dịch, hệ thống tự động ghép nối các \textit{intent} đối ứng qua kiến trúc ba lớp: \textit{Netting Layer} (matching intent ngang hàng), \textit{Intent Accelerator Layer} (Liquidity Providers cung cấp intent đối ứng và nhận incentive fee) và \textit{Fallback Bridge Aggregator} (đảm bảo hoàn tất khi không có intent đối ứng). 
+Kết quả thực nghiệm trên testnet (Sepolia, Arbitrum Sepolia, Base Sepolia) với USDC cho thấy hệ thống xử lý các intent chính xác và giảm đáng kể chi phí và đem lại độ an toàn cao nhất so với các bridge truyền thống.
 
 \vspace*{1cm}
-\textbf{Từ khóa}: Liệt kê 3-5 từ khoá liên quan
+\textbf{Từ khóa}: cross-chain bridge, intent-based execution, peer-to-peer network, netting, HTLC, blockchain interoperability.
 
 \end{small}

@@ -1,4 +1,4 @@
-\chapter{Phân tích và thiết kế hệ thống Bridge p2p intent-based}
+\chapter{Phân tích và thiết kế hệ thống}
 \label{chap:design}
 
 Chương này trình bày quá trình phân tích yêu cầu, kiến trúc tổng quan và thiết kế chi tiết của hệ thống bridge ngang hàng dựa trên intent. Hệ thống được phân tích trên hai trục bổ trợ nhau: trục \textbf{kiến trúc} mô tả các thành phần cấu thành (onchain và offchain), và trục \textbf{thực thi} mô tả cách một intent được phục vụ thông qua mô hình ba lớp Netting Layer, Intent Accelerator Layer và Fallback Bridge Aggregator. Phần cuối của chương trình bày mô hình dữ liệu và các biểu đồ thiết kế chi tiết.
@@ -10,11 +10,11 @@ Chương này trình bày quá trình phân tích yêu cầu, kiến trúc tổn
 Hệ thống tương tác với các tác nhân sau:
 
 \begin{itemize}
-    \item \textbf{End User}: người dùng cuối, tạo và ký intent biểu diễn nhu cầu chuyển tài sản xuyên chuỗi, theo dõi trạng thái và nhận tài sản trên chain đích.
-    \item \textbf{Solver}: tác nhân cung cấp thanh khoản và thực thi (fill) intent ở Intent Accelerator Layer; cạnh tranh với các solver khác thông qua cơ chế Dutch auction.
-    \item \textbf{Matching Engine}: tác nhân nội bộ của hệ thống, tìm các chu trình bù trừ giữa các intent ở Netting Layer.
-    \item \textbf{Smart Contract on-chain}: bao gồm Intent Registry, HTLC Vault và Settlement Contract triển khai trên các blockchain EVM khác nhau, đóng vai trò khoá tài sản và xác minh các điều kiện thực thi.
-    \item \textbf{Fallback Bridge Aggregator}: hệ thống bên thứ ba (ví dụ Chainlink CCIP, LayerZero) được hệ thống ủy thác khi cả Netting và Accelerator đều không khả thi.
+    \item End User: người dùng cuối, tạo và ký intent biểu diễn nhu cầu chuyển tài sản xuyên chuỗi, theo dõi trạng thái và nhận tài sản trên chain đích.
+    \item Solver: tác nhân cung cấp thanh khoản và thực thi (fill) intent ở Intent Accelerator Layer; cạnh tranh với các solver khác thông qua cơ chế Dutch auction.
+    \item Matching Engine: tác nhân nội bộ của hệ thống, tìm các chu trình bù trừ giữa các intent ở Netting Layer.
+    \item Smart Contract on-chain: bao gồm các HTLC Vault triển khai trên các blockchain EVM khác nhau, đóng vai trò khoá tài sản và xác minh các điều kiện thực thi.
+    \item Fallback Bridge Aggregator: hệ thống bên thứ ba (ví dụ Chainlink CCIP, Across Protocol) được hệ thống ủy thác khi cả Netting và Accelerator đều không khả thi.
 \end{itemize}
 
 % TODO: Use case diagram - actors and use cases of the system.
@@ -34,47 +34,49 @@ Các yêu cầu chức năng được nhóm theo từng module nghiệp vụ:
 \paragraph{Quản lý Intent.}
 
 \begin{itemize}
-    \item \textbf{FR-01}: Hệ thống cho phép người dùng tạo và submit intent kèm chữ ký số xác thực quyền sở hữu tài sản.
-    \item \textbf{FR-02}: Hệ thống quản lý vòng đời intent qua các trạng thái \texttt{QUEUED} $\to$ \texttt{PARTIAL} / \texttt{MATCHED} / \texttt{EXPIRED}.
-    \item \textbf{FR-03}: Hệ thống cho phép hủy intent và hoàn trả (refund) tài sản khi quá hạn deadline mà chưa được thực thi.
+    \item FR-01: Hệ thống cho phép người dùng tạo và submit intent kèm chữ ký số xác thực quyền sở hữu tài sản.
+    \item FR-02: Hệ thống quản lý vòng đời intent qua các trạng thái \texttt{QUEUED} $\to$ \texttt{PARTIAL} / \texttt{MATCHED} / \texttt{EXPIRED}.
+    \item FR-03: Hệ thống cho phép hủy intent và hoàn trả (refund) tài sản khi quá hạn deadline mà chưa được thực thi.
 \end{itemize}
 
 \paragraph{Netting Layer.}
 
 \begin{itemize}
-    \item \textbf{FR-04}: Hệ thống mô hình hoá tập intent dưới dạng đồ thị có hướng và tìm các chu trình bù trừ thoả mãn ràng buộc về token, số lượng và deadline.
-    \item \textbf{FR-05}: Hệ thống khởi tạo HTLC trên các chain liên quan và settle giao dịch netting một cách nguyên tử.
+    \item FR-04: Hệ thống mô hình hoá tập intent dưới dạng đồ thị có hướng và tìm các chu trình bù trừ thoả mãn ràng buộc về token, số lượng và deadline.
+    \item FR-05: Hệ thống khởi tạo HTLC trên các chain liên quan và settle giao dịch netting một cách nguyên tử.
 \end{itemize}
 
 \paragraph{Intent Accelerator Layer.}
 
 \begin{itemize}
-    \item \textbf{FR-06}: Hệ thống broadcast intent ra mạng p2p kèm cơ chế incentive tăng dần theo thời gian (Dutch auction).
-    \item \textbf{FR-07}: Hệ thống cho phép solver commit và fill intent với mức incentive hiện hành tại thời điểm commit.
+    \item FR-06: Hệ thống broadcast intent ra mạng p2p kèm cơ chế incentive tăng dần theo thời gian (Dutch auction).
+    \item FR-07: Hệ thống cho phép solver commit và fill intent với mức incentive hiện hành tại thời điểm commit.
 \end{itemize}
 
 \paragraph{Fallback Bridge Aggregator.}
 
 \begin{itemize}
-    \item \textbf{FR-08}: Hệ thống định tuyến intent qua bridge bên thứ ba khi cả Netting và Accelerator đều không hoàn tất, đồng thời theo dõi và đồng bộ trạng thái cho đến khi giao dịch hoàn tất.
+    \item FR-08: Hệ thống định tuyến intent qua bridge bên thứ ba khi cả Netting và Accelerator đều không hoàn tất, đồng thời theo dõi và đồng bộ trạng thái cho đến khi giao dịch hoàn tất.
 \end{itemize}
 
 \subsection{Yêu cầu phi chức năng}
 
 \begin{itemize}
-    \item \textbf{NFR-01 --- Trust-minimization}: hạn chế tối đa giả định tin cậy vào bên thứ ba; mọi thao tác giải phóng tài sản phải được kiểm chứng on-chain.
-    \item \textbf{NFR-02 --- Tính nguyên tử}: với mỗi intent, kết quả phải đảm bảo hoặc tất cả các bên hoàn tất nghĩa vụ, hoặc không bên nào bị thiệt hại.
-    \item \textbf{NFR-03 --- Bảo mật}: smart contract phải chống các tấn công phổ biến như reentrancy, front-running, replay attack; hệ thống offchain phải xác thực chữ ký và chống Sybil.
-    \item \textbf{NFR-04 --- Khả năng phục hồi}: tài sản không bị khoá vĩnh viễn; mọi HTLC đều có timelock đảm bảo refund tự động.
-    \item \textbf{NFR-05 --- Hiệu năng}: độ trễ phù hợp với từng layer --- Netting có thể chấp nhận chờ vài giây, Accelerator yêu cầu đáp ứng gần thời gian thực, Fallback ưu tiên độ tin cậy hơn tốc độ.
-    \item \textbf{NFR-06 --- Tối ưu chi phí gas}: số lượng giao dịch on-chain được giảm thiểu, ưu tiên matching nội bộ trước khi sử dụng bridge ngoài.
+    \item NFR-01 - Trust-minimization: hạn chế tối đa giả định tin cậy vào bên thứ ba; mọi thao tác giải phóng tài sản phải được kiểm chứng on-chain.
+    \item NFR-02 - Tính nguyên tử: với mỗi intent, kết quả phải đảm bảo hoặc tất cả các bên hoàn tất nghĩa vụ, hoặc không bên nào bị thiệt hại.
+    \item NFR-03 - Bảo mật: smart contract phải chống các tấn công phổ biến như reentrancy, front-running, replay attack; hệ thống offchain phải xác thực chữ ký và chống Sybil.
+    \item NFR-04 - Khả năng phục hồi: tài sản không bị khoá vĩnh viễn; mọi HTLC đều có timelock đảm bảo refund tự động.
+    \item NFR-05 - Hiệu năng: độ trễ phù hợp với từng layer --- Netting có thể chấp nhận chờ vài giây, Accelerator yêu cầu đáp ứng gần thời gian thực, Fallback ưu tiên độ tin cậy hơn tốc độ.
+    \item NFR-06 - Tối ưu chi phí gas: số lượng giao dịch on-chain được giảm thiểu, ưu tiên matching nội bộ trước khi sử dụng bridge ngoài.
+    \item NFR-07 - Non-custodial: hệ thống không nắm giữ tài sản của người dùng tại bất kỳ thời điểm nào. Tài sản chỉ được khoá trong các smart contract escrow (HTLC) với điều kiện giải phóng được kiểm chứng on-chain; trong trường hợp giao dịch không thành công, tài sản sẽ được hoàn trả tự động cho người dùng thông qua cơ chế timelock mà không cần sự can thiệp của bất kỳ bên trung gian nào.
 \end{itemize}
 
 \section{Kiến trúc tổng quan hệ thống}
 
 \subsection{Phân tách Onchain và Offchain}
 
-Hệ thống được phân tách rõ ràng thành hai miền: \textbf{onchain} chứa các smart contract chịu trách nhiệm cho các thao tác cần đảm bảo trust-minimized (khoá tài sản, xác minh điều kiện thực thi, settle giao dịch), và \textbf{offchain} chứa các thành phần xử lý intent, matching và điều phối thực thi. Việc phân tách này cho phép tận dụng lợi thế của cả hai miền: onchain đảm bảo tính bất biến và khả năng kiểm chứng, offchain mang lại hiệu năng cao và tính linh hoạt cho các thuật toán phức tạp.
+Hệ thống được phân tách rõ ràng thành hai phần lớn: \textbf{onchain} chứa các smart contract chịu trách nhiệm cho các thao tác cần đảm bảo trust-minimized (khoá tài sản, xác minh điều kiện thực thi, settle giao dịch), và \textbf{offchain} chứa các thành phần xử lý intent, matching và điều phối thực thi. 
+Việc phân tách này cho phép tận dụng lợi thế của cả hai miền: onchain phụ trách lưu trữ và chuyển giao tài sản một cách an toàn, trong khi offchain phụ trách xử lý order và matching với hiệu năng cao, độ trễ thấp.
 
 % TODO: System architecture diagram - onchain/offchain components.
 % Place image at figures/c3/architecture.png and uncomment below.
@@ -91,8 +93,8 @@ Hệ thống được phân tách rõ ràng thành hai miền: \textbf{onchain} 
 Tầng onchain bao gồm các thành phần sau:
 
 \begin{itemize}
-    \item \textbf{HTLC Vault contracts}: smart contract triển khai trên từng blockchain EVM được hỗ trợ (ví dụ Base, Ethereum, Arbitrum, Avalanche). Mỗi contract chịu trách nhiệm khoá tài sản theo cơ chế hashlock và timelock, và giải phóng tài sản khi điều kiện thực thi được thoả mãn.
-    \item \textbf{Fallback bridge endpoints}: các adapter tích hợp với bridge bên thứ ba như Chainlink CCIP và LayerZero, được kích hoạt khi intent rơi vào lớp Fallback.
+    \item HTLC Vault contracts: smart contract triển khai trên từng blockchain EVM được hỗ trợ (ví dụ Base, Ethereum, Arbitrum, Avalanche). Mỗi contract chịu trách nhiệm khoá tài sản theo cơ chế hashlock và timelock, và giải phóng tài sản khi điều kiện thực thi được thoả mãn.
+    \item Fallback bridge endpoints: các adapter tích hợp với bridge bên thứ ba như Chainlink CCIP và Across Protocol, được kích hoạt khi intent đi xuống lớp Fallback.
 \end{itemize}
 
 \subsection{Các thành phần offchain}
@@ -100,10 +102,10 @@ Tầng onchain bao gồm các thành phần sau:
 Tầng offchain được tổ chức thành bốn nhóm chức năng:
 
 \begin{itemize}
-    \item \textbf{Execution Engine}: gồm \textit{Indexer} bắt sự kiện onchain và \textit{Executor} ký và phát sinh các giao dịch on-chain để khởi tạo HTLC, claim tài sản, hoặc gọi bridge fallback.
-    \item \textbf{Ledger}: trung tâm điều phối trạng thái offchain. Bao gồm \textit{Event log} (kafka-style) làm nguồn sự kiện duy nhất, \textit{Risk engine} kiểm tra hợp lệ và rủi ro của intent trước khi chấp nhận, và \textit{Backend} lưu trữ snapshot của balances và positions phục vụ tra cứu nhanh.
-    \item \textbf{Orderbook}: chứa \textit{OrderQueue} lưu các intent đang chờ match, và \textit{Matching Engine} (gồm \textit{Solver} nội bộ) thực hiện thuật toán tìm chu trình bù trừ.
-    \item \textbf{API Gateway}: cổng giao tiếp với các tác nhân bên ngoài, cung cấp các endpoint REST và Server-Sent Events (SSE) cho việc tạo intent, theo dõi trạng thái và nhận sự kiện vòng đời.
+    \item Execution Engine: gồm \textit{Indexer} bắt sự kiện onchain và \textit{Executor} ký và phát sinh các giao dịch on-chain để khởi tạo HTLC, claim tài sản, hoặc gọi bridge fallback.
+    \item Ledger: trung tâm điều phối trạng thái offchain. Bao gồm \textit{Event log} (kafka-style) làm nguồn sự kiện duy nhất, \textit{Risk engine} kiểm tra hợp lệ và rủi ro của intent trước khi chấp nhận, và \textit{Backend} lưu trữ snapshot của balances và positions phục vụ tra cứu nhanh.
+    \item Orderbook: chứa \textit{OrderQueue} lưu các intent đang chờ match, và \textit{Matching Engine} (gồm \textit{Solver} nội bộ) thực hiện thuật toán tìm chu trình bù trừ.
+    \item API Gateway: cổng giao tiếp với các tác nhân bên ngoài, cung cấp các endpoint REST và Server-Sent Events (SSE) cho việc tạo intent, theo dõi trạng thái và nhận sự kiện vòng đời.
 \end{itemize}
 
 \section{Mô hình thực thi ba lớp}
