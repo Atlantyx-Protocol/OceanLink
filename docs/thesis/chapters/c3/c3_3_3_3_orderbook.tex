@@ -1,0 +1,114 @@
+% =============================================================================
+% Draft mục 3.3.3 — Order Book (OrderStore)
+% =============================================================================
+
+\subsection{Order Book (OrderStore)}
+\label{sec:order-book}
+
+\texttt{OrderStore} là sổ lệnh (orderbook) của hệ thống — nơi các
+intent đang active được lưu trữ giữa thời điểm người dùng gửi và thời
+điểm Matching Engine khớp được chúng. Thiết kế của OrderStore phản ánh
+một quyết định kiến trúc quan trọng: \textbf{tách "nguồn sự thật lúc
+chạy" (runtime source of truth) khỏi "lưu trữ bền" (durable
+storage)}, dùng cơ chế write-through cache để vừa giữ độ trễ thấp cho
+matching tick, vừa đảm bảo dữ liệu không mất khi tiến trình khởi
+động lại.
+
+\subsubsection*{Hai tầng dữ liệu}
+
+\paragraph{Tầng trong bộ nhớ (in-memory).} Là các cấu trúc JavaScript
+\texttt{Map} sống trong tiến trình Node của backend. Có ba cấu trúc
+chính:
+
+\begin{itemize}
+  \item \emph{Primary index} — \texttt{Map<orderId, IntentOrder>}
+    cho tra cứu một order theo định danh trong $O(1)$.
+  \item \emph{Pair index} — \texttt{Map<"src-des", Set<orderId>>}
+    cho tra cứu nhanh tập order đang hoạt động theo cặp chuỗi
+    nguồn–đích trong $O(1)$. Pair index chỉ chứa các order
+    \texttt{QUEUED} hoặc \texttt{PARTIAL}; khi một order chuyển sang
+    \texttt{MATCHED} hoặc \texttt{EXPIRED}, pair index được xoá tham
+    chiếu tương ứng để Matching Engine không phải lọc lại.
+  \item \emph{Match log} — mảng \texttt{MatchResult[]} append-only,
+    lưu lịch sử tất cả các sự kiện match đã phát sinh.
+\end{itemize}
+
+\paragraph{Tầng bền vững (Postgres).} Là cơ sở dữ liệu quan hệ chạy
+trong tiến trình riêng biệt, thông qua Drizzle ORM. Ba bảng tương
+ứng:
+
+\begin{itemize}
+  \item \texttt{intent\_orders} — mỗi dòng là một \texttt{IntentOrder}.
+    Số lượng được lưu dạng \texttt{text} để giữ chính xác tuyệt đối
+    (USDC dùng 6 chữ số thập phân, lớp matching xử lý chuỗi số nguyên
+    bất kỳ).
+  \item \texttt{match\_results} — bảng nhật ký append-only của các sự
+    kiện match. Các trường \texttt{cycles} và \texttt{raw\_cycles}
+    được lưu dạng JSONB do hệ thống không cần truy vấn vào nội dung.
+  \item \texttt{executions} — trạng thái thực thi mỗi \texttt{matchId},
+    được cập nhật theo thời gian thực khi Orchestrator chuyển trạng
+    thái \texttt{pending} $\rightarrow$ \texttt{done|error}.
+\end{itemize}
+
+\subsubsection*{Mô hình write-through}
+
+Mọi thao tác mutating trên OrderStore đều theo trình tự:
+
+\begin{enumerate}
+  \item Cập nhật cấu trúc trong bộ nhớ \emph{đồng bộ} (synchronous)
+    để các thành phần đọc tiếp theo (Matching Engine, các route đọc)
+    nhìn thấy giá trị mới ngay lập tức.
+  \item Phát một thao tác ghi tương ứng vào Postgres theo kiểu
+    \emph{fire-and-forget}: tạo Promise, không await, gắn handler
+    \texttt{logDbError} cho trường hợp lỗi.
+\end{enumerate}
+
+Mục tiêu thiết kế là không để vòng lặp matching (chu kỳ 1\,s) bị chặn
+bởi I/O cơ sở dữ liệu. Đánh đổi: nếu tiến trình bị crash giữa bước (1)
+và (2), trạng thái trong bộ nhớ và Postgres có thể lệch nhau trong một
+khoảng ngắn — chấp nhận được ở giai đoạn MVP. Phương án nâng cấp được
+liệt kê ở mục Future Work là chuyển sang \emph{outbox pattern}: append
+event vào một bảng riêng trong cùng một transaction với việc thay đổi
+trạng thái, rồi để một consumer riêng đọc bảng đó.
+
+\subsubsection*{Hydration on boot}
+
+Vì in-memory không phải durable, nó phải được \emph{rehydrate} (tái
+xây dựng) từ Postgres mỗi khi tiến trình khởi động. Phương thức
+\texttt{OrderStore.hydrate()} chạy \emph{trước} khi
+\texttt{MatchScheduler} bắt đầu tick:
+
+\begin{enumerate}
+  \item \texttt{SELECT * FROM intent\_orders} — đọc toàn bộ order, dựng
+    lại primary index và pair index. Chỉ các order \texttt{QUEUED}
+    hoặc \texttt{PARTIAL} được đưa vào pair index, vì pair index chỉ
+    đại diện các order còn ứng cử để match.
+  \item \texttt{SELECT * FROM match\_results ORDER BY matched\_at} —
+    đọc nhật ký match, append theo thứ tự thời gian.
+\end{enumerate}
+
+Hydration được \emph{await} trong \texttt{start()} của entrypoint
+backend; nếu hydration thất bại, tiến trình crash thay vì bắt đầu chạy
+với trạng thái rỗng — đây là lựa chọn an toàn vì rỗng có thể vô tình
+bỏ mất các order còn pending hoặc các execution chưa hoàn tất.
+
+\subsubsection*{Vai trò trong sơ đồ phụ thuộc}
+
+OrderStore là singleton của module \texttt{matching/store/orderStore},
+được chia sẻ bởi:
+
+\begin{itemize}
+  \item \emph{API Gateway} — gọi \texttt{add()} khi nhận
+    \texttt{POST /api/intent} và \texttt{get()} khi nhận các route
+    truy vấn.
+  \item \emph{MatchingService} — gọi \texttt{getActiveOrders()},
+    \texttt{getByPair()}, \texttt{update()},
+    \texttt{removeFromPairIndex()}, \texttt{addMatchResult()},
+    \texttt{expireStale()}.
+\end{itemize}
+
+Nói cách khác, OrderStore đóng vai trò bus dữ liệu nội bộ: \emph{mọi
+thay đổi trạng thái orderbook đi qua nó}, và mọi việc ghi xuống
+Postgres do \emph{một mình OrderStore} chịu trách nhiệm. Nhờ đó các
+thành phần khác (MatchingService) không cần biết về sự tồn tại của
+Postgres — một dạng dependency inversion đơn giản.

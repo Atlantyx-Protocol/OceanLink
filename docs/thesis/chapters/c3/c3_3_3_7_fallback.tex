@@ -1,0 +1,127 @@
+% =============================================================================
+% Draft mục 3.3.7 — Fallback Bridge Aggregator (DESIGN-ONLY)
+% =============================================================================
+
+\subsection{Fallback Bridge Aggregator}
+\label{sec:fallback-bridge}
+
+\noindent\textbf{Lưu ý phạm vi.} Mục này trình bày
+\emph{thiết kế ý đồ} của tầng fallback. Trong scope của luận văn, cài
+đặt thực tế chưa được hoàn tất; mã nguồn hiện chỉ chứa interface và
+một adapter mẫu. Phần thực thi đầy đủ và đo benchmark được liệt kê
+trong Chương Future Work.
+
+\subsubsection*{Lý do tồn tại}
+
+Matching Engine (\S\ref{sec:matching-engine}) chỉ thanh toán được
+phần intent có thể tham gia vào một chu trình thoả ngưỡng
+$\mathrm{ratio} > x$. Có hai nhóm trường hợp một intent
+\emph{không thể} được khớp bởi tầng netting:
+
+\begin{enumerate}
+  \item \textbf{Không có đối ứng.} Tại thời điểm intent được đưa
+    vào orderbook, không có intent nào trên cặp chuỗi đối ứng có khả
+    năng tạo cycle với nó.
+  \item \textbf{Cân bằng lệch.} Cycle tồn tại nhưng
+    $\mathrm{ratio}$ quá nhỏ — phần khớp được không bù được chi phí
+    gas, hoặc phần dư còn lại quá lớn so với nhu cầu của người dùng.
+\end{enumerate}
+
+Trong các trường hợp đó, người dùng vẫn cần một con đường để hoàn
+tất việc bridge. \emph{Fallback Bridge Aggregator} là tầng cuối
+cùng: thay vì cố matching P2P, nó định tuyến intent qua một bridge
+"thông thường" — một bridge bên thứ ba đã có thanh khoản thực sự
+trên cả hai chuỗi — và chấp nhận trả phí cao hơn để đổi lấy
+\emph{tính chắc chắn về thời gian hoàn tất}.
+
+\subsubsection*{Vị trí trong mô hình thực thi ba lớp}
+
+Theo mô hình thực thi ba lớp (\S "Mô hình thực thi ba lớp"), một
+intent điển hình đi qua các lớp theo thứ tự ưu tiên:
+
+\begin{enumerate}
+  \item \textbf{Netting Layer.} Đợi tối đa $T_{\text{net}}$ giây (mặc
+    định: vài tick scheduler). Nếu được matching engine khớp một
+    phần hoặc toàn bộ, phần đã khớp đi qua Execution Engine và HTLC.
+    Phần dư (nếu có) tiếp tục.
+  \item \textbf{Intent Accelerator Layer} (chưa nằm trong scope). Mời
+    các solver bên ngoài quote một mức giá riêng cho phần dư;
+    người gửi có thể chấp nhận hoặc từ chối. Nếu chấp nhận và solver
+    thực hiện, phần dư được thanh toán qua HTLC như một flow đặc
+    biệt.
+  \item \textbf{Fallback Bridge Aggregator.} Nếu cả hai lớp trên
+    không xử lý được trong thời gian $T_{\text{total}}$, phần intent
+    còn lại được định tuyến qua một bridge bên thứ ba.
+\end{enumerate}
+
+Trật tự này đảm bảo: phần lớn intent hưởng lợi từ phí thấp + thanh
+toán P2P (lớp 1), một số ít chấp nhận trade-off (lớp 2), và không
+có intent nào bị "treo" vô thời hạn (lớp 3).
+
+\subsubsection*{Các bridge ứng cử viên}
+
+Thiết kế tham khảo ba bridge phổ biến để tích hợp:
+
+\begin{itemize}
+  \item \textbf{Across Protocol.} Mô hình intents-based, dùng các
+    relayer cạnh tranh. Phù hợp với các cặp Ethereum L1 $\leftrightarrow$ L2 (đặc
+    biệt là Arbitrum, Base, Optimism). Phí thường thấp; thời gian
+    finalize tính bằng phút.
+  \item \textbf{LayerZero.} Generic messaging layer. Tích hợp tốt với
+    nhiều chuỗi non-EVM trong tương lai. Mô hình endpoint + DVN
+    (Decentralized Verifier Network), tuỳ vào lựa chọn DVN mà chi
+    phí và độ trễ khác nhau.
+  \item \textbf{Chainlink CCIP.} Cross-Chain Interoperability
+    Protocol. Phù hợp khi yêu cầu finality cao và sẵn sàng trả phí
+    đáng kể. Mạng đã được tích hợp trên cả ba chuỗi mục tiêu.
+\end{itemize}
+
+Tầng aggregator được thiết kế \emph{không khoá vào một bridge cụ
+thể}; thay vào đó, nó định nghĩa một interface chung và mỗi bridge
+là một adapter implement interface đó.
+
+\subsubsection*{Interface đề xuất}
+
+Theo nguyên tắc đa hình ngầm (structural typing) của TypeScript,
+interface tối thiểu của một bridge adapter có dạng:
+
+\begin{verbatim}
+interface BridgeAdapter {
+  name: string;
+
+  // Lấy quote: phí, ETA, lãi suất bảo đảm
+  quote(req: QuoteRequest): Promise<QuoteResponse>;
+
+  // Phát giao dịch bridge; trả về txHash trên chuỗi nguồn
+  // và thông tin để theo dõi đến khi hoàn tất trên chuỗi đích
+  send(req: SendRequest): Promise<SendResult>;
+
+  // Theo dõi trạng thái của một bridge đang chạy
+  status(handle: BridgeHandle): Promise<BridgeStatus>;
+}
+\end{verbatim}
+
+\texttt{Aggregator} duy trì danh sách các \texttt{BridgeAdapter}, gọi
+\texttt{quote} song song, chọn quote tốt nhất theo một hàm chi phí
+(thường là $\mathrm{fee} + \mathrm{ETA} \cdot \alpha$ cho hằng số
+$\alpha$ phản ánh "giá trị thời gian" của người dùng), rồi gọi
+\texttt{send} trên
+adapter tương ứng. Trạng thái sau đó được theo dõi và cập nhật vào
+\texttt{ExecutionRecord} qua cùng kênh sự kiện như nhánh netting.
+
+\subsubsection*{Câu hỏi mở (đặt cho Future Work)}
+
+\begin{itemize}
+  \item \textbf{Tiêu chí kích hoạt fallback.} Hiện thiết kế dựa vào
+    timeout đơn lẻ; có thể nâng cấp thành chính sách động dựa trên
+    profile rủi ro của người dùng (ví dụ: dùng fallback ngay nếu
+    intent có \texttt{deadline} quá gần).
+  \item \textbf{Lỗ hổng khi quote.} Quote đáo hạn nhanh; aggregator
+    cần xử lý trường hợp quote hết hiệu lực giữa lúc người dùng
+    chấp nhận và lúc \texttt{send}. Phương án đề xuất: re-quote và
+    yêu cầu re-confirm nếu lệch quá ngưỡng.
+  \item \textbf{Tích hợp với accounting nội bộ.} Vì fallback tốn
+    phí thực, hệ thống cần ghi rõ phần phí được chuyển cho bridge
+    bên thứ ba để đối chiếu báo cáo P\&L. Yêu cầu một bảng phụ
+    \texttt{fallback\_executions} trong lược đồ dữ liệu.
+\end{itemize}
