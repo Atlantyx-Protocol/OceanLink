@@ -3,104 +3,105 @@
 
 \section{Giới thiệu chung}
 
-Blockchain đang là một trong những lĩnh vực công nghệ phát triển sôi động nhất hiện nay, với hệ sinh thái đa dạng các nền tảng và ứng dụng phi tập trung (dApp) trải rộng trên nhiều mảng như tài chính phi tập trung (DeFi), NFT hay GameFi. 
-Sự tồn tại song song của nhiều blockchain như Ethereum, BNB Chain, Solana hay các blockchain Layer 2 tạo ra một môi trường phong phú nhưng đồng thời dẫn đến sự phân mảnh về tài sản và thanh khoản. 
-Trong bối cảnh đó, nhu cầu tương tác xuyên chuỗi (cross-chain interaction) trở thành một yêu cầu tất yếu, cho phép người dùng di chuyển tài sản và thực hiện giao dịch giữa các blockchain khác nhau.
+Công nghệ blockchain hiện tại đang phát triển mạnh mẽ với hệ sinh thái đa dạng các nền tảng và ứng dụng phi tập trung (dApp) trải rộng trên nhiều lĩnh vực như tài chính phi tập trung (DeFi), NFT hay GameFi. 
+Sự tồn tại của nhiều blockchain như Bitcoin, Ethereum, BNB Chain, Solana cùng các blockchain Layer 2 tạo ra một môi trường phong phú, nhưng đồng thời dẫn đến sự phân mảnh về tài sản và thanh khoản.
+Trong bối cảnh đó, nhu cầu tương tác xuyên chuỗi trở thành một nhu cầu tất yếu, cho phép người dùng di chuyển tài sản và thực hiện giao dịch giữa các chuỗi khác nhau.
 
-Hiện nay, các giải pháp bridge truyền thống hỗ trợ tương tác xuyên chuỗi tồn tại nhiều hạn chế cả về chi phí, hiệu năng và đặc biệt là bảo mật. 
-Người dùng thường phải thực hiện nhiều giao dịch trên các blockchain khác nhau, dẫn đến chi phí gas cao và nhiều rủi ro. Đặc biệt, bridge đã trở thành mục tiêu của nhiều cuộc tấn công nghiêm trọng, gây thiệt hại lớn cho hệ sinh thái. 
-Trên thực tế, phần lớn các cuộc tấn công có thiệt hại lớn nhất trong lịch sử blockchain đều nhắm vào bridge, điển hình là các vụ Ronin Bridge hack và Wormhole hack với tổng thiệt hại lên tới hàng tỷ USD. Điều này cho thấy rõ ràng rằng bridge là một trong những điểm yếu mang tính hệ thống trong kiến trúc blockchain hiện tại.
+Tuy vậy, các giải pháp bridge truyền thống hỗ trợ tương tác xuyên chuỗi vẫn còn tồn tại nhiều hạn chế cả về chi phí, hiệu năng và đặc biệt là bảo mật. 
+Người dùng thường phải thực hiện nhiều giao dịch trên các blockchain khác nhau, dẫn đến chi phí gas cao và nhiều rủi ro. 
+Bên cạnh đó, bridge đã trở thành mục tiêu của nhiều cuộc tấn công, gây thiệt hại lớn cho hệ sinh thái, điển hình là vụ Ronin Bridge và Wormhole với tổng thiệt hại lên tới hàng tỷ USD. 
+Có thể thấy bridge là một trong những điểm yếu nghiêm trọng trong kiến trúc blockchain hiện tại.
 
 Song song với đó, khối lượng giao dịch cross-chain liên tục gia tăng, đạt tới mức hàng chục tỷ USD mỗi tháng, phản ánh nhu cầu thực tế rất lớn từ phía người dùng. 
 Điều này đặt ra yêu cầu cấp thiết về việc tìm kiếm một mô hình mới có khả năng thay thế hoặc cải thiện các cơ chế bridge hiện tại, nhằm giảm thiểu rủi ro, tối ưu chi phí và nâng cao hiệu năng.
 
 \section{Động lực}
 
-Một hướng tiếp cận tiềm năng cho bài toán tương tác xuyên chuỗi có thể được tìm thấy từ lĩnh vực tài chính truyền thống (TradFi), cụ thể là mô hình hoạt động của Wise (formerly TransferWise). 
-Thay vì sử dụng các hệ thống trung gian phức tạp như SWIFT để thực hiện chuyển tiền quốc tế, Wise áp dụng cơ chế netting nội bộ nhằm tối ưu hóa dòng tiền giữa các quốc gia.
+Một hướng tiếp cận tiềm năng cho bài toán tương tác xuyên chuỗi có thể được tìm thấy từ lĩnh vực tài chính truyền thống (TradFi), cụ thể là mô hình hoạt động của Wise. Thay vì sử dụng các hệ thống trung gian phức tạp như SWIFT để thực hiện chuyển tiền quốc tế, Wise áp dụng cơ chế netting nội bộ nhằm tối ưu hóa dòng tiền giữa các quốc gia.
 
 \begin{figure}[H]
   \begin{center}
   \includegraphics[width=0.8\linewidth]{figures/c1/transferwise}
   \end{center}
-  \caption{Mô hình hoạt động của TransferWise (Wise) --- netting nội bộ giữa các quốc gia}
+  \caption{Mô hình hoạt động của TransferWise (Wise)}
   \label{fig:transferwise}
 \end{figure}
 
 Trong mô hình truyền thống, khi một người dùng chuyển tiền giữa hai quốc gia khác nhau, dòng tiền thực tế phải đi qua nhiều tổ chức trung gian, dẫn đến chi phí cao và thời gian xử lý kéo dài. 
-Ngược lại, Wise duy trì thanh khoản tại nhiều quốc gia và thực hiện việc đối soát các dòng tiền đối ứng trong hệ thống. 
-Ví dụ, nếu tồn tại một người dùng chuyển tiền từ quốc gia A sang quốc gia B và một người khác chuyển từ quốc gia B sang quốc gia A, hệ thống có thể ghép nối hai giao dịch này và chỉ cần điều chỉnh số dư nội bộ, thay vì thực hiện hai giao dịch xuyên biên giới độc lập. Nhờ đó, lượng tiền thực sự cần di chuyển giữa các quốc gia được giảm thiểu đáng kể.
+Trong khi đó Wise duy trì thanh khoản tại nhiều quốc gia và thực hiện việc đối soát các dòng tiền đối ứng trong hệ thống. 
+Ví dụ, người A chuyển tiền từ Việt Nam sang Hàn Quốc và một người khác B chuyển từ Hàn Quốc về Việt Nam, hệ thống có thể ghép nối hai giao dịch này và chỉ cần điều chỉnh số dư nội bộ, thay vì thực hiện hai giao dịch xuyên biên giới độc lập. 
+Nhờ đó, lượng tiền thực sự cần di chuyển giữa các quốc gia được giảm thiểu đáng kể.
 
-Từ góc nhìn này, có thể nhận thấy một sự tương đồng đáng kể giữa hệ thống tài chính truyền thống và hệ sinh thái blockchain hiện nay. 
+Từ góc nhìn này, có một sự tương đồng đáng kể giữa hệ thống tài chính truyền thống và hệ sinh thái blockchain hiện nay. 
 Mỗi blockchain có thể được xem như một ``quốc gia'' độc lập, với tài sản và thanh khoản được quản lý riêng biệt. 
-Các giao dịch cross-chain, về bản chất, tương tự như các giao dịch xuyên biên giới trong tài chính truyền thống, khi tài sản cần được chuyển từ một quốc gia này sang quốc gia khác. 
-Dựa trên sự tương đồng đó, nghiên cứu này đề xuất việc áp dụng tư tưởng của cơ chế netting vào bài toán cross-chain. 
+Các giao dịch cross-chain, về bản chất tương tự như các giao dịch xuyên biên giới trong tài chính truyền thống, khi tài sản cần được chuyển từ một quốc gia này sang quốc gia khác. 
+Dựa trên sự tương đồng đó, KLTN đề xuất áp dụng tư tưởng của Wise vào bài toán cross-chain. 
 Thay vì phụ thuộc hoàn toàn vào các bridge để chuyển tài sản trực tiếp giữa các blockchain, hệ thống có thể khai thác các nhu cầu giao dịch đối ứng của người dùng và thực hiện việc ghép nối các \textit{intent} tương thích. 
 Khi đó, phần lớn các giao dịch có thể được xử lý thông qua cơ chế matching nội bộ, trong khi nhu cầu chuyển tài sản thực tế giữa các chain được giảm thiểu.
 
-Cách tiếp cận này không chỉ giúp tối ưu hóa chi phí mà còn giảm thiểu đáng kể rủi ro về bảo mật, do hạn chế sự phụ thuộc vào các bridge vốn là điểm yếu phổ biến trong các hệ thống cross-chain hiện tại. 
-Qua đó, mô hình được đề xuất mở ra một hướng đi mới, trong đó việc tương tác giữa các blockchain được thực hiện một cách hiệu quả hơn thông qua cơ chế điều phối và đối soát, thay vì di chuyển tài sản trực tiếp.
+Cách tiếp cận này không chỉ giúp tối ưu hóa chi phí mà còn giảm thiểu đáng kể rủi ro về bảo mật, do hạn chế sự phụ thuộc vào các bridge vốn là điểm yếu nghiêm trọng trong các hệ thống cross-chain hiện tại. 
+Qua đó, mô hình được đề xuất mở ra một hướng đi mới, trong đó việc tương tác giữa các blockchain được thực hiện một cách hiệu quả hơn thông qua cơ chế đối soát, thay vì di chuyển tài sản trực tiếp.
 
 \section{Phát biểu bài toán}
 
-Dự án tập trung vào việc xây dựng một hệ thống hỗ trợ giao dịch xuyên chuỗi dựa trên mô hình intent, với mục tiêu giảm thiểu sự phụ thuộc vào bridge truyền thống.
+KTLC tập trung vào việc xây dựng một hệ thống hỗ trợ giao dịch cross-chain dựa trên mô hình intent-based, với mục tiêu giảm thiểu sự phụ thuộc vào các bridge truyền thống.
 
 \subsection{Đầu vào}
 
 Đầu vào của hệ thống là một tập hợp các \textit{intent order} do người dùng cung cấp, trong đó mỗi intent biểu diễn nhu cầu chuyển tài sản từ một blockchain nguồn sang một blockchain đích. 
-Mỗi intent không mô tả chi tiết quá trình thực hiện mà chỉ xác định các tham số mà hệ thống cần thỏa mãn.
+Mỗi intent không mô tả chi tiết quá trình thực hiện mà chỉ xác định các tham số đầu vào của hệ thống. Cụ thể, một intent được đặc trưng bởi các thông tin sau:
 
-Cụ thể, một intent được đặc trưng bởi các thông tin sau:
-
-\begin{itemize}
-    \item \textbf{Source chain} (\texttt{srcChain}): blockchain nguồn, nơi tài sản ban đầu được nắm giữ
-    \item \textbf{Destination chain} (\texttt{desChain}): blockchain đích mà người dùng mong muốn nhận tài sản
-    \item \textbf{Amount} (\texttt{amount}): số lượng tài sản cần chuyển
-    \item \textbf{Deadline} (\texttt{deadline}): thời hạn mà giao dịch cần được hoàn tất
-    \item \textbf{Incentive fee} (\texttt{incentiveFee}): chi phí người dùng bỏ ra để ưu tiên giao dịch được xử lý nhanh hơn; trong trường hợp bằng 0, hệ thống chỉ thực hiện matching ngang hàng qua p2p network
-    \item \textbf{User address} (\texttt{userAddress}): địa chỉ ví của người dùng phát sinh intent, dùng để xác thực quyền sở hữu tài sản trên chain nguồn và là đích nhận tài sản trên chain đích
-\end{itemize}
-
-Trong phạm vi nghiên cứu này, tài sản được giả định là USDC trên chain nguồn nhằm đơn giản hóa việc phân tích và tập trung vào cơ chế matching xuyên chuỗi.
-
-Các intent trong hệ thống có thể tồn tại độc lập hoặc có mối quan hệ đối ứng với nhau. Khi xuất hiện các intent có thể ghép nối, hệ thống cần xác định các cặp hoặc nhóm intent tương thích để thực hiện matching.
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|p{10cm}|}
+        \hline
+        \textbf{Thuộc tính} & \textbf{Mô tả} \\
+        \hline
+        \texttt{srcChain} & Blockchain nguồn, nơi tài sản ban đầu được nắm giữ. \\
+        \hline
+        \texttt{desChain} & Blockchain đích mà người dùng mong muốn nhận tài sản. \\
+        \hline
+        \texttt{amount} & Số lượng tài sản cần chuyển. \\
+        \hline
+        \texttt{deadline} & Thời hạn mà giao dịch cần được hoàn tất. \\
+        \hline
+        \texttt{incentiveFee} & Chi phí người dùng bỏ ra để ưu tiên giao dịch được xử lý nhanh hơn, trong trường hợp bằng 0, hệ thống chỉ thực hiện matching ngang hàng qua p2p network. \\
+        \hline
+        \texttt{userAddress} & Địa chỉ ví của người dùng phát sinh intent, dùng để xác thực quyền sở hữu tài sản trên chain nguồn và nhận tài sản trên chain đích. \\
+        \hline
+    \end{tabular}
+    \caption{Các thuộc tính của một intent order.}
+    \label{tab:intent-attributes}
+\end{table}
 
 \subsection{Đầu ra}
 
-Đầu ra của hệ thống là trạng thái trong đó người dùng nhận được tài sản tương ứng trên blockchain đích, thỏa mãn các điều kiện đã đặt ra trong intent ban đầu. Cụ thể, người dùng cần nhận được một lượng USDC trên chain đích không thấp hơn giá trị yêu cầu, trong khoảng thời gian cho phép.
+Đầu ra của hệ thống là trạng thái trong đó người dùng nhận được tài sản tương ứng trên blockchain đích, thoả mãn các điều kiện đã đặt ra trong intent ban đầu. Cụ thể, người dùng cần nhận được một lượng USDC trên chain đích không thấp hơn giá trị yêu cầu và nằm trong khoảng thời gian cho phép.
 
-Hệ thống cần đảm bảo rằng quá trình thực hiện giao dịch là chính xác, an toàn và hiệu quả, đồng thời tối ưu hóa việc sử dụng thanh khoản trong toàn bộ hệ thống.
+Hệ thống cần đảm bảo rằng quá trình thực hiện giao dịch là chính xác, an toàn, hiệu quả và đồng thời tối ưu hoá việc sử dụng thanh khoản trong toàn bộ hệ thống.
 
 \section{Mục tiêu và phạm vi nghiên cứu}
 
 \subsection{Mục tiêu nghiên cứu}
 
-Khoá luận đặt ra các mục tiêu chính sau:
-
-\begin{itemize}
-    \item Xây dựng một hệ thống bridge cross-chain theo mô hình ngang hàng (peer-to-peer) dựa trên cơ chế intent-based, cho phép người dùng gửi các intent và hệ thống tự động ghép nối các intent đối ứng.
-    \item Xây dựng giao diện người dùng để tương tác với hệ thống, bao gồm các chức năng kết nối ví, tạo intent, theo dõi trạng thái và quan sát kết quả matching.
-\end{itemize}
+KLTN đặt ra hai mục tiêu chính. Thứ nhất, xây dựng một hệ thống bridge cross-chain theo mô hình ngang hàng (peer-to-peer) dựa trên cơ chế intent-based, cho phép người dùng gửi các intent và hệ thống tự động ghép nối các intent đối ứng. Thứ hai, xây dựng giao diện người dùng để tương tác với hệ thống, bao gồm các chức năng kết nối ví, tạo intent, theo dõi trạng thái và nhận kết quả matching.
 
 \subsection{Phạm vi nghiên cứu}
 
-Phạm vi của khoá luận được giới hạn như sau:
-
-\begin{itemize}
-    \item \textbf{Môi trường triển khai}: hệ thống được triển khai và đánh giá trên môi trường \textit{testnet}, không bao gồm việc vận hành trên mainnet.
-    \item \textbf{Loại blockchain}: nghiên cứu chỉ tập trung vào các blockchain tương thích EVM (Ethereum Virtual Machine). Việc mở rộng sang các blockchain non-EVM (như Solana, Cosmos, Bitcoin) được giới hạn trong khuôn khổ khoá luận và có thể được nghiên cứu thêm trong tương lai.
-    \item \textbf{Loại tài sản}: chỉ xét tài sản dạng stablecoin USDC nhằm đơn giản hoá bài toán định giá và tập trung vào cơ chế matching.
-\end{itemize}
+Phạm vi của khoá luận được giới hạn trên một số điều kiện sau. Về môi trường triển khai, hệ thống được triển khai và đánh giá trên môi trường testnet, không vận hành trên mainnet. 
+Về loại blockchain, KLTN chỉ tập trung vào các blockchain tương thích EVM (Ethereum Virtual Machine).
+Việc mở rộng sang các blockchain non-EVM như Solana, Cosmos, Bitcoin được giới hạn trong khuôn khổ khoá luận và sẽ được nghiên cứu thêm trong tương lai. 
+Về loại tài sản, khoá luận chỉ xét tài sản dạng stablecoin, cụ thể là USDC nhằm đơn giản hoá bài toán định giá và tập trung vào cơ chế matching.
 
 \section{Cấu trúc khoá luận}
 
-Khoá luận được trình bày theo năm chương như sau:
-
 \begin{itemize}
-    \item \textbf{Chương 1 - Đặt vấn đề}: Trong chương này, KLTN giới thiệu bối cảnh và động lực của bài toán tương tác xuyên chuỗi, phát biểu rõ ràng bài toán cần giải quyết với đầu vào, đầu ra và các giả định, đồng thời xác định mục tiêu và phạm vi nghiên cứu.
-    \item \textbf{Chương 2 - Cơ sở lý thuyết}: Chương này trình bày các khái niệm nền tảng (cross-chain bridge, intent-based execution, atomic swap/HTLC, mô hình netting trong tài chính truyền thống), các pattern phân loại bridge, đồng thời khảo sát các giải pháp hiện có và chỉ ra điểm mạnh, điểm yếu của từng hướng tiếp cận để làm cơ sở cho thiết kế đề xuất.
-    \item \textbf{Chương 3 - Phân tích và thiết kế hệ thống Bridge p2p intent-based}: Chương này trình bày phân tích yêu cầu (tác nhân, yêu cầu chức năng, phi chức năng), kiến trúc tổng quan của hệ thống theo trục onchain/offchain, mô hình thực thi intent ba lớp (Netting Layer, Intent Accelerator Layer, Fallback Bridge Aggregator), cùng mô hình dữ liệu và các biểu đồ thiết kế chi tiết.
-    \item \textbf{Chương 4 - Cài đặt, kiểm thử và triển khai hệ thống}: Nội dung Chương 4 trình bày việc cài đặt thực tế hệ thống trên môi trường testnet với các blockchain EVM, các kịch bản kiểm thử, kết quả đạt được so với mục tiêu, và quy trình triển khai.
+    \item Chương 1 giới thiệu bối cảnh và động lực của bài toán tương tác xuyên chuỗi, phát biểu rõ ràng bài toán cần giải quyết với đầu vào, đầu ra và các giả định, đồng thời xác định mục tiêu và phạm vi nghiên cứu.
+    \item Chương 2 trình bày các khái niệm nền tảng như cross-chain bridge, intent-based execution, atomic swap và HTLC, mô hình netting trong tài chính truyền thống cùng các pattern phân loại bridge. Sau đó, chương này cũng khảo sát các giải pháp hiện có và chỉ ra điểm mạnh, điểm yếu của từng hướng tiếp cận để làm cơ sở cho thiết kế đề xuất.
+    \item Chương 3 đi vào phân tích yêu cầu của hệ thống (tác nhân, yêu cầu chức năng và phi chức năng). Tiếp đó trình bày kiến trúc tổng quan theo trục onchain và offchain, mô hình thực thi intent ba lớp gồm Netting Layer, Intent Accelerator Layer và Fallback Bridge Aggregator kèm theo mô hình dữ liệu và các biểu đồ thiết kế chi tiết.
+    \item Chương 4 mô tả việc cài đặt thực tế hệ thống trên môi trường testnet với các blockchain EVM, các kịch bản kiểm thử, kết quả đạt được so với mục tiêu và quy trình triển khai.
 \end{itemize}
 
 Phần kết luận tổng kết các đóng góp chính của khoá luận và đề xuất các hướng phát triển tiếp theo.
+
+% [đã sửa: viết lại tóm tắt + chương 1 - giảm bullet bold, chuyển sang văn xuôi liền mạch, dùng "Thứ nhất/Thứ hai" cho liệt kê dài]

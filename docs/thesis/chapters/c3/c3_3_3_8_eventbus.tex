@@ -5,121 +5,44 @@
 \subsection{Event Bus và Persistence}
 \label{sec:event-bus-persistence}
 
-Lớp persistence của hệ thống được thiết kế tách bạch \emph{hai mối
-quan tâm khác nhau}:
+Lớp persistence của hệ thống được thiết kế tách bạch hai mối quan tâm khác nhau. Trạng thái bền (durable state) phải sống sót qua restart tiến trình và là nguồn để rebuild in-memory cache; phần này được cài đặt bằng Postgres. Sự kiện thời gian thực (transient pub/sub) chỉ quan trọng khi đang truyền cho người dùng đang kết nối, không cần lưu trữ; phần này được cài đặt bằng một EventEmitter trong bộ nhớ.
 
-\begin{itemize}
-  \item \textbf{Trạng thái bền (durable state)} — phải sống sót qua
-    restart tiến trình, là nguồn để rebuild in-memory cache. Được
-    cài đặt bằng \emph{Postgres}.
-  \item \textbf{Sự kiện thời gian thực (transient pub/sub)} — chỉ
-    quan trọng khi đang truyền cho người dùng đang kết nối; không
-    cần lưu trữ. Được cài đặt bằng một \emph{EventEmitter trong bộ
-    nhớ}.
-\end{itemize}
+Hai cơ chế này, đặt cạnh nhau, đóng vai trò tương đương với một event log Kafka trong các kiến trúc microservice phổ biến, nhưng với chi phí vận hành thấp hơn nhiều bậc — phù hợp với quy mô MVP và scope của luận văn. Phân tích so sánh được trình bày ở mục Phân tích thiết kế thay thế: Kafka vs Postgres + Emitter trong chương Đánh giá.
 
-Hai cơ chế này, đặt cạnh nhau, đóng vai trò \emph{tương đương với
-một event log Kafka} trong các kiến trúc microservice phổ biến,
-nhưng với chi phí vận hành thấp hơn nhiều bậc — phù hợp với quy mô
-MVP và scope của luận văn. Phân tích so sánh được trình bày ở
-\S "Phân tích thiết kế thay thế: Kafka vs Postgres + Emitter" trong
-chương Đánh giá.
+\subsubsection{Postgres và lược đồ ba bảng}
 
-\subsubsection*{Postgres: lược đồ ba bảng}
+Cơ sở dữ liệu được truy cập qua Drizzle ORM (TypeScript-first, không codegen) với connection thuần từ \texttt{postgres-js}. Có ba bảng chính, dưới đây trình bày ngắn gọn (chi tiết cột và index xem \texttt{packages/backend/src/db/schema.ts}).
 
-Cơ sở dữ liệu được truy cập qua Drizzle ORM (TypeScript-first, không
-codegen) với connection thuần từ \texttt{postgres-js}. Ba bảng được
-mô tả ngắn gọn dưới đây; chi tiết cột và index xem
-\texttt{packages/backend/src/db/schema.ts}.
+\subsubsection*{Bảng \texttt{intent\_orders}}
 
-\paragraph{\texttt{intent\_orders}.} Một dòng cho mỗi
-\texttt{IntentOrder}. Cột chính: \texttt{order\_id} (primary key),
-\texttt{src\_chain}, \texttt{des\_chain}, \texttt{amount}
-(\texttt{text}, để giữ độ chính xác bigint), \texttt{incentive\_fee},
-\texttt{deadline}, \texttt{created\_at}, \texttt{status} (chuỗi enum
-\texttt{QUEUED}/\texttt{PARTIAL}/\texttt{MATCHED}/\texttt{EXPIRED}),
-\texttt{user\_address}. Bảng này phục vụ rebuild orderbook khi
-\texttt{OrderStore.hydrate()} chạy lúc khởi động.
+Bảng này có một dòng cho mỗi \texttt{IntentOrder}, với các cột chính gồm \texttt{order\_id} (primary key), \texttt{src\_chain}, \texttt{des\_chain}, \texttt{amount} (\texttt{text}, để giữ độ chính xác bigint), \texttt{incentive\_fee}, \texttt{deadline}, \texttt{created\_at}, \texttt{status} (chuỗi enum \texttt{QUEUED}/\texttt{PARTIAL}/\texttt{MATCHED}/\texttt{EXPIRED}) và \texttt{user\_address}. Bảng phục vụ rebuild orderbook khi \texttt{OrderStore.hydrate()} chạy lúc khởi động.
 
-\paragraph{\texttt{match\_results}.} Bảng append-only ghi mỗi sự
-kiện match. Cột chính: \texttt{match\_id} (primary key),
-\texttt{matched\_at}, \texttt{orders} (JSONB —
-mảng \texttt{MatchedOrderEntry}), \texttt{cycles} (JSONB), và
-\texttt{raw\_cycles} (JSONB — snapshot cạnh từ thuật toán). Việc
-chọn JSONB cho ba trường mảng là vì hệ thống không bao giờ truy vấn
-\emph{vào trong} các trường đó — chỉ ghi và đọc nguyên khối.
+\subsubsection*{Bảng \texttt{match\_results}}
 
-\paragraph{\texttt{executions}.} Trạng thái thực thi mỗi
-\texttt{matchId}. Cột: \texttt{match\_id} (primary key), \texttt{status}
-(\texttt{pending}/\texttt{done}/\texttt{error}), \texttt{data} (JSONB),
-\texttt{error}. Khác với hai bảng trên, dòng trong bảng này được
-\emph{cập nhật tại chỗ} (qua \texttt{INSERT ... ON CONFLICT UPDATE})
-khi Orchestrator chuyển trạng thái.
+Đây là bảng append-only ghi mỗi sự kiện match, với các cột chính gồm \texttt{match\_id} (primary key), \texttt{matched\_at}, \texttt{orders} (JSONB --- mảng \texttt{MatchedOrderEntry}), \texttt{cycles} (JSONB) và \texttt{raw\_cycles} (JSONB --- snapshot cạnh từ thuật toán). Việc chọn JSONB cho ba trường mảng là vì hệ thống không bao giờ truy vấn vào trong các trường đó — chỉ ghi và đọc nguyên khối.
 
-\subsubsection*{Lazy initialization của DB client}
+\subsubsection*{Bảng \texttt{executions}}
 
-Vì module \texttt{db/client.ts} được \texttt{import} sớm (theo cơ
-chế hoisting của ES Module) trong khi \texttt{dotenv.config()} chỉ
-chạy sau khi tất cả import hoàn tất, một thiết kế đơn giản đọc
-\texttt{process.env.DATABASE\_URL} ở top-level sẽ throw lỗi.
+Bảng này lưu trạng thái thực thi mỗi \texttt{matchId}, với các cột \texttt{match\_id} (primary key), \texttt{status} (\texttt{pending}/\texttt{done}/\texttt{error}), \texttt{data} (JSONB) và \texttt{error}. Khác với hai bảng trên, dòng trong bảng này được cập nhật tại chỗ (qua \texttt{INSERT ... ON CONFLICT UPDATE}) khi Orchestrator chuyển trạng thái.
 
-Giải pháp được áp dụng: \emph{lazy initialization}. Module export
-một Proxy đại diện cho Drizzle handle; chỉ khi một thuộc tính của
-Proxy được truy cập lần đầu, hàm \texttt{getDb()} mới đọc biến môi
-trường, kết nối Postgres và cache instance lại. Cơ chế này làm cho
-\texttt{db/client.ts} không phụ thuộc thứ tự import, đồng thời cho
-phép unit test inject biến môi trường giả lập trước khi truy cập
-DB lần đầu.
+\subsubsection{Lazy initialization của DB client}
 
-\subsubsection*{Mẫu write-through với fail-and-log}
+Vì module \texttt{db/client.ts} được \texttt{import} sớm (theo cơ chế hoisting của ES Module) trong khi \texttt{dotenv.config()} chỉ chạy sau khi tất cả import hoàn tất, một thiết kế đơn giản đọc \texttt{process.env.DATABASE\_URL} ở top-level sẽ throw lỗi.
 
-Như đã mô tả ở \S\ref{sec:order-book}, mỗi mutation in-memory được
-mirror sang Postgres theo kiểu fire-and-forget:
+Giải pháp được áp dụng là \emph{lazy initialization}. Module export một Proxy đại diện cho Drizzle handle; chỉ khi một thuộc tính của Proxy được truy cập lần đầu, hàm \texttt{getDb()} mới đọc biến môi trường, kết nối Postgres và cache instance lại. Cơ chế này làm cho \texttt{db/client.ts} không phụ thuộc thứ tự import, đồng thời cho phép unit test inject biến môi trường giả lập trước khi truy cập DB lần đầu.
 
-\begin{itemize}
-  \item Promise \texttt{insert/update} không được \texttt{await}.
-  \item Handler \texttt{.catch(err => logDbError(scope, err))} đảm
-    bảo lỗi không trở thành unhandled rejection và được log với
-    namespace cụ thể (\texttt{orders.add}, \texttt{matchResults.add},
-    \texttt{executions.set}, ...).
-\end{itemize}
+\subsubsection{Mẫu write-through với fail-and-log}
 
-Trade-off đã được phân tích ở \S\ref{sec:order-book}: nguy cơ lệch
-giữa in-memory và DB trong cửa sổ rất ngắn nếu tiến trình crash.
-Đây là chấp nhận được ở MVP, nhưng phương án thay thế thông qua
-\emph{outbox pattern} (append event vào một bảng riêng cùng
-transaction với mutation, sau đó dispatch tách biệt) được kiến nghị
-trong Future Work.
+Như đã mô tả ở \S\ref{sec:order-book}, mỗi mutation in-memory được mirror sang Postgres theo kiểu fire-and-forget. Cụ thể, Promise \texttt{insert/update} không được \texttt{await}, và handler \texttt{.catch(err => logDbError(scope, err))} đảm bảo lỗi không trở thành unhandled rejection và được log với namespace cụ thể (\texttt{orders.add}, \texttt{matchResults.add}, \texttt{executions.set}, ...).
 
-\subsubsection*{\texttt{orderEvents}: in-memory event bus}
+Trade-off đã được phân tích ở \S\ref{sec:order-book}: nguy cơ lệch giữa in-memory và DB trong cửa sổ rất ngắn nếu tiến trình crash. Đây là chấp nhận được ở MVP, nhưng phương án thay thế thông qua \emph{outbox pattern} (append event vào một bảng riêng cùng transaction với mutation, sau đó dispatch tách biệt) được kiến nghị trong Future Work.
 
-Ngoài durable state, hệ thống còn cần một kênh truyền \emph{sự kiện
-lifecycle thời gian thực} đến các client đang kết nối qua
-Server-Sent Events (SSE). \texttt{orderEvents} là một
-\texttt{EventEmitter} của Node.js, sống trong cùng tiến trình
-backend, không persist.
+\subsubsection{\texttt{orderEvents}: in-memory event bus}
 
-\paragraph{Bộ giá trị sự kiện.} Mỗi event là một đối tượng
-\texttt{OrderEvent} với cấu trúc:
+Ngoài durable state, hệ thống còn cần một kênh truyền sự kiện lifecycle thời gian thực đến các client đang kết nối qua Server-Sent Events (SSE). \texttt{orderEvents} là một \texttt{EventEmitter} của Node.js, sống trong cùng tiến trình backend và không persist.
 
-\begin{itemize}
-  \item \texttt{orderId} — định danh order liên quan;
-  \item \texttt{type} — một trong \texttt{queued | matched | plan |
-    htlc\_created | withdrawn | done | error};
-  \item \texttt{message} — thông điệp ngắn cho UI;
-  \item \texttt{data} — payload có cấu trúc (txHash, chainKey, \ldots{});
-  \item \texttt{timestamp} — Unix epoch.
-\end{itemize}
+Mỗi event là một đối tượng \texttt{OrderEvent} với cấu trúc gồm \texttt{orderId} (định danh order liên quan), \texttt{type} (một trong \texttt{queued | matched | plan | htlc\_created | withdrawn | done | error}), \texttt{message} (thông điệp ngắn cho UI), \texttt{data} (payload có cấu trúc, gồm txHash, chainKey, ...), và \texttt{timestamp} (Unix epoch).
 
-\paragraph{Producer.} \texttt{OrderStore} phát \texttt{queued} khi
-một order được \texttt{add()}, \texttt{matched} khi
-\texttt{addMatchResult()}. \texttt{Orchestrator} phát \texttt{plan},
-\texttt{htlc\_created}, \texttt{withdrawn}, \texttt{done},
-\texttt{error} trong các bước thực thi của mình.
+Phía producer, \texttt{OrderStore} phát \texttt{queued} khi một order được \texttt{add()}, và phát \texttt{matched} khi \texttt{addMatchResult()}. \texttt{Orchestrator} phát \texttt{plan}, \texttt{htlc\_created}, \texttt{withdrawn}, \texttt{done}, \texttt{error} trong các bước thực thi của mình. Phía consumer, route \texttt{GET /api/intent/:orderId/events} mở một stream SSE: nó subscribe vào \texttt{orderEvents}, lọc theo \texttt{orderId} truyền vào, và push tuần tự xuống browser. Khi client đóng kết nối, listener được tháo gỡ. Với chỉ một consumer nội bộ (SSE handler), \texttt{EventEmitter} là đủ, không cần Redis pub/sub hay Kafka topic.
 
-\paragraph{Consumer.} Route \texttt{GET /api/intent/:orderId/events}
-mở một stream SSE: nó subscribe vào \texttt{orderEvents}, lọc theo
-\texttt{orderId} truyền vào, và push tuần tự xuống browser. Khi
-client đóng kết nối, listener được tháo gỡ. Với chỉ một consumer
-nội bộ (SSE handler), \texttt{EventEmitter} là đủ — không cần Redis
-pub/sub hay Kafka topic.
+% [đã sửa: chuyển các \paragraph{...} và bullet list dạng "tên - mô tả" thành câu liền mạch trong văn xuôi]

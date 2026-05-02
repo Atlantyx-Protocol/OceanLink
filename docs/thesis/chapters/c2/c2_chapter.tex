@@ -3,101 +3,321 @@
 
 \section{Các khái niệm cơ bản}
 
-Để xây dựng và phân tích hệ thống giao dịch xuyên chuỗi dựa trên intent, cần làm rõ một số khái niệm và mô hình nền tảng trong cả lĩnh vực blockchain và tài chính truyền thống. Các khái niệm và cơ sở lý thuyết chính bao gồm:
+Để xây dựng và phân tích hệ thống giao dịch xuyên chuỗi intent-based, 
+trước hết cần làm rõ một số khái niệm và các mô hình nền tảng trong cả lĩnh vực blockchain
+và tài chính truyền thống.
 
-\begin{itemize}
-    \item \textbf{Cross-chain bridge}: là cơ chế cho phép chuyển tài sản hoặc dữ liệu giữa các blockchain khác nhau. Các bridge phổ biến thường hoạt động theo mô hình \textit{lock-and-mint} (khóa tài sản trên chain nguồn và phát hành tài sản đại diện trên chain đích) hoặc dựa trên liquidity pool. Mặc dù cho phép hiện thực hóa giao dịch cross-chain, các mô hình này đòi hỏi sự tin cậy vào smart contract, các bên trung gian như relayer hoặc validator, từ đó làm gia tăng rủi ro bảo mật.
-    \item \textbf{Cross-chain interaction}: là khái niệm tổng quát bao hàm tất cả các hình thức tương tác giữa các blockchain, bao gồm chuyển tài sản, message và đồng bộ trạng thái. Đây là bài toán phức tạp do sự khác biệt về kiến trúc và cơ chế đồng thuận giữa các chain, đồng thời là nền tảng cho các ứng dụng đa chuỗi hiện đại.
-    \item \textbf{Intent-based execution}: là mô hình trong đó người dùng chỉ cần mô tả mục tiêu mong muốn thay vì các bước thực hiện cụ thể. Hệ thống sẽ sử dụng các tác nhân trung gian (solver) để tìm và thực thi phương án tối ưu. Một ví dụ tiêu biểu là CoW Protocol, nơi các lệnh giao dịch được gom lại và xử lý thông qua cơ chế batch auction nhằm tận dụng sự trùng khớp giữa các nhu cầu giao dịch.
-    \item \textbf{Atomic swap và HTLC (Hashed Timelock Contract)}: là cơ chế cho phép hai bên trao đổi tài sản giữa các blockchain mà không cần tin cậy lẫn nhau. HTLC sử dụng kết hợp hashlock và timelock để đảm bảo rằng giao dịch chỉ được thực hiện khi cả hai bên đều hoàn thành nghĩa vụ. Tuy nhiên, mô hình cũng phải gặp hạn chế về khả năng mở rộng và khó áp dụng trong các hệ thống nhiều bên.
-    \item \textbf{Mô hình tài chính truyền thống (SWIFT, Wise)}:
-    \begin{itemize}
-        \item SWIFT là hệ thống truyền thông giữa các ngân hàng, hỗ trợ chuyển tiền quốc tế nhưng phụ thuộc vào nhiều trung gian, dẫn đến chi phí cao và độ trễ lớn.
-        \item Wise (formerly TransferWise) áp dụng cơ chế \textit{netting nội bộ}, cho phép đối soát các dòng tiền đối ứng và giảm thiểu việc chuyển tiền xuyên biên giới thực tế.
-    \end{itemize}
-\end{itemize}
+\subsection*{Cross-chain bridge}
+
+Cross-chain bridge là cơ chế cho phép chuyển tài sản hoặc dữ liệu giữa các blockchain khác nhau. 
+Các bridge phổ biến thường hoạt động theo mô hình \textit{lock-and-mint}, 
+đó là khoá tài sản trên chain nguồn và phát hành tài sản đại diện tương ứng trên chain đích.
+Hoặc một cơ chế khác cũng phổ biến đó là duy trì thanh khoản trên
+nhiều chain (liquidity pool).
+Tuy nhiên các mô hình này đòi hỏi sự tin cậy vào smart contract 
+cũng như các bên trung gian như relayer hoặc validator, từ đó làm gia tăng rủi ro bảo mật.
+
+\subsection*{Cross-chain interaction}
+
+Cross-chain interaction là khái niệm tổng quát hơn, 
+bao hàm tất cả các hình thức tương tác giữa các blockchain. 
+Không chỉ giới hạn ở việc chuyển tài sản mà còn bao gồm truyền message hay đồng bộ trạng thái. 
+
+\subsection*{Intent-based execution}
+
+Intent-based execution là mô hình trong đó người dùng chỉ cần mô tả mục tiêu mong muốn 
+thay vì các bước thực hiện cụ thể. 
+Hệ thống sẽ sử dụng các tác nhân trung gian (solver) để tìm và thực thi phương án tối ưu. 
+Một ví dụ tiêu biểu là CoW Protocol, 
+các lệnh giao dịch hoán đổi tài sản được gom lại và xử lý thông qua cơ chế batch auction 
+nhằm tận dụng sự 
+trùng khớp giữa các nhu cầu giao dịch.
+
+\subsection*{Atomic swap và HTLC}
+
+Atomic swap là một phương pháp cho phép hai bên trao đổi tài sản giữa các blockchain khác nhau mà
+không cần đến một bên trung gian đáng tin cậy. 
+Tính chất quan trọng của atomic swap là tính \textit{nguyên tử} (atomicity), 
+giao dịch hoặc được thực hiện trọn vẹn ở cả hai phía, hoặc không xảy ra ở bất kỳ phía nào, 
+qua đó loại bỏ rủi ro một bên nhận được tài sản còn bên kia thì không.
+
+
+HTLC (Hashed Timelock Contract) là một trong những thuật toán phổ biến nhất để giải quyết bài toán 
+atomic swap.
+HTLC kết hợp hai cơ chế khóa là \textit{hashlock} và \textit{timelock}: 
+hashlock yêu cầu bên nhận phải cung cấp bí mật (secret) của một giá trị băm để mở khoá tài sản, 
+trong khi timelock đặt ra một thời hạn để giao dịch phải được hoàn tất, 
+nếu không tài sản sẽ được hoàn trả lại cho bên gửi. 
+Nhờ sự kết hợp này, HTLC đảm bảo rằng giao dịch chỉ được thực hiện khi cả hai bên đều hoàn thành 
+nghĩa vụ. 
+Tuy nhiên, mô hình HTLC vẫn gặp hạn chế về khả năng mở rộng và khó áp dụng trong các hệ 
+thống hiện nay.
 
 \section{Các pattern phân loại bridge}
 
 \subsection{Phân loại theo messaging protocol}
 
-Các bridge có thể được phân loại dựa trên cách mà chain đích xác minh trạng thái hoặc giao dịch từ chain nguồn:
+Các bridge có thể được phân loại dựa trên cách mà chain đích xác minh trạng thái hoặc giao dịch 
+từ chain nguồn. Dựa trên mức độ tin cậy khác nhau giữa các bên tham gia, chia thành bốn nhóm chính, 
+mỗi nhóm tương ứng với một mức độ tin cậy nhất định.
 
-\begin{itemize}
-    \item State validating protocols: là mô hình trong đó chain đích có thể xác minh trực tiếp trạng thái của chain nguồn dựa trên các giả định bảo mật của blockchain gốc. Mô hình này thường xuất hiện trong các bridge giữa Layer 1 và Layer 2, nơi Layer 1 đóng vai trò là ``source of truth''. Nhờ đó, mức độ bảo mật cao vì không cần tin tưởng bên thứ ba, nhưng chi phí tính toán và triển khai thường lớn.
-    \item Consensus verifying protocols: trong mô hình này, chain đích xác minh rằng một giao dịch trên chain nguồn đã được hoàn tất thông qua việc kiểm chứng cơ chế đồng thuận. Điều này thường yêu cầu các bằng chứng (proof) về block hoặc transaction, giúp đảm bảo tính đúng đắn mà không cần tin cậy hoàn toàn vào bên trung gian.
-    \item Third-party attestation protocols: là mô hình phổ biến nhất trong thực tế, trong đó một thực thể trung gian (có thể là một validator, một tập hợp multi-signature hoặc một blockchain riêng) xác nhận tính hợp lệ của giao dịch. Ưu điểm là dễ triển khai và hiệu năng cao, nhưng nhược điểm lớn là phụ thuộc vào trust assumption, dẫn đến nhiều rủi ro bảo mật.
-    \item Optimistic protocols: dựa trên giả định rằng các giao dịch là hợp lệ trừ khi bị chứng minh ngược lại. Một hoặc nhiều ``watcher'' có thể phát hiện và báo cáo gian lận trong một khoảng thời gian gọi là fraud window. Mô hình này giảm chi phí xác minh ban đầu nhưng yêu cầu cơ chế challenge hiệu quả để đảm bảo an toàn.
-\end{itemize}
+\subsubsection*{State validating protocols}
 
-\paragraph{Nhận xét chung về giả định tin cậy.}Các nhóm messaging protocol nêu trên có thể được nhìn nhận một qua \textit{trust assumption} đối với tập hợp $n$ thực thể trung gian (validator, relayer, watcher, v.v.):
+Trong mô hình state validating, chain đích có thể xác minh trực tiếp trạng thái của chain nguồn 
+dựa trên các khả năng bảo mật của chain nguồn. 
+Mô hình này thường xuất hiện trong các bridge giữa Layer 1 và Layer 2,
+nơi Layer 1 đóng vai trò là nguồn tin cậy (source of truth). 
+Nhờ đó, mức độ bảo mật cực kỳ cao, để tấn công mô hình tương đương với việc phá vỡ hệ thống blockchain.
+Ưu điểm là không cần tin tưởng bên thứ ba, tuy nhiên chi phí tính toán và triển khai thường rất lớn.
 
-\begin{itemize}
-    \item State validating và consensus verifying gần như không đặt giả định tin cậy lên bất kỳ trung gian nào, mà dựa trực tiếp vào tính đúng đắn của blockchain nguồn (cryptographic / consensus security). Đây là mức bảo đảm mạnh nhất nhưng đi kèm chi phí triển khai và xác minh cao.
-    \item Optimistic protocols dựa trên giả định \textit{1-of-n}: hệ thống vẫn an toàn miễn là tồn tại ít nhất một watcher trung thực đưa ra fraud proof trong cửa sổ challenge. Đây là một giả định tương đối nhẹ, vì chỉ cần một thực thể không bị thoả hiệp là đủ để bảo vệ toàn hệ thống. Nhược điểm chính là độ trễ lớn do fraud window và sự phụ thuộc vào liveness của watcher.
-    \item Third-party attestation protocols dựa trên giả định \textit{m-of-n}: giao dịch được coi là hợp lệ khi đủ $m$ trong số $n$ validator/signer đồng thuận xác nhận. Tính an toàn của toàn bộ hệ thống quy về việc tối thiểu $n - m + 1$ thực thể không bị thoả hiệp đồng thời. Đây là giả định mong manh hơn nhiều so với 1-of-n: chỉ cần kẻ tấn công kiểm soát được đa số (hoặc ngưỡng $m$) là toàn bộ tài sản trên bridge có thể bị rút. Các vụ hack lớn nhất (Ronin, Wormhole, Multichain, Binance Bridge) đều khai thác trực tiếp điểm yếu này.
-\end{itemize}
+\subsubsection*{Consensus verifying protocols}
 
-Nhìn chung, có thể thấy rõ ràng sự đánh đổi giữa hai mô hình: mô hình \textit{m-of-n} dễ triển khai và có hiệu năng cao nhưng tập trung rủi ro vào một tập hợp nhỏ các bên trung gian, trong khi \textit{1-of-n} an toàn hơn nhưng phải chấp nhận độ trễ và chi phí của cơ chế challenge. Nhận định này là cơ sở quan trọng cho thiết kế đề xuất ở Chương 3, trong đó hệ thống được hướng tới việc giảm tối đa số thực thể trung gian cần phải tin cậy thay vì chỉ tăng số lượng tin cậy trong mô hình $m$-of-$n$.
+Trong mô hình consensus verifying, 
+chain đích xác minh rằng một giao dịch trên chain nguồn đã được hoàn tất 
+thông qua việc kiểm chứng cơ chế đồng thuận. 
+Cách làm này thường yêu cầu phải cung cấp các bằng chứng (proof) về block hoặc transaction, 
+nhằm đảm bảo tính đúng đắn mà không cần tin tưởng hoàn toàn vào bên trung gian.
+
+\subsubsection*{Third-party attestation protocols}
+
+Đây là mô hình phổ biến nhất trong thực tế, xuất hiện nhiều trong các bridge thương mại hiện nay. 
+Trong đó một thực thể trung gian (có thể là một validator, một tập hợp multi-signature 
+hoặc một blockchain riêng) xác nhận tính hợp lệ của giao dịch. 
+Ưu điểm của mô hình này là dễ triển khai và hiệu năng cao, 
+nhưng nhược điểm lớn là phụ thuộc vào trust assumption, dẫn đến nhiều rủi ro bảo mật.
+
+\subsubsection*{Optimistic protocols}
+
+Optimistic protocols được xây dựng dựa trên giả định lạc quan rằng các giao dịch là hợp lệ trừ
+khi bị chứng minh ngược lại. 
+Một hoặc nhiều ``watcher'' có thể phát hiện và báo cáo gian lận 
+trong một khoảng thời gian gọi là fraud window. 
+Mô hình này giảm chi phí xác minh ban đầu nhưng yêu cầu cơ chế thách thức (challenge) 
+hiệu quả để đảm bảo sự an toàn.
+
+\subsubsection*{Phân tích giả định tin cậy}
+
+Bốn nhóm messaging protocol nêu trên có thể được nhìn nhận thông qua 
+\textit{trust assumption} đối với tập hợp $n$ thực thể trung gian (validator, relayer, watcher, ...). 
+Hai nhóm state validating và consensus verifying không đặt giả định tin cậy lên bất kỳ trung gian 
+nào, mà dựa trực tiếp vào tính đúng đắn của blockchain nguồn (cryptographic / consensus security).
+Đây là mức bảo đảm cao nhất nhưng đi kèm chi phí triển khai và xác minh cao. 
+Optimistic protocols dựa trên giả định \textit{1-of-n}, 
+tức hệ thống vẫn an toàn miễn là tồn tại ít nhất một watcher trung thực đưa ra 
+fraud proof trong cửa sổ challenge. Đây là một giả định tương đối nhẹ 
+vì chỉ cần một thực thể không bị thoả hiệp là đủ để bảo vệ toàn hệ thống nhưng
+nhược điểm chính là độ trễ lớn do fraud window và sự phụ thuộc vào liveness của watcher. 
+Third-party attestation protocols dựa trên giả định \textit{m-of-n}: 
+giao dịch được coi là hợp lệ khi đủ $m$ trong số $n$ validator đồng thuận xác nhận. 
+Tính an toàn của toàn bộ hệ thống yêu cầu việc tối thiểu $n - m + 1$ thực thể không bị 
+thoả hiệp đồng thời. 
+Đây là giả định yếu và mong manh hơn so với 1-of-n, 
+chỉ cần kẻ tấn công kiểm soát được đa số (hoặc ngưỡng $m$) là toàn bộ tài sản 
+trên bridge có thể bị kiểm soát.
+Các vụ hack bridge nghiêm trọng nhất đều khai thác trực tiếp điểm yếu này.
+
+Nhìn chung, có thể nhận thấy một sự đánh đổi rõ ràng giữa các mô hình này, 
+\textit{m-of-n} dễ triển khai, hiệu năng cao nhưng 
+tập trung rủi ro vào một tập hợp nhỏ các bên trung gian, 
+trong khi \textit{1-of-n} an toàn hơn nhưng phải chấp nhận 
+độ trễ và chi phí của cơ chế challenge. 
+Nhận định này là cơ sở quan trọng cho thiết kế đề xuất ở Chương 3,
+ở đó hệ thống hướng tới việc loại bỏ thực thể trung gian cần phải 
+tin cậy thay vì chỉ tăng số lượng tin cậy trong mô hình $m$-of-$n$.
 
 \subsection{Phân loại theo type of operation}
 
-Bên cạnh messaging protocol, bridge còn được phân loại theo cách thức xử lý tài sản và giao dịch giữa các chain:
+Bên cạnh messaging protocol, bridge còn được phân loại theo cách thức xử lý tài sản 
+và giao dịch giữa các chain.
 
-\begin{itemize}
-    \item Liquidity networks: sử dụng các pool thanh khoản trên nhiều chain. Người dùng gửi tài sản vào pool trên chain nguồn và nhận tài sản tương ứng từ pool trên chain đích. Mô hình này không yêu cầu mint tài sản mới mà tận dụng thanh khoản có sẵn, giúp giảm độ trễ và cải thiện trải nghiệm người dùng, nhưng phụ thuộc vào thanh khoản và có thể gặp rủi ro mất cân bằng pool.
-    \item Token bridges: hoạt động theo mô hình khóa (lock) hoặc đốt (burn) tài sản trên chain nguồn và phát hành (mint) tài sản tương ứng trên chain đích. Các token được tạo ra trên chain đích thường là tài sản tổng hợp (wrapped asset), đại diện cho quyền sở hữu tài sản gốc. Đây là mô hình phổ biến nhất nhưng cũng là mục tiêu của nhiều cuộc tấn công do tồn tại các thành phần như custodian và debt issuer.
-    \item Coordination protocols: không chỉ tập trung vào chuyển tài sản mà còn hỗ trợ tương tác phức tạp giữa các chain, như gọi hàm, truyền dữ liệu hoặc đồng bộ trạng thái. Mô hình này cho phép xây dựng các ứng dụng đa chuỗi (cross-chain dApps), nhưng đồng thời làm tăng đáng kể độ phức tạp của hệ thống.
-\end{itemize}
+\subsubsection*{Liquidity networks}
 
-Từ các khái niệm trên, có thể nhận thấy rằng các hệ thống hiện tại, dù trong blockchain hay tài chính truyền thống, đều phải đối mặt với bài toán tối ưu hóa giữa chi phí, hiệu năng và độ an toàn. Đặc biệt, cơ chế netting trong tài chính truyền thống và mô hình intent-based trong blockchain gợi mở khả năng kết hợp để xây dựng một hệ thống cross-chain hiệu quả hơn, trong đó việc ghép nối các nhu cầu giao dịch có thể thay thế cho việc di chuyển tài sản trực tiếp giữa các chain.
+Liquidity networks sử dụng các pool thanh khoản trên nhiều chain, 
+trong đó người dùng gửi tài sản vào pool trên chain nguồn và nhận tài sản tương ứng 
+từ pool trên chain đích. 
+Mô hình này tận dụng nguồn thanh khoản có sẵn mà không yêu cầu mint tài sản mới
+giúp giảm độ trễ và cải thiện trải nghiệm người dùng tuy nhiên lại phụ thuộc vào thanh khoản
+và có thể gặp rủi ro mất cân bằng pool hoặc rủi ro tập trung.
+
+\subsubsection*{Token bridges}
+
+Token bridges hoạt động theo mô hình khoá (lock) hoặc đốt (burn) 
+tài sản trên chain nguồn và phát hành (mint) tài sản tương ứng trên chain đích. 
+Các token được tạo ra trên chain đích thường là tài sản tổng hợp (wrapped asset), 
+đại diện cho quyền sở hữu tài sản gốc. 
+Đây là mô hình phổ biến nhất nhưng cũng là mục tiêu của nhiều cuộc 
+tấn công do tồn tại các thành phần trung gian như custodian và debt issuer.
+
+\subsubsection*{Coordination protocols}
+
+Coordination protocols là mô hình không chỉ tập trung vào chuyển tài sản 
+mà còn hỗ trợ tương tác phức tạp giữa các chain, 
+như gọi hàm, truyền dữ liệu hoặc đồng bộ trạng thái. 
+Mô hình này cho phép xây dựng các ứng dụng đa chuỗi (cross-chain dApps), 
+nhưng đồng thời làm tăng đáng kể độ phức tạp của hệ thống.
 
 \section{Khảo sát các giải pháp hiện có}
 
 \subsection{Phân loại}
 
-Để đánh giá tổng quan các kiến trúc bridge hiện nay, tiến hành phân loại các bridge dựa trên các pattern bridge đã trình bày ở mục 2.2: (i) cơ chế truyền thông giữa các chain (communication protocol) và (ii) loại hình vận hành (bridge type). Kết quả được biểu diễn dưới dạng một bảng, trong đó các cột tương ứng với các messaging protocol (state validating, consensus verifying, third-party attestation, optimistic), còn các hàng tương ứng với các loại bridge (liquidity network, token bridge, coordination protocol).
+Để có cái nhìn tổng quan về các kiến trúc bridge hiện nay, 
+KLTN tiến hành phân loại các bridge dựa trên các pattern đã trình bày ở mục 2.2 
+theo hai cách phân loại cơ chế truyền thông giữa các chain
+và loại hình vận hành. 
+Kết quả được biểu diễn dưới dạng một bảng, 
+trong đó các cột tương ứng với các 
+messaging protocol (state validating, consensus verifying, third-party attestation, optimistic),
+ còn các hàng tương ứng với các loại bridge (liquidity network, token bridge, coordination protocol).
 
 \begin{figure}[H]
   \begin{center}
   \includegraphics[width=\linewidth]{figures/c1/bridge-taxonomy}
   \end{center}
-  \caption{Phân loại các bridge theo messaging protocol và type of operation, đánh dấu trạng thái bảo mật}
+  \caption{Phân loại các bridge theo pattern tương ứng}
   \label{fig:bridge-taxonomy}
 \end{figure}
 
-Trong biểu đồ này, mỗi bridge được đánh dấu theo trạng thái bảo mật: các bridge đã bị tấn công được viền đỏ, các bridge có lỗ hổng đã được phát hiện nhưng chưa bị khai thác được viền xanh lam nét đứt, và các trường hợp nằm ngoài phạm vi nghiên cứu được đánh dấu bằng viền hồng. Cách biểu diễn này cho phép quan sát trực quan mối quan hệ giữa kiến trúc bridge và mức độ rủi ro bảo mật.
+Trong bảng này, mỗi bridge được đánh dấu theo trạng thái bảo mật. 
+Các bridge đã bị tấn công được đánh dấu viền đỏ, 
+các bridge có lỗ hổng đã được phát hiện nhưng chưa bị khai thác 
+được đánh dấu viền xanh lam nét đứt, 
+còn các trường hợp nằm ngoài phạm vi nghiên cứu được đánh dấu bằng viền hồng. 
+Cách biểu diễn này đưa ra cái nhìn tổng quan mối quan hệ giữa kiến trúc bridge 
+và mức độ rủi ro bảo mật.
 
-Từ Hình~\ref{fig:bridge-taxonomy}, có thể rút ra một số nhận xét như sau. Thứ nhất, phần lớn các bridge đang vận hành trong thực tế nằm ở nhóm \textit{third-party attestation} - cũng chính là cột tập trung nhiều ô có viền đỏ nhất, tương ứng với các vụ tấn công lớn như Ronin, Wormhole, Multichain hay Binance Bridge. 
-Thứ hai, các nhóm \textit{optimistic} và \textit{consensus verifying} có một số đại diện (Nomad, Across, Cosmos IBC, zkBridge), nhưng số lượng và quy mô triển khai còn khá ít so với third-party attestation. 
-Thứ ba, nhóm \textit{state validating} gần như chỉ xuất hiện trong các bridge giữa Layer 1 và Layer 2 (Optimism, Arbitrum, zkSync), phản ánh thực tế rằng mô hình này khó áp dụng cho các blockchain Layer 1 độc lập. 
-Đặc biệt, có thể quan sát thấy một số ô trống, ví dụ giữa \textit{state validating} và \textit{liquidity network} không có dự án nào, cho thấy việc kết hợp xác minh trạng thái với mô hình thanh khoản trực tiếp vẫn là một hướng nghiên cứu đầy thách thức. 
-Tổng thể, biểu đồ cho thấy hệ sinh thái bridge hiện nay đang lệch mạnh về phía các thiết kế ưu tiên hiệu năng và dễ triển khai nhưng đồng thời cũng là phía gánh chịu phần lớn rủi ro bảo mật.
+Từ Hình~\ref{fig:bridge-taxonomy}, có thể rút ra một số nhận xét như sau.
+Trước hết, phần lớn các bridge đang vận hành trong thực tế nằm ở nhóm 
+\textit{third-party attestation} và đây cũng chính là cột tập trung nhiều ô có viền đỏ nhất, 
+tương ứng với các vụ tấn công lớn như Ronin, Wormhole, Multichain hay Binance Bridge. 
+Tiếp theo, các nhóm \textit{optimistic} và \textit{consensus verifying} có một số đại 
+diện như Nomad, Polkadot, Cosmos IBC, zkBridge, nhưng số lượng và quy mô triển khai còn khá 
+khiêm tốn so với third-party attestation. 
+Trong khi đó, nhóm \textit{state validating} gần như chỉ xuất hiện trong các bridge giữa
+Layer 1 và Layer 2 như Polygon zkEVM, Arbitrum, zkSync, cho thấy thực tế rằng mô hình này còn khó 
+áp dụng cho các blockchain Layer 1 độc lập. 
+Và một điểm đặc biệt giữa \textit{state validating} và \textit{liquidity network} không có dự án nào,
+cho thấy việc kết hợp xác minh trạng thái với mô hình thanh khoản trực tiếp vẫn là một hướng nghiên cứu đầy thách thức. 
+Tổng thể, bảng trên cho thấy hệ sinh thái bridge hiện nay đang lệch mạnh về 
+phía các thiết kế ưu tiên hiệu năng và dễ triển khai nhưng đồng thời cũng là bên gánh chịu 
+phần lớn rủi ro bảo mật.
 
 \subsection{Đánh giá các sản phẩm tiêu biểu}
 \label{sec:related-products}
 
-Mục này khảo sát và phân tích một số bridge tiêu biểu trong từng nhóm cùng các sự cố bảo mật và số liệu thiệt hại đã được ghi nhận trên thực tế. Theo báo cáo của Chainalysis, riêng năm 2022 các vụ tấn công vào bridge đã gây thiệt hại khoảng \textbf{2 tỷ USD}, chiếm xấp xỉ 69\% tổng giá trị bị đánh cắp trong các sự cố crypto của năm. Con số này phản ánh rõ rằng bridge đang là điểm yếu hàng đầu của hệ sinh thái cross-chain.
+Mục này khảo sát và phân tích một số bridge tiêu biểu trong từng nhóm cùng các sự 
+cố bảo mật và số liệu thiệt hại đã được ghi nhận trên thực tế. 
+Theo báo cáo của Chainalysis, 
+riêng năm 2022 các vụ tấn công vào bridge đã gây thiệt hại khoảng
+\textbf{2 tỷ USD}, chiếm xấp xỉ 69\% tổng giá trị bị đánh cắp trong các sự cố crypto của năm. 
+Con số này phản ánh rõ rằng bridge đang là điểm yếu hàng đầu của hệ sinh thái cross-chain.
 
-\paragraph{Nhóm third-party attestation ($m$-of-$n$).} Đây là nhóm chiếm tỷ trọng lớn nhất trong các bridge thực tế và cũng là nơi tập trung phần lớn các vụ tấn công lớn nhất lịch sử blockchain:
+\subsubsection*{Nhóm third-party attestation ($m$-of-$n$)}
 
-\begin{itemize}
-    \item \textit{Ronin Bridge} (Sky Mavis / Axie Infinity, 03/2022): thiệt hại khoảng \textbf{625 triệu USD}. Kẻ tấn công chiếm quyền 5 trong tổng số 9 validator của bridge, vừa đúng ngưỡng $m = 5$, từ đó ký phê duyệt các giao dịch rút giả. Đây là minh chứng điển hình cho điểm yếu của giả định $m$-of-$n$ khi $n$ nhỏ.
-    \item \textit{Wormhole} (Solana--Ethereum, 02/2022): thiệt hại khoảng \textbf{326 triệu USD}. Lỗi nằm ở khâu kiểm tra chữ ký của tập guardian: smart contract bỏ sót việc xác minh \texttt{sysvar} chuẩn, cho phép giả mạo VAA (Verified Action Approval) mà không cần thực sự được các guardian ký. Jump Crypto sau đó phải bù đắp toàn bộ số ETH bị mất.
-    \item \textit{BNB Token Hub} (BNB Chain, 10/2022): bridge tạo ra khoảng \textbf{570 triệu USD} BNB giả, trong đó khoảng \textbf{100 triệu USD} thực sự bị rút trước khi mạng được dừng khẩn cấp. Nguyên nhân là lỗ hổng trong xác minh IAVL Merkle proof.
-    \item \textit{Harmony Horizon Bridge} (06/2022): thiệt hại khoảng \textbf{100 triệu USD}. Multi-sig 2-of-5 bị xâm nhập khi khoá riêng của hai signer bị lộ --- một biểu hiện cực đoan của giả định $m$-of-$n$ với $m, n$ rất nhỏ.
-    \item \textit{Kelp DAO qua LayerZero} (04/2026): thiệt hại khoảng \textbf{292 triệu USD}. Kẻ tấn công giả mạo thông điệp cross-chain trên LayerZero bridge, khai thác cơ chế xác thực giữa Oracle và Relayer để rút tài sản trên nhiều chain. Vụ việc cho thấy ngay cả các thiết kế $m$-of-$n$ với $n$ lớn và phân tách vai trò Oracle/Relayer vẫn có thể bị khai thác khi giả định độc lập giữa các bên không được đảm bảo trong thực tế.
-\end{itemize}
+Đây là nhóm chiếm tỷ trọng lớn nhất trong các bridge thực tế và cũng là nơi 
+tập trung phần lớn các vụ tấn công lớn nhất lịch sử blockchain.
 
-\paragraph{Nhóm optimistic ($1$-of-$n$).} Tuy có giả định lý thuyết tương đối nhẹ, các thiết kế optimistic vẫn dễ tổn thương trước lỗi hợp đồng cấp gốc:
-\begin{itemize}
-    \item \textit{Nomad Bridge} (08/2022): thiệt hại khoảng \textbf{190 triệu USD}. Một thay đổi cấu hình khiến giá trị \texttt{0x00} bị coi là một root hợp lệ, kéo theo bất kỳ message nào cũng được chấp thuận mặc định. Vụ việc trở thành một trong những ``hack mở'' lớn nhất khi hàng trăm địa chỉ độc lập sao chép giao dịch khai thác để tự rút tiền.
-\end{itemize}
+\paragraph{Ronin Bridge (Sky Mavis / Axie Infinity).}
+Ronin Bridge là cầu nối giữa Ethereum và sidechain Ronin của trò chơi Axie Infinity,
+hoạt động theo mô hình lock-and-mint với một tập hợp gồm 9 validator chịu trách nhiệm
+xác nhận các giao dịch chuyển tài sản giữa hai chain.
+Mỗi giao dịch rút tài sản chỉ cần đủ ngưỡng $m = 5$ chữ ký validator để được phê duyệt.
+Ưu điểm của thiết kế này là đơn giản, hiệu năng cao và chi phí xác thực thấp,
+phù hợp với khối lượng giao dịch lớn của trò chơi.
+Tuy nhiên, việc tập $n$ nhỏ và phụ thuộc hoàn toàn vào tính trung thực của các validator
+khiến hệ thống trở nên mong manh trước các cuộc tấn công nhắm vào private key (khóa riêng) của validator.
+Tháng 03/2022, kẻ tấn công đã chiếm quyền kiểm soát 5 trong số 9 validator,
+vừa đủ ngưỡng $m$, sau đó ký phê duyệt (approve) các giao dịch rút giả và gây thiệt hại
+khoảng \textbf{625 triệu USD}. Đây là minh chứng điển hình cho điểm yếu của giả định
+$m$-of-$n$ khi $n$ nhỏ.
 
-\paragraph{Nhóm consensus verifying.} Các thiết kế dạng light-client như Cosmos IBC hoặc các đề xuất zkBridge có nền tảng bảo mật mạnh hơn về mặt lý thuyết do giảm phụ thuộc vào trung gian. Tuy nhiên, sản phẩm thương mại còn rất hạn chế: chi phí triển khai light client cho mỗi cặp blockchain cao, và chi phí xác minh zk-proof on-chain vẫn là rào cản đối với các bridge giá trị thấp.
+\paragraph{Wormhole (Solana--Ethereum).}
+Wormhole là một generic message-passing bridge giữa nhiều blockchain,
+sử dụng một tập hợp 19 \textit{guardian} ký xác nhận các thông điệp cross-chain
+dưới dạng VAA (Verified Action Approval).
+Smart contract trên chain đích sẽ kiểm tra chữ ký của các guardian trước khi mint
+tài sản tương ứng.
+Ưu điểm của Wormhole là khả năng tổng quát, hỗ trợ nhiều loại tương tác xuyên chuỗi chuyển tài sản, 
+đồng thời có hiệu năng cao nhờ mô hình attestation off-chain.
+Tuy nhiên nhược điểm là độ an toàn phụ thuộc vào tính đúng đắn 
+của smart contract xác minh chữ ký
+và tính trung thực của tập guardian.
+Tháng 02/2022, một lỗi trong khâu kiểm tra chữ ký của smart contract trên Solana
+(bỏ sót việc xác minh \texttt{sysvar} chuẩn) đã cho phép kẻ tấn công giả mạo VAA
+mà không cần được các guardian ký, gây thiệt hại khoảng \textbf{326 triệu USD}.
 
-\paragraph{Nhóm state validating.} Hầu như chỉ tồn tại trong các bridge giữa Layer 1 và Layer 2 (Optimism Bridge, Arbitrum Bridge, zkSync Bridge), nơi Layer 1 đóng vai trò nguồn chân lý duy nhất. Mô hình có độ an toàn cao nhất về thiết kế nhưng không áp dụng được cho các Layer 1 độc lập do không tồn tại quan hệ trạng thái.
+\paragraph{Kelp DAO qua LayerZero.}
+LayerZero V2 là một omnichain messaging protocol, trong đó việc xác thực
+thông điệp cross-chain được uỷ quyền cho một tập hợp \textit{Decentralized
+Verifier Network} (DVN) do mỗi ứng dụng tự cấu hình. Mỗi thông điệp được coi
+là hợp lệ khi đủ ngưỡng $m$-of-$n$ DVN ký xác nhận, tuỳ thuộc vào cấu hình
+mà ứng dụng lựa chọn (ví dụ 1-of-1, 2-of-3 hay nhiều hơn).
+Ưu điểm của thiết kế này là tính linh hoạt cao, ứng dụng có thể chọn DVN phù hợp
+với mức độ rủi ro và chi phí, đồng thời giảm phụ thuộc vào một tập validator
+cố định như mô hình $m$-of-$n$ truyền thống.
+Nhược điểm là an toàn của bridge thực chất phụ thuộc vào cấu hình DVN do ứng dụng
+tự chọn, một cấu hình lỏng (đặc biệt là 1-of-1) sẽ thu hẹp giả định bảo mật xuống
+một thực thể duy nhất, đồng thời tính sẵn sàng (liveness) của DVN cũng trở thành
+yếu tố trọng yếu.
+Tháng 04/2026, Kelp DAO bị tấn công khi đang sử dụng cấu hình 1-of-1 DVN trên
+LayerZero V2. Theo phân tích sau sự cố, kẻ tấn công đã chiếm quyền các RPC node
+mà DVN của Kelp dựa vào, đồng thời tiến hành DDoS các node lành mạnh khác để buộc
+DVN failover sang đúng các node đã bị thoả hiệp, từ đó ký xác nhận các thông điệp
+cross-chain giả mạo và rút tài sản trên nhiều chain. Tổng thiệt hại ước tính khoảng
+\textbf{292 triệu USD}, được cho là liên quan đến nhóm Lazarus Group.
+Vụ việc cho thấy mô hình DVN linh hoạt vẫn có thể bị suy giảm xuống mức rủi ro
+tương đương một validator duy nhất nếu ứng dụng cấu hình ngưỡng quá lỏng,
+và an toàn của bridge có thể bị phá vỡ ngay ở tầng hạ tầng (RPC, network) chứ
+không nhất thiết ở tầng smart contract.
 
-Tóm lại, phần lớn tài sản bị đánh cắp trong lịch sử bridge tập trung vào các thiết kế dựa trên niềm tin vào một tập hợp nhỏ trung gian (mô hình $m$-of-$n$ với $n$ nhỏ), trong khi các mô hình an toàn hơn như consensus verifying hoặc state validating lại khó triển khai và chưa phổ biến. 
-Các giải pháp bridge hiện tại do đó chủ yếu đánh đổi giữa hiệu năng và bảo mật: phổ biến nhưng dễ bị khai thác, hoặc an toàn nhưng khó triển khai trên diện rộng. 
-Mặc dù các hướng tiếp cận intent-based và liquidity network đã bắt đầu xuất hiện, chưa có sản phẩm nào đồng thời (i) giảm tối đa số bên trung gian cần tin cậy, (ii) khai thác thanh khoản P2P từ chính người dùng, và (iii) duy trì hiệu năng phù hợp với trải nghiệm thực tế - đây chính là khoảng trống mà luận văn hướng tới.
+\subsubsection*{Nhóm optimistic ($1$-of-$n$)}
+
+\paragraph{Nomad Bridge.}
+Nomad Bridge là một generic message-passing bridge giữa nhiều blockchain,
+hoạt động theo mô hình optimistic. Mỗi thông điệp cross-chain được gắn với một
+\textit{Merkle root} mặc định được coi là hợp lệ sau một
+khoảng thời gian gọi là fraud window, trừ khi có ít nhất một watcher gửi fraud proof phản đối.
+Ưu điểm của thiết kế này là chi phí xác minh ban đầu thấp vì chỉ cần một watcher trung thực phát hiện
+gian lận trong fraud window là đủ để bảo vệ toàn hệ thống.
+Đó cũng chính là nhược điểm chính là độ trễ lớn do phải chờ hết fraud window thời gian chellenge
+và sự phụ thuộc vào tính
+liveness của watcher.
+Tháng 08/2022, một thay đổi cấu hình của Nomad đã khiến giá trị \texttt{0x00} bị coi
+là một root hợp lệ, kéo theo bất kỳ message nào cũng được chấp thuận mặc định mà
+không cần đi qua quy trình challenge. Vụ việc gây thiệt hại khoảng \textbf{190 triệu USD}
+và trở thành một trong những ``hack mở'' lớn nhất khi hàng trăm địa chỉ độc lập đã
+sao chép giao dịch khai thác để tự rút tiền.
+
+\subsubsection*{Nhóm consensus verifying}
+
+Các hệ thống thuộc nhóm này xác minh trạng thái hoặc giao dịch của chain nguồn
+trực tiếp trên chain đích bằng cách triển khai một \textit{light client} hoặc kiểm
+tra zero-knowledge proof, thay vì dựa vào một tập hợp validator được tin cậy.
+Trong mô hình light client, chain đích chạy một phiên bản rút gọn của giao thức đồng
+thuận chain nguồn để xác minh các block header và transaction proof, ví dụ tiêu biểu là Cosmos IBC.
+Trong khi mô hình zkBridge thì sử dụng zk-SNARK/zk-STARK để chứng minh tính đúng đắn của
+một quá trình chuyển trạng thái, yêu cầu chain đích chỉ cần xác minh proof có kích thước nhỏ.
+Ưu điểm lớn nhất của nhóm này là nền tảng bảo mật mạnh hơn do giảm
+phụ thuộc vào trung gian, độ an toàn của bridge gắn trực tiếp với độ an toàn của
+chain nguồn.
+Nhược điểm là chi phí triển khai light client cho mỗi cặp blockchain rất cao và chi phí
+xác minh zk-proof onchain vẫn rất lớn gây khó khăn trong việc phát và triển khai
+thương mại.
+
+\subsubsection*{Nhóm state validating}
+
+Nhóm này hầu như chỉ tồn tại trong các bridge giữa Layer 1 và Layer 2 
+(Optimism Bridge, Arbitrum Bridge, zkSync Bridge), nơi Layer 1 
+đóng vai trò source of truth. Đây là mô hình có độ an toàn cao nhất về thiết kế nhưng
+không áp dụng được cho các Layer 1 độc lập do không tồn tại quan hệ trạng thái.
+
+Tóm lại, phần lớn tài sản bị đánh cắp trong lịch sử bridge tập trung vào các thiết kế 
+dựa trên niềm tin vào một tập hợp nhỏ trung gian (mô hình $m$-of-$n$ với $n$ nhỏ), 
+trong khi các mô hình an toàn hơn như consensus verifying hoặc state validating 
+lại khó triển khai và chưa phổ biến, được thương mại hóa. 
+Các giải pháp bridge hiện tại chủ yếu đánh đổi giữa hiệu năng và bảo mật, một số
+phổ biến nhưng dễ bị khai thác, hoặc một số an toàn nhưng khó triển khai trên diện rộng. 
+Mặc dù các hướng tiếp cận intent-based và liquidity network đã bắt đầu xuất hiện, 
+chưa có sản phẩm nào đồng thời giảm tối đa số bên trung gian cần tin cậy, 
+tận dụng nguồn thanh khoản tối ưu và hiệu năng tốt. 
+Đây chính là khoảng trống mà luận văn hướng tới.
+
