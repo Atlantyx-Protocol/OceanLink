@@ -19,7 +19,7 @@ Với mỗi \texttt{MatchResult}, Orchestrator thực hiện các bước sau:
 
 \begin{enumerate}
   \item Đánh dấu trạng thái match sang \texttt{pending} và lưu xuống database.
-  \item Phân tích chu trình thành các \emph{send action} và gom theo chuỗi nguồn cùng người gửi, mỗi nhóm tương ứng với một order multi-fill.
+  \item Phân tích chu trình thành các send action và gom theo chuỗi nguồn cùng người gửi, mỗi nhóm tương ứng với một order multi-fill.
   \item Tạo presiding order trên chuỗi đầu tiên (sinh các secret và hashlock), tiếp đến tạo các responding order trên các chuỗi còn lại với cùng tập hashlock.
   \item Khi đã đủ HTLC trên các chain, lần lượt gọi \texttt{withdraw} với preimage tương ứng để chuyển tài sản về người nhận.
   \item Cập nhật trạng thái match sang \texttt{done} và emit các event lifecycle ra ngoài.
@@ -57,9 +57,9 @@ cấu hình chain và signer tương ứng mà không phải sửa logic của O
 \subsubsection{Mô hình thực thi ba lớp}
 \label{sec:three-layer-model}
 
-Như đã đề cập ở phần dẫn đoạn của chương, intent không qua một con đường xử lý 
-duy nhất mà tổ chức việc thanh toán thành 
-\emph{ba lớp thực thi} áp dụng tuần tự. 
+Như đã đề cập ở phần dẫn đoạn của chương, intent không qua một con đường xử lý
+duy nhất mà tổ chức việc thanh toán thành
+ba lớp thực thi áp dụng tuần tự.
 Execution Engine thực hiện điều phối cả ba lớp này.
 \subsubsection*{Netting Layer}
 
@@ -69,14 +69,14 @@ vì không cần solver, chất lượng thực thi tối ưu (không trượt g
 vào sự xuất hiện của intent đối ứng, có thể phải chờ nhiều tick trước khi tìm được match.
 
 \subsubsection*{Intent Accelerator Layer}
-Đây là lớp xử lý phần intent không match được trong Layer đầu tiên bằng 
-cách cho phép người dùng đính kèm \emph{incentive fee} để các solver bên ngoài cạnh tranh 
-fill và hưởng phần fee này. Cụ thể cơ chế \emph{incentive Dutch auction}:
-phí thưởng cho solver bắt đầu bằng không và tăng dần theo thời gian, 
-tạo trò chơi giữa thực thi sớm với phần thưởng thấp và chờ phần thưởng 
-cao hơn nhưng lại đối mặt rủi ro mất lượt. Khi solver commit, việc settlement cuối vẫn là 
-HTLC do BridgeService phát, khác Netting Layer ở \emph{nguồn thanh khoản} (solver bên ngoài thay vì 
-intent nội bộ), không khác ở \emph{cơ chế settle}. Ưu điểm là tốc độ thực thi gần như tức thời, 
+Đây là lớp xử lý phần intent không match được trong Layer đầu tiên bằng
+cách cho phép người dùng đính kèm incentive fee để các solver bên ngoài cạnh tranh
+fill và hưởng phần fee này. Cụ thể cơ chế incentive Dutch auction:
+phí thưởng cho solver bắt đầu bằng không và tăng dần theo thời gian,
+tạo trò chơi giữa thực thi sớm với phần thưởng thấp và chờ phần thưởng
+cao hơn nhưng lại đối mặt rủi ro mất lượt. Khi solver commit, việc settlement cuối vẫn là
+HTLC do BridgeService phát, khác Netting Layer ở nguồn thanh khoản (solver bên ngoài thay vì
+intent nội bộ), không khác ở cơ chế settle. Ưu điểm là tốc độ thực thi gần như tức thời, 
 nhược điểm là chi phí cao hơn Lớp 1 (incentive trả cho solver).
 
 \subsubsection*{Fallback Bridge Aggregator}

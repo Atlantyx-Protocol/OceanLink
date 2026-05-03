@@ -5,15 +5,15 @@ Chương này trình bày chi tiết phân tích yêu cầu,
 kiến trúc tổng quan 
 và thiết kế chi tiết của hệ thống bridge ngang hàng dựa trên intent.
 
-Mọi giải pháp bridge cross-chain đều phải đối mặt với một bài toán 
-đánh đổi thường được gọi là \emph{trilemma}, 
-giữa ba thuộc tính như Hình \ref{fig:trilemma}. 
+Mọi giải pháp bridge cross-chain đều phải đối mặt với một bài toán
+đánh đổi thường được gọi là trilemma,
+giữa ba thuộc tính như Hình \ref{fig:trilemma}.
 Độ an toàn thể hiện mức độ trust-minimization, 
 khả năng bảo mật và sự chắc chắn rằng tài sản không bị khai thác. 
-Chi phí là tổng phí mà người dùng phải trả, 
-bao gồm gas on-chain, phí thanh khoản trả cho (người cung cấp thanh khoản) 
-Liquidity Provider 
-hoặc phí dịch vụ trả cho relayer hoặc solver. 
+Chi phí là tổng phí mà người dùng phải trả,
+bao gồm gas on-chain, phí thanh khoản trả cho nhà cung cấp thanh khoản
+(Liquidity Provider -- LP)
+hoặc phí dịch vụ trả cho relayer hoặc solver.
 Tốc độ là độ trễ tính từ lúc submit intent đến lúc người dùng nhận được tài sản trên chuỗi đích. 
 Không có giải pháp nào tối ưu cả ba thuộc tính cùng lúc,
 mọi thiết kế phải chọn ưu tiên hai và chấp nhận đánh đổi thuộc tính còn lại.
@@ -51,22 +51,22 @@ mọi thiết kế phải chọn ưu tiên hai và chấp nhận đánh đổi t
 
 Như đã phân tích ở Chương \ref{chap:background},
 đa số bridge thương mại hiện nay chọn cặp
-\emph{chi phí thấp + tốc độ cao} và đánh đổi sự an toàn.
+``chi phí thấp + tốc độ cao'' và đánh đổi sự an toàn.
 Các thiết kế đó cho phép việc di chuyển tài sản xuyên chuỗi
 gần như tức thời và phí thấp nhờ duy trì
 một tập hợp validator nhỏ hoặc relayer tập trung
 nhưng đây chính là điểm yếu bị khai thác trong các vụ hack gây thiệt hại hàng tỷ USD.
-Bên cạnh đó cũng có một số bridge chọn cặp 
-\emph{an toàn + tốc độ cao} tuy vậy các thiết kế lại có chi phí triển khai và xác minh on-chain rất lớn, khiến phí giao
+Bên cạnh đó cũng có một số bridge chọn cặp
+``an toàn + tốc độ cao'' tuy vậy các thiết kế lại có chi phí triển khai và xác minh on-chain rất lớn, khiến phí giao
 dịch trở nên đắt đỏ và phạm vi áp dụng còn hạn chế.
 
-KLTN đi theo hướng ngược lại với phần lớn thị trường, ưu tiên đồng thời 
-\emph{an toàn} và \emph{chi phí thấp}, chấp nhận đánh đổi một phần tốc độ. 
+KLTN đi theo hướng ngược lại với phần lớn thị trường, ưu tiên đồng thời
+an toàn và chi phí thấp, chấp nhận đánh đổi một phần tốc độ.
 Cụ thể, dự án kết hợp ưu điểm của hai nhóm phân loại đã được phân 
 tích ở Chương \ref{chap:background} đó là nhóm State validating protocols
 và Liquidity network.
 Một mặt, hệ thống khai thác nguồn thanh khoản của chính người dùng qua việc
-P2P matching giữa các intent,
+matching P2P giữa các intent,
 thay vì bể thanh khoản tập trung của LP theo đúng tinh thần của Liquidity network.
 Nhờ đó chi phí gần bằng không (chỉ bao gồm phí gas), 
 không phụ thuộc vào nhà cung cấp thanh khoản bên ngoài. 
@@ -77,20 +77,20 @@ cần tin cậy bên trung gian nào.
 Tài sản chỉ chuyển giao khi đầy đủ điều kiện được kiểm chứng on-chain
 qua smart contract nếu không sẽ refund tự động.
 
-Sự kết hợp này mang lại đồng thời tính 
-\emph{trustless} như nhóm state validating, không cần tin cậy bên trung gian nào để giải phóng tài sản
-và chi phí thấp (nhờ P2P matching nội bộ). 
-Đổi lại, hệ thống phải chấp nhận \emph{độ trễ cao hơn} các bridge 
+Sự kết hợp này mang lại đồng thời tính trustless như nhóm state validating,
+không cần tin cậy bên trung gian nào để giải phóng tài sản
+và chi phí thấp (nhờ matching P2P nội bộ).
+Đổi lại, hệ thống phải chấp nhận độ trễ cao hơn các bridge
 thuần khác do một intent có thể phải chờ một thời gian
-để tìm được đối tác bù trừ trước khi được settle, 
+để tìm được đối tác bù trừ trước khi được settle,
 thay vì được fill tức thời từ các bên trung gian hoặc qua các bể thanh khoản.
 
 Để hạn chế đánh đổi về tốc độ mà không mất đi các tính chất cốt lõi,
-dự án tổ chức việc thực thi intent thành ba lớp áp dụng tuần tự cho 
-mỗi intent: Netting Layer phụ trách matching P2P nội bộ với chi phí 
-gần bằng không, Intent Accelerator Layer cho phép người dùng gửi thêm 
-\emph{incentive fee} để được fill nhanh trong khi solver bên ngoài 
-cạnh tranh quote và hưởng phần fee này, và cuối cùng 
+dự án tổ chức việc thực thi intent thành ba lớp áp dụng tuần tự cho
+mỗi intent: Netting Layer phụ trách matching P2P nội bộ với chi phí
+gần bằng không, Intent Accelerator Layer cho phép người dùng gửi thêm
+incentive fee để được fill nhanh trong khi solver bên ngoài
+cạnh tranh quote và hưởng phần fee này, và cuối cùng
 Fallback Bridge Aggregator định tuyến qua bridge bên thứ ba khi cần 
 đảm bảo completion. Cách thiết kế này giúp phần lớn intent hưởng 
 chi phí thấp nhất ở Lớp 1, chỉ một phần nhỏ chấp nhận chi phí cao hơn 

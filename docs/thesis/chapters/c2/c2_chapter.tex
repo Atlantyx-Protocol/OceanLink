@@ -3,9 +3,27 @@
 
 \section{Các khái niệm cơ bản}
 
-Để xây dựng và phân tích hệ thống giao dịch xuyên chuỗi intent-based, 
+Để xây dựng và phân tích hệ thống giao dịch xuyên chuỗi intent-based,
 trước hết cần làm rõ một số khái niệm và các mô hình nền tảng trong cả lĩnh vực blockchain
 và tài chính truyền thống.
+
+\subsection*{Smart contract (hợp đồng thông minh)}
+
+Smart contract (hợp đồng thông minh) là các đoạn mã chương trình được triển khai
+và thực thi trên blockchain, cho phép tự động thực hiện các điều khoản giao dịch
+khi các điều kiện được lập trình sẵn xảy ra mà không cần đến bên trung gian.
+Một khi đã được triển khai lên blockchain, mã nguồn của smart contract là bất biến,
+mọi node trong mạng đều có thể độc lập thực thi và xác minh kết quả qua cơ chế đồng
+thuận, từ đó đảm bảo tính minh bạch và chống can thiệp.
+Trong các nền tảng tương thích Ethereum Virtual Machine (EVM), smart contract
+thường được viết bằng các ngôn ngữ bậc cao như Solidity hoặc Vyper, sau đó được biên
+dịch sang bytecode để thực thi trên EVM.
+Đối với các hệ thống cross-chain, smart contract đóng vai trò then chốt là nơi khoá
+tài sản, xác minh điều kiện giải phóng và phát các sự kiện (event) để các thành phần
+off-chain theo dõi. Trong khoá luận tốt nghiệp (KLTN), smart contract chính là
+thành phần on-chain triển khai giao thức HTLC, chịu trách nhiệm đảm bảo tính nguyên
+tử của các giao dịch xuyên chuỗi mà không cần đặt giả định tin cậy vào bất kỳ bên
+trung gian nào.
 
 \subsection*{Cross-chain bridge}
 
@@ -42,7 +60,7 @@ giao dịch hoặc được thực hiện trọn vẹn ở cả hai phía, hoặ
 qua đó loại bỏ rủi ro một bên nhận được tài sản còn bên kia thì không.
 
 
-HTLC (Hashed Timelock Contract) là một trong những thuật toán phổ biến nhất để giải quyết bài toán 
+HTLC là một trong những thuật toán phổ biến nhất để giải quyết bài toán
 atomic swap.
 HTLC kết hợp hai cơ chế khóa là \textit{hashlock} và \textit{timelock}: 
 hashlock yêu cầu bên nhận phải cung cấp bí mật (secret) của một giá trị băm để mở khoá tài sản, 
@@ -266,8 +284,9 @@ tự chọn, một cấu hình lỏng (đặc biệt là 1-of-1) sẽ thu hẹp 
 một thực thể duy nhất, đồng thời tính sẵn sàng (liveness) của DVN cũng trở thành
 yếu tố trọng yếu.
 Tháng 04/2026, Kelp DAO bị tấn công khi đang sử dụng cấu hình 1-of-1 DVN trên
-LayerZero V2. Theo phân tích sau sự cố, kẻ tấn công đã chiếm quyền các RPC node
-mà DVN của Kelp dựa vào, đồng thời tiến hành DDoS các node lành mạnh khác để buộc
+LayerZero V2. Theo phân tích sau sự cố, kẻ tấn công đã chiếm quyền các node Remote
+Procedure Call (RPC) mà DVN của Kelp dựa vào, đồng thời tiến hành tấn công từ chối
+dịch vụ phân tán (Distributed Denial of Service -- DDoS) các node lành mạnh khác để buộc
 DVN failover sang đúng các node đã bị thoả hiệp, từ đó ký xác nhận các thông điệp
 cross-chain giả mạo và rút tài sản trên nhiều chain. Tổng thiệt hại ước tính khoảng
 \textbf{292 triệu USD}, được cho là liên quan đến nhóm Lazarus Group.
@@ -300,8 +319,9 @@ Các hệ thống thuộc nhóm này xác minh trạng thái hoặc giao dịch 
 trực tiếp trên chain đích bằng cách triển khai một \textit{light client} hoặc kiểm
 tra zero-knowledge proof, thay vì dựa vào một tập hợp validator được tin cậy.
 Trong mô hình light client, chain đích chạy một phiên bản rút gọn của giao thức đồng
-thuận chain nguồn để xác minh các block header và transaction proof, ví dụ tiêu biểu là Cosmos IBC.
-Trong khi mô hình zkBridge thì sử dụng zk-SNARK/zk-STARK để chứng minh tính đúng đắn của
+thuận chain nguồn để xác minh các block header và transaction proof, ví dụ tiêu biểu là
+Cosmos Inter-Blockchain Communication (IBC).
+Trong khi mô hình zkBridge thì sử dụng zk-SNARK (Zero-Knowledge Succinct Non-Interactive Argument of Knowledge) hoặc zk-STARK (Zero-Knowledge Scalable Transparent Argument of Knowledge) để chứng minh tính đúng đắn của
 một quá trình chuyển trạng thái, yêu cầu chain đích chỉ cần xác minh proof có kích thước nhỏ.
 Ưu điểm lớn nhất của nhóm này là nền tảng bảo mật mạnh hơn do giảm
 phụ thuộc vào trung gian, độ an toàn của bridge gắn trực tiếp với độ an toàn của

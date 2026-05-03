@@ -5,18 +5,17 @@
 \subsection{API Gateway}
 \label{sec:api-gateway}
 
-API Gateway là cầu nối cho mọi tương tác giữa frontend và phần
-lõi off-chain (orderbook, matching, execution) đều đi qua tầng này. Cài đặt
-Gateway phục vụ ba nhóm chức năng chính. Trước hết là \emph{submit và truy vấn
-intent}: \texttt{POST /api/intent} nhận intent từ người dùng, 
-\emph{stream lifecycle qua
-Server-Sent Events}: \texttt{GET /api/intent/:orderId/events}
- mở kết nối SSE,
-đăng ký listener trên \texttt{orderEvents} 
+API (Application Programming Interface) Gateway là cầu nối cho mọi tương tác
+giữa frontend và phần lõi off-chain (orderbook, matching, execution) đều đi qua
+tầng này. Cài đặt Gateway phục vụ ba nhóm chức năng chính. Trước hết là submit
+và truy vấn intent: \texttt{POST /api/intent} nhận intent từ người dùng,
+stream lifecycle qua Server-Sent Events (SSE): \texttt{GET /api/intent/:orderId/events}
+mở kết nối SSE,
+đăng ký listener trên \texttt{orderEvents}
 lọc theo \texttt{orderId} và push các
-\texttt{OrderEvent} xuống client để frontend hiển thị 
+\texttt{OrderEvent} xuống client để frontend hiển thị
 trạng thái thời gian thực.
-Cuối cùng là \emph{truy vấn execution}: 
+Cuối cùng là truy vấn execution:
 \texttt{GET /api/orchestrator/execution/:matchId}
 trả về \texttt{ExecutionRecord} của một match, gồm presiding order, các responding
 withdraw và trạng thái thực thi, phục vụ cho giao diện kết quả cuối cùng (txHash,
