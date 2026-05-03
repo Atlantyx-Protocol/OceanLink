@@ -5,64 +5,50 @@
 \subsection{Execution Engine: Orchestrator và BridgeService}
 \label{sec:execution-engine}
 
-Khi Matching Engine sản sinh một \texttt{MatchResult} chứa các chu trình đã được khớp về mặt logic, công việc còn lại là biến chu trình đó thành các giao dịch trên chuỗi sao cho \emph{tài sản chỉ thực sự chuyển nếu mọi nhánh trong chu trình đều thành công}. Đây là vai trò của Execution Engine, được tách thành hai tầng. Tầng \textbf{Orchestrator} chịu trách nhiệm lập kế hoạch và điều phối, còn \textbf{BridgeService} là tầng thấp, gói gọn các tương tác cụ thể với hợp đồng HTLC trên từng chuỗi.
+Khi Matching Engine gửi các \texttt{MatchResult} chứa các chu trình đã được khớp về mặt logic, 
+công việc còn lại là biến chu trình đó thành các giao dịch trên chuỗi
+tương ứng. Đây chính là vai trò của Execution Engine, được tách thành hai thành phần. 
+\textbf{Orchestrator} chịu trách nhiệm lập kế hoạch và điều phối, 
+còn \textbf{BridgeService} tương tác trực tiếp với contract HTLC trên các chain.
 
-\subsubsection{Mô hình presiding/responding}
+\subsubsection{Quy trình xử lý \texttt{MatchResult}}
 
-Một chu trình có thể chứa nhiều cạnh trên cùng một chuỗi (nhiều intent có cùng chuỗi nguồn nhưng khác chuỗi đích, hoặc ngược lại). Với HTLC chuẩn, mỗi cạnh sẽ là một giao dịch riêng — chi phí gas cao và phải đồng bộ nhiều secret/hashlock. OceanLink tận dụng tính chất multi-fill của HTLC (xem \S\ref{sec:smart-contract-layer}) để \emph{gom} các cạnh cùng chuỗi nguồn vào \emph{một} order với nhiều fill, giảm số giao dịch cần phát.
-
-Trong mỗi \texttt{MatchResult}, một order consolidated được Orchestrator chọn làm \emph{order chủ tịch} (\texttt{presiding order}); các order còn lại là \emph{order phản hồi} (\texttt{responding orders}). Phân vai này quyết định ai sinh bí mật. Order chủ tịch sinh các bí mật $s_i$ tươi (random 256-bit) tại lúc tạo, và publish các hashlock $h_i = \mathrm{SHA256}(s_i)$ qua sự kiện \texttt{FillCreated}. Các order phản hồi không sinh bí mật mới mà tái sử dụng các $h_i$ đã có; mỗi fill trong order phản hồi liên kết với đúng một fill trong order chủ tịch (qua chỉ số chu trình), do đó cùng chia sẻ một preimage.
-
-Cấu trúc này là cốt lõi của tính nguyên tử: \emph{biết một preimage $s_i$ là điều kiện đủ để mở khoá tất cả các fill chia sẻ $h_i$ trên mọi chuỗi}. Khi order chủ tịch được rút bằng $s_i$, giá trị $s_i$ trở thành công khai trên chuỗi — bất kỳ ai (Orchestrator trong trường hợp này) cũng có thể dùng nó để rút các fill phản hồi tương ứng trên các chuỗi khác.
-
-\subsubsection{Thuật toán \texttt{handleMatchResults}}
-
-Orchestrator nhận một mảng \texttt{MatchResult} từ scheduler. Với mỗi \texttt{MatchResult} (xử lý tuần tự để giữ thứ tự thời gian matchId), thực hiện các bước sau:
+Orchestrator nhận một mảng \texttt{MatchResult} từ scheduler và 
+xử lý tuần tự. 
+Với mỗi \texttt{MatchResult}, Orchestrator thực hiện các bước sau:
 
 \begin{enumerate}
-  \item Đặt \texttt{ExecutionRecord} cho \texttt{matchId} sang \texttt{pending} và persist vào bảng \texttt{executions}.
-  \item Trích các \emph{send action} từ chu trình (\texttt{extractSendActionsFromCycles}). Mỗi send action mô tả: cạnh nào, chuỗi nguồn nào, người gửi nào (địa chỉ ví), người nhận nào, số tiền bao nhiêu, thuộc chu trình nào.
-  \item Gom các action có cùng \emph{chuỗi nguồn + người gửi} thành nhóm (\texttt{groupActionsByChainKey}); mỗi nhóm sẽ trở thành \emph{một} order multi-fill trên chuỗi đó.
-  \item Chọn nhóm đầu tiên làm presiding, gọi \texttt{executePresidingOrder} $\rightarrow$ BridgeService.\texttt{createOrder} với cờ \texttt{isPresiding=true}. Kết quả: orderId trên chuỗi, txHash, danh sách $\{s_i, h_i\}$ cho các fill.
-  \item Dựng map \emph{cycleIdx $\rightarrow$ hashlock} từ kết quả presiding để các order phản hồi biết phải tái sử dụng hashlock nào cho mỗi chu trình.
-  \item Gọi \texttt{executeNonPresidingOrders} cho từng nhóm còn lại, truyền kèm map hashlock; mỗi nhóm tạo một order phản hồi với \texttt{isPresiding=false}, không sinh secret mới.
-  \item Sau khi mọi HTLC đã có mặt trên chuỗi, gọi \texttt{verifyAndWithdrawOrders}. Bước này thực hiện các giao dịch \texttt{withdraw} với preimage tương ứng trên cả chuỗi chủ tịch và các chuỗi phản hồi để đưa tài sản về tay người nhận thực sự.
-  \item Persist \texttt{ExecutionRecord} với \texttt{status="done"} và đầy đủ dữ liệu (presiding order info, danh sách responding withdraws, các secret từng fill) vào bảng \texttt{executions}.
-  \item Phát các sự kiện lifecycle qua \texttt{orderEvents}: \texttt{plan}, \texttt{htlc\_created} (cho mỗi nhóm), \texttt{withdrawn}, \texttt{done}.
+  \item Đánh dấu trạng thái match sang \texttt{pending} và lưu xuống database.
+  \item Phân tích chu trình thành các \emph{send action} và gom theo chuỗi nguồn cùng người gửi, mỗi nhóm tương ứng với một order multi-fill.
+  \item Tạo presiding order trên chuỗi đầu tiên (sinh các secret và hashlock), tiếp đến tạo các responding order trên các chuỗi còn lại với cùng tập hashlock.
+  \item Khi đã đủ HTLC trên các chain, lần lượt gọi \texttt{withdraw} với preimage tương ứng để chuyển tài sản về người nhận.
+  \item Cập nhật trạng thái match sang \texttt{done} và emit các event lifecycle ra ngoài.
 \end{enumerate}
 
-Nếu bất kỳ bước nào throw, khối catch đặt \texttt{ExecutionRecord} sang \texttt{status="error"} với thông điệp lỗi tương ứng và phát sự kiện \texttt{error}. Hệ thống không có rollback on-chain: các HTLC đã được tạo sẽ tự hoàn lại sau \texttt{timelock} hết hạn (cơ chế refund của hợp đồng — xem \S\ref{sec:smart-contract-layer}).
+Nếu bất kỳ bước nào lỗi throw, hệ thống không có rollback on-chain. Các HTLC đã được tạo sẽ tự hoàn lại sau 
+\texttt{timelock} hết hạn (cơ chế refund của hợp đồng — 
+xem \S\ref{sec:smart-contract-layer}).
 
 \subsubsection{Phân tích tính nguyên tử (atomicity)}
 
-Hệ thống đảm bảo \emph{không có trạng thái} mà một bên nhận tài sản trong khi bên đối ứng mất tài sản. Có bốn pha có thể xảy ra sai sót, và ở mỗi pha cần phân tích để chứng minh tính nguyên tử được duy trì.
+Hệ thống đảm bảo không có trường hợp mà một bên nhận tài sản trong khi bên đối ứng mất tài sản. 
+Có bốn case có thể xảy ra sai sót, phân tích để chứng minh tính nguyên tử được duy trì:
 
-\subsubsection*{Sai sót khi tạo presiding}
+\begin{itemize}
+    \item Tạo presiding fail: nếu giao dịch \texttt{newOrder} của presiding fail, không có HTLC nào được tạo và không có tài sản nào bị khoá.
+    \item Tạo responding fail: nếu một responding order fail sau khi presiding đã có mặt trên chuỗi, presiding sẽ ở trạng thái khoá nhưng không ai rút (vì bên đối ứng không có HTLC để rút). Sau \texttt{timelock}, người gửi presiding gọi \texttt{refund} để lấy lại, bên đối ứng cũng không chịu thiệt hại nào vì chưa khoá tài sản.
+    \item Withdraw presiding fail: nếu withdraw fail sau khi mọi HTLC đã được tạo, các HTLC sẽ tự được refund sau timelock như trường hợp trên.
+    \item Withdraw responding fail: presiding đã được rút thành công, secret $s_i$ đã công khai trên chuỗi qua event \texttt{FillWithdrawn} nhưng Orchestrator chưa kịp gọi withdraw cho responding. Đây không phải sự cố làm mất tính nguyên tử vì secret đã hiện hữu on-chain, người nhận của responding (hoặc bất kỳ ai theo dõi event) đều có thể tự gọi withdraw để rút phần của mình. Cờ \texttt{allowWithdrawAfterExpiry} bật khi deploy còn cho phép thao tác này diễn ra ngay cả khi timelock đã hết, đảm bảo các fill responding luôn có thể được claim.
+\end{itemize}
 
-Nếu giao dịch \texttt{newOrder} của presiding fail, không có HTLC nào được tạo, không có tài sản nào bị khoá; thoát an toàn.
+\subsubsection{BridgeService}
 
-\subsubsection*{Sai sót khi tạo responding}
-
-Nếu một responding order fail sau khi presiding đã có mặt trên chuỗi, presiding sẽ ở trạng thái khoá nhưng không ai rút (vì bên đối ứng không có HTLC để rút). Sau \texttt{timelock} (mặc định 10 phút), người gửi presiding gọi \texttt{refund} để lấy lại; bên đối ứng cũng không chịu thiệt hại nào vì chưa khoá tài sản.
-
-\subsubsection*{Sai sót khi withdraw presiding}
-
-Nếu withdraw fail sau khi mọi HTLC đã được tạo, các HTLC sẽ bị refund sau timelock — như trường hợp trên.
-
-\subsubsection*{Sai sót khi withdraw responding}
-
-Đây là tình huống tinh tế nhất. Presiding đã được rút, bí mật $s_i$ đã công khai trên chuỗi, nhưng Orchestrator không kịp gọi withdraw cho responding. Trong trường hợp này, bất kỳ ai (không chỉ Orchestrator) cũng có thể đọc $s_i$ từ event \texttt{FillWithdrawn} của chuỗi presiding và gọi withdraw cho fill responding tương ứng. Hợp đồng cho phép địa chỉ admin (nếu được whitelist) thực hiện thay người nhận; kết hợp với cờ \texttt{allowWithdrawAfterExpiry} (đặt \texttt{true} khi deploy) cho phép cứu các fill ngay cả sau khi timelock đã hết.
-
-\subsubsection{BridgeService: tầng tương tác với chuỗi}
-
-\texttt{BridgeService} là một wrapper mỏng xung quanh viem (thư viện TypeScript cho EVM), cung cấp bốn phép nguyên thuỷ. \texttt{createOrder(\{ receivers, amounts, chain, isPresiding, onBehalfOf \})} gọi hàm \texttt{newOrder} của hợp đồng HTLC; khi \texttt{isPresiding=true}, hàm sinh secret tươi và tính hashlock, còn khi \texttt{false}, hàm nhận hashlock từ Orchestrator. Tham số \texttt{onBehalfOf} cho phép admin tạo order thay mặt một ví người dùng khác (xem mục về cờ admin trong \S\ref{sec:smart-contract-layer}). \texttt{withdraw(\{ orderId, fillId, preimage, chain \})} gọi \texttt{withdraw} trên hợp đồng tương ứng. \texttt{refund(\{ orderId, chain \})} gọi \texttt{refund}, chủ yếu được kích hoạt thủ công hoặc bởi một tiến trình ``garbage collector'' sau khi timelock hết hạn (chưa nằm trong scope của MVP). Cuối cùng, \texttt{approve(...)} thực hiện pre-approve USDC cho hợp đồng HTLC.
-
-BridgeService dùng một signer cho mỗi chuỗi, ánh xạ qua biến môi trường: ví LP $B$ ký giao dịch trên Ethereum Sepolia, $C$ trên Base Sepolia, $D$ trên Arbitrum Sepolia. Đối với các giao dịch read (estimate gas, balanceOf, allowance), BridgeService dùng signer \texttt{PRIVATE\_KEY\_ADMIN} dưới vai trò ``ambient reader''.
-
-\subsubsection{Vai trò trong sơ đồ tổng thể}
-
-Execution Engine là \emph{ranh giới on-chain duy nhất} của hệ thống. Mọi giao dịch đi từ off-chain xuống on-chain đều phải qua BridgeService; Orchestrator không bao giờ tự gọi viem mà phải đi qua wrapper. Phân chia này có hai lợi ích chính. Một là test-friendly: trong test, BridgeService có thể được thay bằng một fake để Orchestrator chạy không cần kết nối chain, giữ cho unit test của logic điều phối nhanh và ổn định. Hai là single point of change cho việc mở rộng sang chuỗi mới: thêm một chuỗi (vd. Avalanche) chỉ yêu cầu thêm cấu hình trong \texttt{config/chains.ts} và một signer cho ví tương ứng; Orchestrator không phải sửa.
-
+BridgeService là thành phần tương tác trực tiếp với smart contract HTLC trên các chain
+qua các thao tác cơ bản (tạo order, withdraw,
+refund, approve).
+Mỗi chain được cấu hình một signer riêng tương ứng với một ví của hệ thống, giúp
+việc mở rộng sang các chain mới trong tương lai trở nên đơn giản, chỉ cần thêm
+cấu hình chain và signer tương ứng mà không phải sửa logic của Orchestrator.
 % -----------------------------------------------------------------------------
 % Mô hình thực thi ba lớp — chuyển từ section riêng vào đây vì Execution
 % Engine là điểm điều phối chiến lược thực thi của một intent.
@@ -71,34 +57,85 @@ Execution Engine là \emph{ranh giới on-chain duy nhất} của hệ thống. 
 \subsubsection{Mô hình thực thi ba lớp}
 \label{sec:three-layer-model}
 
-Như đã đề cập ở phần dẫn nhập của chương, OceanLink không cố ép mọi intent qua một con đường thanh toán duy nhất mà tổ chức việc thanh toán thành \emph{ba lớp thực thi} áp dụng tuần tự. Execution Engine là thành phần điều phối hai trong ba lớp này (Lớp 1 và Lớp 2 — cả hai đều settle qua HTLC do BridgeService phát) và bàn giao Lớp 3 cho Fallback Bridge Aggregator (xem \S\ref{sec:fallback-bridge}). Việc trình bày mô hình ở đây — bên trong tiểu mục Execution Engine — phản ánh đúng vị trí của thành phần này như một \emph{strategy router} giữa các lớp.
+Như đã đề cập ở phần dẫn đoạn của chương, intent không qua một con đường xử lý 
+duy nhất mà tổ chức việc thanh toán thành 
+\emph{ba lớp thực thi} áp dụng tuần tự. 
+Execution Engine thực hiện điều phối cả ba lớp này.
+\subsubsection*{Netting Layer}
 
-\subsubsection*{Lớp 1 --- Netting Layer}
+Mục tiêu của lớp này là thanh toán bằng cách bù trừ trực tiếp các intent đối ứng, 
+không cần thanh khoản ngoài. Ưu điểm là chi phí gần bằng không (chỉ phí gas), trustles 
+vì không cần solver, chất lượng thực thi tối ưu (không trượt giá). Nhược điểm là phụ thuộc 
+vào sự xuất hiện của intent đối ứng, có thể phải chờ nhiều tick trước khi tìm được match.
 
-Mục tiêu của lớp này là thanh toán bằng cách bù trừ trực tiếp các intent đối ứng, không cần thanh khoản ngoài. Cụ thể, Matching Engine (\S\ref{sec:matching-engine}) mô hình hoá tập intent đang chờ thành đồ thị có hướng và tìm các chu trình bù trừ; mỗi chu trình thoả ngưỡng chấp nhận sẽ được Orchestrator và BridgeService thanh toán nguyên tử qua HTLC trên các chuỗi liên quan, đúng theo mô hình presiding/responding ở phần đầu tiểu mục này. Ưu điểm là chi phí gần bằng không (chỉ phí gas), trust-minimized vì không cần solver, chất lượng thực thi tối ưu (không trượt giá). Nhược điểm là phụ thuộc vào sự xuất hiện của intent đối ứng, có thể phải chờ nhiều tick trước khi tìm được match.
+\subsubsection*{Intent Accelerator Layer}
+Đây là lớp xử lý phần intent không match được trong Layer đầu tiên bằng 
+cách cho phép người dùng đính kèm \emph{incentive fee} để các solver bên ngoài cạnh tranh 
+fill và hưởng phần fee này. Cụ thể cơ chế \emph{incentive Dutch auction}:
+phí thưởng cho solver bắt đầu bằng không và tăng dần theo thời gian, 
+tạo trò chơi giữa thực thi sớm với phần thưởng thấp và chờ phần thưởng 
+cao hơn nhưng lại đối mặt rủi ro mất lượt. Khi solver commit, việc settlement cuối vẫn là 
+HTLC do BridgeService phát, khác Netting Layer ở \emph{nguồn thanh khoản} (solver bên ngoài thay vì 
+intent nội bộ), không khác ở \emph{cơ chế settle}. Ưu điểm là tốc độ thực thi gần như tức thời, 
+nhược điểm là chi phí cao hơn Lớp 1 (incentive trả cho solver).
 
-\subsubsection*{Lớp 2 --- Intent Accelerator Layer}
+\subsubsection*{Fallback Bridge Aggregator}
+\label{sec:fallback-bridge}
 
-Mục tiêu của lớp này là thanh toán nhanh phần intent không match được trong Lớp 1 bằng cách cho phép người dùng đính kèm \emph{incentive fee} để các solver bên ngoài cạnh tranh fill và hưởng phần fee này. Cụ thể, phần dư của intent được broadcast đến các solver đã đăng ký; mỗi solver đề xuất một mức giá riêng, người gửi chấp nhận quote tốt nhất. Một biến thể quan trọng là \emph{incentive Dutch auction}: phí thưởng cho solver bắt đầu bằng không và tăng dần theo thời gian, tạo trò chơi chiến lược giữa ``thực thi sớm với phần thưởng thấp'' và ``chờ phần thưởng cao hơn nhưng đối mặt rủi ro mất lượt''. Khi solver commit, kênh thanh toán cuối vẫn là HTLC do BridgeService phát; khác Lớp 1 ở \emph{nguồn thanh khoản} (solver bên ngoài thay vì intent nội bộ), không khác ở \emph{cơ chế settle}. Ưu điểm là tốc độ thực thi gần như tức thời; nhược điểm là chi phí cao hơn Lớp 1 (incentive trả cho solver) và tiềm năng các hành vi chiến lược như selective fill.
+Để đảm bảo tính hoàn thiện của intent, lớp này hoạt động bằng cách định tuyến qua một bridge
+bên thứ ba có thanh khoản thực sự. Tuy nhiên chi phí cao hơn và độ trễ phụ thuộc vào bridge
+bên ngoài.
 
-\subsubsection*{Lớp 3 --- Fallback Bridge Aggregator}
+Trong phạm vi KLTN, \textit{Across Protocol} được tích hợp làm bridge mặc định cho lớp
+fallback. Across hoạt động theo mô hình intent-based, dựa vào các relayer cạnh tranh để
+fill các yêu cầu chuyển tài sản. Bridge này phù hợp với các cặp Ethereum L1
+$\leftrightarrow$ L2 như Arbitrum, Base hay Optimism, có phí giao dịch thấp và thời gian
+hoàn tất nhanh.
 
-Mục tiêu của lớp này là bảo đảm completion cho intent vẫn còn dư sau hai lớp trên, bằng cách định tuyến qua một bridge bên thứ ba có thanh khoản thực sự. Lớp này bỏ qua HTLC và đi qua kênh thanh toán riêng của bridge — Execution Engine chỉ tham gia đến bước ``đánh dấu intent chuyển sang Lớp 3'' rồi bàn giao điều phối cho Fallback Bridge Aggregator (\S\ref{sec:fallback-bridge}). Ưu điểm là hoàn tất gần như chắc chắn; nhược điểm là chi phí cao nhất, độ trễ phụ thuộc bridge bên ngoài.
+Aggregator được thiết kế không gắn cứng vào một bridge cụ thể, thay vào đó định nghĩa
+một interface chung và mỗi bridge là một adapter cài đặt theo interface đó:
 
-Vòng đời một intent qua ba lớp diễn ra theo trình tự sau. Đầu tiên, intent được \texttt{validateIntent} ở API Gateway và đưa vào OrderStore với trạng thái \texttt{QUEUED}. Trong cửa sổ thời gian $T_{\text{net}}$, Matching Engine cố tìm cycle ở mỗi tick: nếu tìm được cycle khớp toàn bộ, trạng thái chuyển \texttt{MATCHED}, Execution Engine settle nguyên tử qua HTLC, intent kết thúc ở Lớp 1; nếu khớp một phần, phần khớp được settle, phần dư trở thành \texttt{PARTIAL} và tiếp tục chờ. Khi cửa sổ $T_{\text{net}}$ trôi qua mà phần dư vẫn còn, intent (hoặc phần dư của nó) được chuyển sang Lớp 2: broadcast cho solver, chạy Dutch auction. Nếu một solver commit, phần đó được settle qua cùng kênh HTLC; nếu không, sang Lớp 3. Lớp 3 chọn bridge tốt nhất, phát giao dịch qua adapter và theo dõi đến khi hoàn tất hoặc thất bại; đây là điểm cuối, không có Lớp 4.
+\begin{verbatim}
+interface BridgeAdapter {
+  name: string;
 
-Trật tự ``leo dần'' này đảm bảo phần lớn intent hưởng chi phí thấp nhất có thể (Lớp 1), một số ít chấp nhận trade-off cho tốc độ (Lớp 2), và \emph{không có intent nào bị treo vô thời hạn} (Lớp 3 luôn sẵn sàng làm điểm thoát).
+  // Lấy quote: phí, ETA
+  quote(req: QuoteRequest): Promise<QuoteResponse>;
+
+  // gửi giao dịch bridge, trả về txHash trên chuỗi nguồn
+  send(req: SendRequest): Promise<SendResult>;
+
+  // Theo dõi trạng thái của một bridge đang chạy
+  status(handle: BridgeHandle): Promise<BridgeStatus>;
+}
+\end{verbatim}
+
+\subsubsection*{Vòng đời của intent}
+
+Vòng đời một intent qua ba lớp diễn ra theo trình tự sau. 
+Đầu tiên, intent được gửi và xác thực qua API Gatewway sau đó được đưa vào OrderBook với trạng thái \texttt{QUEUED}. 
+Trong cửa sổ thời gian $T_{\text{net}}$, 
+Matching Engine cố tìm cycle ở mỗi tick, nếu tìm được cycle khớp toàn bộ, 
+trạng thái chuyển \texttt{MATCHED}. Nếu khớp một phần, phần khớp được sẽ settle qua matching engine, 
+phần dư trở thành \texttt{PARTIAL} và tiếp tục chờ. 
+Khi cửa sổ $T_{\text{net}}$ đã hết thời gian mà phần dư vẫn còn, 
+intent (hoặc phần dư của nó) được chuyển sang Lớp 2,
+broadcast cho solver, chạy Dutch auction. 
+Nếu một solver commit, phần đó được settle qua cùng kênh HTLC; 
+nếu không, sang Lớp 3. Lớp 3 chọn bridge tốt nhất, 
+phát giao dịch qua adapter và theo dõi đến khi hoàn tất hoặc thất bại và là điểm cuối cùng.
+
+Trật tự leo dần này đảm bảo phần lớn intent hưởng chi phí thấp nhất có thể, một số ít chấp nhận trade-off cho tốc độ, và không có intent nào bị treo vô thời hạn.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=\linewidth]{figures/c3/intent-layer}
-  \caption{Vòng đời của một intent qua ba lớp thực thi: bắt đầu ở
-  Netting Layer, leo dần xuống Intent Accelerator Layer khi không
-  tìm được đối tác bù trừ, và cuối cùng được định tuyến qua
-  Fallback Bridge Aggregator nếu cần.}
+  \caption{Vòng đời của một intent qua ba lớp thực thi.}
   \label{fig:intent-lifecycle}
 \end{figure}
 
-Mặc dù ba lớp khác nhau ở \emph{nguồn thanh khoản} và \emph{cơ chế tìm đối tác}, chúng dùng chung phần lớn các thành phần đã giới thiệu. Lớp 1 dùng API Gateway, OrderStore, Matching Engine (MatchScheduler + MatchingService + Solver), Execution Engine và Smart Contract Layer (HTLC). Lớp 2 dùng cùng API Gateway và OrderStore, nhưng thay Matching Engine bằng một bộ phát quote tới các solver bên ngoài; Execution Engine và HTLC vẫn là kênh thanh toán cuối. Lớp 3 dùng Fallback Bridge Aggregator để chọn và gọi adapter bridge phù hợp; bỏ qua HTLC và đi qua kênh thanh toán riêng của bridge bên thứ ba.
-
-Trong phạm vi triển khai của luận văn, Lớp 1 đã được cài đặt đầy đủ với matching engine, HTLC multi-fill và orchestrator. Đây là phần tập trung của các tiểu mục thiết kế chi tiết và phần đo benchmark trong chương Đánh giá. Lớp 2 được trình bày ở mức thiết kế (interface, Dutch auction incentive, lưu đồ tương tác) và cài đặt cụ thể nằm ngoài scope. Lớp 3 cũng chỉ được trình bày ở mức thiết kế: interface \texttt{BridgeAdapter} và danh sách bridge ứng cử (\S\ref{sec:fallback-bridge}); cài đặt cụ thể nằm ngoài scope. Phần Future Work (chương cuối) liệt kê các hạng mục cần hoàn thiện để Lớp 2 và Lớp 3 đi vào hoạt động đầy đủ.
+Trong phạm vi triển khai của KLTN, Lớp 1 đã được cài đặt đầy đủ với matching engine, 
+HTLC multi-fill và orchestrator. Đây là phần tập trung của các mục quan trọng nhất
+Lớp 2 được trình bày ở mức thiết kế (interface, Dutch auction incentive, biểu đồ) và cài đặt cụ thể nằm ngoài scope. 
+Lớp 3 đã được tích hợp với Across Protocol làm bridge bên thứ ba mặc định. Việc mở rộng sang 
+các bridge khác để định tuyến tối ưu hơn được liệt kê trong định hướng phát triển tiếp theo.

@@ -5,43 +5,19 @@
 \subsection{API Gateway}
 \label{sec:api-gateway}
 
-API Gateway là điểm vào duy nhất của backend. Tất cả các tương tác giữa frontend và phần lõi off-chain (orderbook, matching, execution) đều đi qua tầng này. Cài đặt dựa trên Fastify --- một web framework Node.js có hiệu năng cao và schema validation tích hợp --- chạy như một plugin trong cùng tiến trình với matching scheduler và các engine khác.
-
-\subsubsection{Cấu trúc route}
-
-Các endpoint được nhóm theo khu vực tương ứng với bốn module chính. Nhóm \texttt{/api/intent} phục vụ submit intent mới, truy vấn trạng thái intent và mở stream SSE lifecycle. Nhóm \texttt{/api/orchestrator} phục vụ truy vấn \texttt{ExecutionRecord} của một matchId. Hai nhóm \texttt{/api/bridge} và \texttt{/api/htlc} cho phép gọi trực tiếp các thao tác on-chain (tạo HTLC, withdraw, refund) bỏ qua matching engine, chủ yếu phục vụ script vận hành và testing thủ công. Cuối cùng, nhóm \texttt{/api/approval} quản lý USDC approval cho LP wallet.
-
-\subsubsection{Vai trò trong bốn nhóm thao tác}
-
-\subsubsection*{Submit intent}
-
-\texttt{POST /api/intent} nhận body JSON với các trường \texttt{srcChain}, \texttt{desChain}, \texttt{amount}, \texttt{deadline}, \texttt{userAddress}, và tuỳ chọn \texttt{incentiveFee}. Hàm \texttt{validateIntent} thực hiện các kiểm tra:
-
-\begin{itemize}
-    \item Hai chuỗi nguồn--đích khác nhau và cùng được hỗ trợ.
-    \item \texttt{amount} là số nguyên dương dạng chuỗi, không tràn.
-    \item \texttt{deadline} thuộc tương lai (so với \texttt{Math.floor(Date.now() / 1000)}).
-    \item \texttt{userAddress} đúng định dạng EVM.
-\end{itemize}
-
-Nếu hợp lệ, gateway sinh \texttt{orderId} (UUID), đặt \texttt{status = QUEUED}, gọi \texttt{orderStore.add()} và phản hồi \texttt{201 Created} kèm \texttt{orderId}. Các route truy vấn (\texttt{GET /api/intent/:id}) đọc trực tiếp từ in-memory OrderStore, tận dụng tính chất tra cứu $O(1)$ của primary index.
-
-\subsubsection*{Stream lifecycle (SSE)}
-
-\texttt{GET /api/intent/:orderId/events} mở một kết nối Server-Sent Events. Handler đăng ký một listener trên \texttt{orderEvents}, lọc theo \texttt{orderId}, và push các \texttt{OrderEvent} xuống client ở định dạng \texttt{text/event-stream}. Khi client ngắt kết nối, listener được tháo gỡ để tránh rò bộ nhớ.
-
-\subsubsection*{Truy vấn execution}
-
-\texttt{GET /api/orchestrator/execution/:matchId} trả về \texttt{ExecutionRecord} cho một match đã (hoặc đang) thực thi. Dữ liệu gồm order chủ tịch (chainKey, orderId, secrets), các responding withdraw, và trạng thái \texttt{pending}/\texttt{done}/\texttt{error}. Endpoint này được frontend dùng để hiển thị giao diện kết quả cuối cùng (txHash trên các chuỗi, người nhận, số tiền).
-
-\subsubsection*{Thao tác on-chain trực tiếp}
-
-Các route dưới \texttt{/api/bridge}, \texttt{/api/htlc}, \texttt{/api/approval} đóng gói các phép nguyên thủy của \texttt{BridgeService}: tạo HTLC, rút, hoàn lại, approve. Chúng \emph{không} đi qua matching engine; đây là kênh thoát hiểm để thực hiện các thao tác đặc thù như debugging, hoặc bridge thủ công khi muốn kiểm thử HTLC mà không cần matching cycle.
-
-\subsubsection{CORS và xác thực}
-
-CORS được mở cho \texttt{FRONTEND\_URL} (cấu hình qua biến môi trường, mặc định \texttt{http://localhost:3000}) với \texttt{credentials: true}. Trong scope MVP, hệ thống không có authentication và rate limiting; bất kỳ ai biết URL đều có thể submit intent. Đây là quyết định có chủ đích để giảm phạm vi của luận văn. Trong production, các tầng xác thực (API key, signature-based authentication, hoặc EIP-4361 Sign-In with Ethereum) sẽ được thêm giữa frontend và gateway.
-
-\subsubsection{Vai trò Risk engine trong intention diagram}
-
-Trong sơ đồ kiến trúc dự kiến, một module \emph{Risk engine} riêng biệt được vẽ giữa API Gateway và Orderbook để kiểm tra các thuộc tính rủi ro (sender bị blocklist, intent vi phạm chính sách, ...). Trong cài đặt hiện tại, vai trò này được hợp nhất vào hàm \texttt{validateIntent} ở route handler, đủ cho scope MVP và testnet. Việc tách Risk engine thành module độc lập kèm các kiểm tra phức tạp như sanction screening hay AML scoring được liệt kê ở Future Work.
+API Gateway là cầu nối cho mọi tương tác giữa frontend và phần
+lõi off-chain (orderbook, matching, execution) đều đi qua tầng này. Cài đặt
+Gateway phục vụ ba nhóm chức năng chính. Trước hết là \emph{submit và truy vấn
+intent}: \texttt{POST /api/intent} nhận intent từ người dùng, 
+\emph{stream lifecycle qua
+Server-Sent Events}: \texttt{GET /api/intent/:orderId/events}
+ mở kết nối SSE,
+đăng ký listener trên \texttt{orderEvents} 
+lọc theo \texttt{orderId} và push các
+\texttt{OrderEvent} xuống client để frontend hiển thị 
+trạng thái thời gian thực.
+Cuối cùng là \emph{truy vấn execution}: 
+\texttt{GET /api/orchestrator/execution/:matchId}
+trả về \texttt{ExecutionRecord} của một match, gồm presiding order, các responding
+withdraw và trạng thái thực thi, phục vụ cho giao diện kết quả cuối cùng (txHash,
+người nhận, số tiền trên các chuỗi).

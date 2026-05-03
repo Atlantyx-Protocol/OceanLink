@@ -1,12 +1,29 @@
 \chapter*{Kết luận}
 \addcontentsline{toc}{chapter}{Kết luận}
 
-Khoá luận đã nghiên cứu bài toán tương tác xuyên chuỗi --- một trong những điểm yếu hệ thống đang tồn tại trong kiến trúc blockchain hiện tại --- và đề xuất \textit{OceanLink Protocol}, một hệ thống bridge dựa trên mô hình intent-based kết hợp mạng ngang hàng. Thay vì lựa chọn cặp đánh đổi quen thuộc \emph{chi phí thấp + tốc độ cao} đi kèm rủi ro bảo mật như phần lớn các bridge thương mại, OceanLink chọn ưu tiên đồng thời \emph{an toàn} và \emph{chi phí thấp}, chấp nhận đánh đổi một phần tốc độ. Lựa chọn này được hiện thực hoá thông qua việc kết hợp matching ngang hàng (lấy cảm hứng từ cơ chế netting nội bộ của Wise) với hashlock và timelock của HTLC, cùng kiến trúc thực thi ba lớp tuần tự (Netting, Accelerator, Fallback) cho phép hạn chế đánh đổi về tốc độ mà không phải hi sinh các tính chất cốt lõi.
+Hệ sinh thái blockchain đang phân mảnh thành nhiều chain độc lập, kéo theo nhu
+cầu chuyển tài sản qua lại ngày càng lớn. Tuy nhiên các giải pháp bridge hiện
+tại phần lớn đánh đổi an toàn để lấy chi phí thấp và tốc độ cao, từ đó trở thành
+mục tiêu của nhiều vụ hack lớn. Xuất phát từ thực trạng đó, KLTN đã đề xuất và
+xây dựng OceanLink Protocol, một hệ thống bridge intent-based ngang hàng đi theo
+hướng ngược lại, giữ an toàn lên hàng đầu nhưng vẫn duy trì chi phí thấp.
 
-\textbf{Đóng góp chính của khoá luận} có thể tóm gọn như sau. Thứ nhất, khoá luận đã phân tích yêu cầu, đề xuất kiến trúc tổng quan onchain/offchain và thiết kế chi tiết tám thành phần cốt lõi của hệ thống --- HTLC Vault, API Gateway, Orderbook, Matching Engine, Liquidity Provider Service, Execution Engine, Fallback Bridge và Event Bus --- cùng mô hình dữ liệu xoay quanh năm thực thể trung tâm \texttt{IntentOrder}, \texttt{CycleMatch}, \texttt{MatchedOrderEntry}, \texttt{MatchResult} và \texttt{ExecutionPlan}. Thứ hai, khoá luận đã đề xuất mô hình thực thi ba lớp và thuật toán giảm chu trình (cycle-reduction) chạy theo tick định kỳ với ngưỡng chấp nhận được, cho phép ghép nối các intent đối ứng ở quy mô orderbook thực tế. Thứ ba, khoá luận đã hiện thực hoá toàn bộ thiết kế thành một sản phẩm hoạt động được trên ba mạng EVM testnet (Sepolia, Arbitrum Sepolia, Base Sepolia), bao gồm backend Fastify/TypeScript và giao diện Next.js cho người dùng cuối. Thứ tư, khoá luận đã đánh giá hệ thống bằng một kịch bản kiểm thử nạp tải sát thực tế, sử dụng 1000 intent thu thập và chuyển đổi từ Dune Analytics, gửi rải đều trong cửa sổ hai giờ qua 24 batch matching.
+KLTN đã thiết kế kiến trúc ba lớp Netting - Accelerator - Fallback. Toàn bộ thiết kế đã được hiện thực hoá thành
+sản phẩm chạy trên ba chain EVM testnet (Ethereum Sepolia, Arbitrum Sepolia,
+Base Sepolia) cùng giao diện người dùng. Khi đánh giá với 1000 intent thu thập
+từ Dune Analytics, hệ thống phục vụ được khoảng 96\% số intent, trong đó riêng
+lớp Netting đã chiếm gần 1/4 với chi phí gần bằng không.
 
-\textbf{Kết quả thực nghiệm} cho thấy mô hình ba lớp phục vụ được 96\% intent với phân bố tải gần với kỳ vọng thiết kế ($\le 1$ điểm phần trăm sai lệch trên cả bốn lớp). Trong số đó, lớp Netting đóng góp xấp xỉ một phần tư tổng tỷ lệ thành công với chi phí gần bằng không cho người dùng, xác nhận luận điểm trung tâm của khoá luận: việc kết hợp matching ngang hàng nội bộ với cơ chế Accelerator và Fallback cho phép phục vụ phần lớn lưu lượng bridge thực tế mà vẫn giữ được tính trust-minimization và chi phí thấp. Số chu trình tìm được trung bình 4.6 cycle/batch khẳng định rằng giả thuyết về sự tồn tại đối ứng tự nhiên giữa các chiều bridge phổ biến --- đặc biệt giữa Ethereum và các Layer 2 --- là có cơ sở thực tiễn chứ không phải kỳ vọng lý thuyết.
+Tuy vậy, hệ thống vẫn còn nhiều hạn chế. Phạm vi triển khai hiện mới dừng ở
+testnet với ba chain EVM, tài sản hỗ trợ giới hạn ở USDC, phần kiểm thử on-chain
+được giả lập qua mock do hạn chế về tài nguyên, và thuật toán matching hiện tại
+còn đơn giản, chưa đảm bảo tối ưu toàn cục.
 
-\textbf{Hạn chế.} Mặc dù kết quả khả quan, hệ thống vẫn còn một số hạn chế cần được nhìn nhận. Thứ nhất, phạm vi triển khai chỉ giới hạn trong testnet và ba blockchain EVM, chưa được kiểm chứng trên mainnet với áp lực thanh khoản và chi phí gas thật. Thứ hai, tài sản được giả định duy nhất là USDC; với các token có thanh khoản phân mảnh hơn, phân bố cycle có thể giảm đáng kể, làm giảm hiệu quả của lớp Netting. Thứ ba, Fallback Bridge Aggregator trong kịch bản kiểm thử được mock thay vì tích hợp thật với Chainlink CCIP hoặc Across; phần 4\% intent expired phản ánh một phần đến từ ràng buộc giả lập này. Thứ tư, thuật toán cycle-reduction hiện tại là một chiến lược tham lam dựa trên DFS, không đảm bảo tối ưu toàn cục về tổng khối lượng được khớp; với quy mô orderbook lớn hơn, các thuật toán xấp xỉ tốt hơn (ví dụ giảm chu trình theo trọng số có ràng buộc thời gian) có thể cải thiện đáng kể tỷ lệ Netting.
-
-\textbf{Hướng phát triển tiếp theo.} Trên cơ sở các kết quả và hạn chế đã nêu, có bốn hướng mở rộng đáng được tiếp tục nghiên cứu. Thứ nhất, mở rộng tập chuỗi được hỗ trợ sang các blockchain non-EVM như Solana, Cosmos hoặc Bitcoin sẽ làm phong phú thêm orderbook và tăng xác suất tìm được chu trình bù trừ, đồng thời đặt ra thách thức kỹ thuật mới về cơ chế hashlock cho các môi trường thực thi khác nhau. Thứ hai, tích hợp thật với CCIP, Across và LayerZero ở lớp Fallback sẽ cho phép đo chính xác chi phí và độ trễ thực tế, đồng thời mở ra khả năng định tuyến thông minh giữa nhiều bridge bên thứ ba dựa trên giá quote tại runtime. Thứ ba, nâng cấp thuật toán matching theo hướng kết hợp với học máy hoặc tối ưu lồi để tận dụng tốt hơn các chu trình dài và các pattern lưu lượng theo thời gian. Thứ tư, mở rộng hệ thống sang các loại tài sản khác (ETH, các stablecoin khác, các token có biến động giá) đòi hỏi mô hình hoá lại trọng số đồ thị theo giá trị tương đối và cơ chế đối phó với biến động giá trong cửa sổ matching. Việc theo đuổi các hướng này sẽ giúp đưa OceanLink từ một sản phẩm chứng minh khả thi trên testnet trở thành một giải pháp khả triển khai cho hệ sinh thái cross-chain trên mainnet.
+Trong tương lai, hệ thống sẽ được mở rộng sang các blockchain non-EVM như Solana
+hay Cosmos để tăng xác suất tìm được chu trình đối ứng, tích hợp thật với các
+bridge thương mại như Chainlink CCIP và LayerZero ở lớp Fallback, đồng thời nâng
+cấp thuật toán matching và mở rộng sang các loại tài sản khác ngoài USDC.
+KLTN cho thấy hướng tiếp cận intent-based ngang hàng là khả thi để
+vừa giữ an toàn vừa giảm chi phí cho bridge cross-chain hy vọng các kết
+quả trong KLTN sẽ là tiền đề để hoàn thiện giao thức và đưa vào mainnet trong
+thời gian tới.

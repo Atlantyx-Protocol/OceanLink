@@ -97,33 +97,40 @@ hiệu quả để đảm bảo sự an toàn.
 
 \subsubsection*{Phân tích giả định tin cậy}
 
-Bốn nhóm messaging protocol nêu trên có thể được nhìn nhận thông qua 
-\textit{trust assumption} đối với tập hợp $n$ thực thể trung gian (validator, relayer, watcher, ...). 
-Hai nhóm state validating và consensus verifying không đặt giả định tin cậy lên bất kỳ trung gian 
-nào, mà dựa trực tiếp vào tính đúng đắn của blockchain nguồn (cryptographic / consensus security).
-Đây là mức bảo đảm cao nhất nhưng đi kèm chi phí triển khai và xác minh cao. 
-Optimistic protocols dựa trên giả định \textit{1-of-n}, 
-tức hệ thống vẫn an toàn miễn là tồn tại ít nhất một watcher trung thực đưa ra 
-fraud proof trong cửa sổ challenge. Đây là một giả định tương đối nhẹ 
-vì chỉ cần một thực thể không bị thoả hiệp là đủ để bảo vệ toàn hệ thống nhưng
-nhược điểm chính là độ trễ lớn do fraud window và sự phụ thuộc vào liveness của watcher. 
-Third-party attestation protocols dựa trên giả định \textit{m-of-n}: 
-giao dịch được coi là hợp lệ khi đủ $m$ trong số $n$ validator đồng thuận xác nhận. 
-Tính an toàn của toàn bộ hệ thống yêu cầu việc tối thiểu $n - m + 1$ thực thể không bị 
-thoả hiệp đồng thời. 
-Đây là giả định yếu và mong manh hơn so với 1-of-n, 
-chỉ cần kẻ tấn công kiểm soát được đa số (hoặc ngưỡng $m$) là toàn bộ tài sản 
-trên bridge có thể bị kiểm soát.
-Các vụ hack bridge nghiêm trọng nhất đều khai thác trực tiếp điểm yếu này.
+Bốn nhóm messaging protocol ở trên có thể được nhìn nhận qua \textit{trust assumption}
+đối với tập hợp $n$ thực thể trung gian (validator, relayer, watcher, ...).
+Mức độ tin cậy mà mỗi mô hình dựa vào tập trung gian này cũng khác nhau dẫn tới các hệ quả cũng khác nhau.
 
-Nhìn chung, có thể nhận thấy một sự đánh đổi rõ ràng giữa các mô hình này, 
-\textit{m-of-n} dễ triển khai, hiệu năng cao nhưng 
-tập trung rủi ro vào một tập hợp nhỏ các bên trung gian, 
-trong khi \textit{1-of-n} an toàn hơn nhưng phải chấp nhận 
-độ trễ và chi phí của cơ chế challenge. 
-Nhận định này là cơ sở quan trọng cho thiết kế đề xuất ở Chương 3,
-ở đó hệ thống hướng tới việc loại bỏ thực thể trung gian cần phải 
-tin cậy thay vì chỉ tăng số lượng tin cậy trong mô hình $m$-of-$n$.
+Phổ biến nhất hiện nay là third-party attestation protocols, hoạt động dưới giả định
+\textit{m-of-n}. Một giao dịch được coi là hợp lệ khi đủ $m$ trong số $n$ validator
+cùng xác nhận. Hệ thống chỉ an toàn khi tối thiểu $n - m + 1$ thực thể không bị
+thoả hiệp đồng thời, hay nói cách khác kẻ tấn công chỉ cần kiểm soát đúng ngưỡng $m$
+là có thể chiếm quyền toàn bộ bridge.
+Khi $n$ nhỏ, ngưỡng này rất dễ vượt qua trong thực tế, chỉ cần đánh cắp khoá riêng
+của vài validator hoặc khai thác một lỗi xác minh chữ ký. 
+Tăng số lượng $n$ cũng không giải quyết triệt để, phần lớn các vụ tấn công lớn trong 
+lịch sử bridge đều khai thác đúng nhóm này, một
+phần vì giả định m-of-n vốn yếu, một phần vì tính độc lập của các bên trong tập $n$
+rất khó để kiểm chứng ngoài thực tế.
+
+Optimistic protocols sử dụng giả định \textit{1-of-n}. Hệ thống an toàn
+miễn là tồn tại tối thiểu một watcher trung thực đưa ra fraud proof trong cửa sổ
+challenge. Giả định này rõ ràng nhẹ hơn m-of-n vì chỉ cần một thực thể không bị thoả hiệp
+là đủ để bảo vệ toàn hệ thống. Tuy nhiên đánh đổi lại là độ trễ của fraud window và sự
+phụ thuộc vào tính liveness của watcher. Ngoài ra, nếu chính cơ chế xác minh on-chain
+bị lỗi thì giả định 1-of-n
+mất hoàn toàn ý nghĩa.
+
+Hai nhóm còn lại, state validating và consensus verifying không cần đặt
+giả định tin cậy lên bất kỳ trung gian nào mà dựa trực tiếp vào tính đúng đắn của
+blockchain nguồn. Về mặt thiết kế, đây là mức bảo đảm chặt nhất, tuy nhiên chi phí
+triển khai và xác minh on-chain rất cao, vì vậy số lượng sản phẩm thương mại còn rất hạn chế.
+
+Có thể thấy mỗi mô hình đều có ưu điểm và nhược điểm riêng giữa độ an toàn, chi phí
+và hiệu năng thực tế. Nhận định này góp phần định hình thiết kế của Chương 3,
+thay vì chạy theo việc tăng $n$ hay siết chặt ngưỡng $m$ trong mô hình $m$-of-$n$,
+KLTN hướng tới loại bỏ hoàn toàn thực thể trung gian cần tin cậy ở khâu xác thực
+giao dịch xuyên chuỗi.
 
 \subsection{Phân loại theo type of operation}
 
