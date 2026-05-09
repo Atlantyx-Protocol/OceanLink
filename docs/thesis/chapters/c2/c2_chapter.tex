@@ -18,12 +18,9 @@ thuận, từ đó đảm bảo tính minh bạch và chống can thiệp.
 Trong các nền tảng tương thích Ethereum Virtual Machine (EVM), smart contract
 thường được viết bằng các ngôn ngữ bậc cao như Solidity hoặc Vyper, sau đó được biên
 dịch sang bytecode để thực thi trên EVM.
-Đối với các hệ thống cross-chain, smart contract đóng vai trò then chốt là nơi khoá
+Đối với các hệ thống cross-chain, smart contract đóng vai trò quan trọng là nơi khoá
 tài sản, xác minh điều kiện giải phóng và phát các sự kiện (event) để các thành phần
-off-chain theo dõi. Trong khoá luận tốt nghiệp (KLTN), smart contract chính là
-thành phần on-chain triển khai giao thức HTLC, chịu trách nhiệm đảm bảo tính nguyên
-tử của các giao dịch xuyên chuỗi mà không cần đặt giả định tin cậy vào bất kỳ bên
-trung gian nào.
+off-chain theo dõi.
 
 \subsection*{Cross-chain bridge}
 
@@ -185,10 +182,11 @@ nhưng đồng thời làm tăng đáng kể độ phức tạp của hệ thố
 
 \subsection{Phân loại}
 
-Để có cái nhìn tổng quan về các kiến trúc bridge hiện nay, 
-KLTN tiến hành phân loại các bridge dựa trên các pattern đã trình bày ở mục 2.2 
+Để có cái nhìn tổng quan về các kiến trúc bridge hiện nay,
+KLTN tiến hành phân loại các bridge dựa trên các pattern đã trình bày ở mục 2.2
+và kế thừa cách hệ thống hoá của Notland ~\cite{notland2024sok},
 theo hai cách phân loại cơ chế truyền thông giữa các chain
-và loại hình vận hành. 
+và loại hình vận hành.
 Kết quả được biểu diễn dưới dạng một bảng, 
 trong đó các cột tương ứng với các 
 messaging protocol (state validating, consensus verifying, third-party attestation, optimistic),
@@ -198,7 +196,7 @@ messaging protocol (state validating, consensus verifying, third-party attestati
   \begin{center}
   \includegraphics[width=\linewidth]{figures/c1/bridge-taxonomy}
   \end{center}
-  \caption{Phân loại các bridge theo pattern tương ứng}
+  \caption{Phân loại các bridge theo pattern tương ứng (nguồn:~\cite{notland2024sok})}
   \label{fig:bridge-taxonomy}
 \end{figure}
 
@@ -231,9 +229,9 @@ phần lớn rủi ro bảo mật.
 
 Mục này khảo sát và phân tích một số bridge tiêu biểu trong từng nhóm cùng các sự 
 cố bảo mật và số liệu thiệt hại đã được ghi nhận trên thực tế. 
-Theo báo cáo của Chainalysis, 
+Theo báo cáo của Chainalysis~\cite{chainalysis2022bridge},
 riêng năm 2022 các vụ tấn công vào bridge đã gây thiệt hại khoảng
-\textbf{2 tỷ USD}, chiếm xấp xỉ 69\% tổng giá trị bị đánh cắp trong các sự cố crypto của năm. 
+\textbf{2 tỷ USD}, chiếm xấp xỉ 69\% tổng giá trị bị đánh cắp trong các sự cố crypto của năm.
 Con số này phản ánh rõ rằng bridge đang là điểm yếu hàng đầu của hệ sinh thái cross-chain.
 
 \subsubsection*{Nhóm third-party attestation ($m$-of-$n$)}
@@ -252,7 +250,7 @@ Tuy nhiên, việc tập $n$ nhỏ và phụ thuộc hoàn toàn vào tính trun
 khiến hệ thống trở nên mong manh trước các cuộc tấn công nhắm vào private key (khóa riêng) của validator.
 Tháng 03/2022, kẻ tấn công đã chiếm quyền kiểm soát 5 trong số 9 validator,
 vừa đủ ngưỡng $m$, sau đó ký phê duyệt (approve) các giao dịch rút giả và gây thiệt hại
-khoảng \textbf{625 triệu USD}. Đây là minh chứng điển hình cho điểm yếu của giả định
+khoảng \textbf{625 triệu USD}~\cite{ronin_postmortem}. Đây là minh chứng điển hình cho điểm yếu của giả định
 $m$-of-$n$ khi $n$ nhỏ.
 
 \paragraph{Wormhole (Solana--Ethereum).}
@@ -268,7 +266,7 @@ của smart contract xác minh chữ ký
 và tính trung thực của tập guardian.
 Tháng 02/2022, một lỗi trong khâu kiểm tra chữ ký của smart contract trên Solana
 (bỏ sót việc xác minh \texttt{sysvar} chuẩn) đã cho phép kẻ tấn công giả mạo VAA
-mà không cần được các guardian ký, gây thiệt hại khoảng \textbf{326 triệu USD}.
+mà không cần được các guardian ký, gây thiệt hại khoảng \textbf{326 triệu USD}~\cite{wormhole_chainalysis}.
 
 \paragraph{Kelp DAO qua LayerZero.}
 LayerZero V2 là một omnichain messaging protocol, trong đó việc xác thực
@@ -285,15 +283,13 @@ một thực thể duy nhất, đồng thời tính sẵn sàng (liveness) của
 yếu tố trọng yếu.
 Tháng 04/2026, Kelp DAO bị tấn công khi đang sử dụng cấu hình 1-of-1 DVN trên
 LayerZero V2. Theo phân tích sau sự cố, kẻ tấn công đã chiếm quyền các node Remote
-Procedure Call (RPC) mà DVN của Kelp dựa vào, đồng thời tiến hành tấn công từ chối
-dịch vụ phân tán (Distributed Denial of Service -- DDoS) các node lành mạnh khác để buộc
+Procedure Call (RPC) mà DVN của Kelp dựa vào, đồng thời tiến hành tấn công DDoS các node khác để buộc
 DVN failover sang đúng các node đã bị thoả hiệp, từ đó ký xác nhận các thông điệp
 cross-chain giả mạo và rút tài sản trên nhiều chain. Tổng thiệt hại ước tính khoảng
-\textbf{292 triệu USD}, được cho là liên quan đến nhóm Lazarus Group.
+\textbf{292 triệu USD}~\cite{kelp_chainalysis}.
 Vụ việc cho thấy mô hình DVN linh hoạt vẫn có thể bị suy giảm xuống mức rủi ro
 tương đương một validator duy nhất nếu ứng dụng cấu hình ngưỡng quá lỏng,
-và an toàn của bridge có thể bị phá vỡ ngay ở tầng hạ tầng (RPC, network) chứ
-không nhất thiết ở tầng smart contract.
+và an toàn của bridge có thể bị phá vỡ ngay ở tầng hạ tầng.
 
 \subsubsection*{Nhóm optimistic ($1$-of-$n$)}
 
@@ -309,7 +305,7 @@ và sự phụ thuộc vào tính
 liveness của watcher.
 Tháng 08/2022, một thay đổi cấu hình của Nomad đã khiến giá trị \texttt{0x00} bị coi
 là một root hợp lệ, kéo theo bất kỳ message nào cũng được chấp thuận mặc định mà
-không cần đi qua quy trình challenge. Vụ việc gây thiệt hại khoảng \textbf{190 triệu USD}
+không cần đi qua quy trình challenge. Vụ việc gây thiệt hại khoảng \textbf{190 triệu USD}~\cite{nomad_immunefi}
 và trở thành một trong những ``hack mở'' lớn nhất khi hàng trăm địa chỉ độc lập đã
 sao chép giao dịch khai thác để tự rút tiền.
 
