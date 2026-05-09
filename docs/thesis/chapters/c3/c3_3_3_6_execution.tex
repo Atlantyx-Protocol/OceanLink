@@ -1,0 +1,141 @@
+% =============================================================================
+% Draft mục 3.3.6 — Execution Engine (Orchestrator + BridgeService)
+% =============================================================================
+
+\subsection{Execution Engine: Orchestrator và BridgeService}
+\label{sec:execution-engine}
+
+Khi Matching Engine gửi các \texttt{MatchResult} chứa các chu trình đã được khớp về mặt logic, 
+công việc còn lại là biến chu trình đó thành các giao dịch trên chuỗi
+tương ứng. Đây chính là vai trò của Execution Engine, được tách thành hai thành phần. 
+\textbf{Orchestrator} chịu trách nhiệm lập kế hoạch và điều phối, 
+còn \textbf{BridgeService} tương tác trực tiếp với contract HTLC trên các chain.
+
+\subsubsection{Quy trình xử lý \texttt{MatchResult}}
+
+Orchestrator nhận một mảng \texttt{MatchResult} từ scheduler và 
+xử lý tuần tự. 
+Với mỗi \texttt{MatchResult}, Orchestrator thực hiện các bước sau:
+
+\begin{enumerate}
+  \item Đánh dấu trạng thái match sang \texttt{pending} và lưu xuống database.
+  \item Phân tích chu trình thành các send action và gom theo chuỗi nguồn cùng người gửi, mỗi nhóm tương ứng với một order multi-fill.
+  \item Tạo presiding order trên chuỗi đầu tiên (sinh các secret và hashlock), tiếp đến tạo các responding order trên các chuỗi còn lại với cùng tập hashlock.
+  \item Khi đã đủ HTLC trên các chain, lần lượt gọi \texttt{withdraw} với preimage tương ứng để chuyển tài sản về người nhận.
+  \item Cập nhật trạng thái match sang \texttt{done} và emit các event lifecycle ra ngoài.
+\end{enumerate}
+
+Nếu bất kỳ bước nào lỗi throw, hệ thống không có rollback on-chain. Các HTLC đã được tạo sẽ tự hoàn lại sau 
+\texttt{timelock} hết hạn (cơ chế refund của hợp đồng — 
+xem \S\ref{sec:smart-contract-layer}).
+
+\subsubsection{Phân tích tính nguyên tử (atomicity)}
+
+Hệ thống đảm bảo không có trường hợp mà một bên nhận tài sản trong khi bên đối ứng mất tài sản. 
+Có bốn case có thể xảy ra sai sót, phân tích để chứng minh tính nguyên tử được duy trì:
+
+\begin{itemize}
+    \item Tạo presiding fail: nếu giao dịch \texttt{newOrder} của presiding fail, không có HTLC nào được tạo và không có tài sản nào bị khoá.
+    \item Tạo responding fail: nếu một responding order fail sau khi presiding đã có mặt trên chuỗi, presiding sẽ ở trạng thái khoá nhưng không ai rút (vì bên đối ứng không có HTLC để rút). Sau \texttt{timelock}, người gửi presiding gọi \texttt{refund} để lấy lại, bên đối ứng cũng không chịu thiệt hại nào vì chưa khoá tài sản.
+    \item Withdraw presiding fail: nếu withdraw fail sau khi mọi HTLC đã được tạo, các HTLC sẽ tự được refund sau timelock như trường hợp trên.
+    \item Withdraw responding fail: presiding đã được rút thành công, secret $s_i$ đã công khai trên chuỗi qua event \texttt{FillWithdrawn} nhưng Orchestrator chưa kịp gọi withdraw cho responding. Đây không phải sự cố làm mất tính nguyên tử vì secret đã hiện hữu on-chain, người nhận của responding (hoặc bất kỳ ai theo dõi event) đều có thể tự gọi withdraw để rút phần của mình. Cờ \texttt{allowWithdrawAfterExpiry} bật khi deploy còn cho phép thao tác này diễn ra ngay cả khi timelock đã hết, đảm bảo các fill responding luôn có thể được claim.
+\end{itemize}
+
+\subsubsection{BridgeService}
+
+BridgeService là thành phần tương tác trực tiếp với smart contract HTLC trên các chain
+qua các thao tác cơ bản (tạo order, withdraw,
+refund, approve).
+Mỗi chain được cấu hình một signer riêng tương ứng với một ví của hệ thống, giúp
+việc mở rộng sang các chain mới trong tương lai trở nên đơn giản, chỉ cần thêm
+cấu hình chain và signer tương ứng mà không phải sửa logic của Orchestrator.
+% -----------------------------------------------------------------------------
+% Mô hình thực thi ba lớp — chuyển từ section riêng vào đây vì Execution
+% Engine là điểm điều phối chiến lược thực thi của một intent.
+% -----------------------------------------------------------------------------
+
+\subsubsection{Mô hình thực thi ba lớp}
+\label{sec:three-layer-model}
+
+Như đã đề cập ở phần dẫn đoạn của chương, intent không qua một con đường xử lý
+duy nhất mà tổ chức việc thanh toán thành
+ba lớp thực thi áp dụng tuần tự.
+Execution Engine thực hiện điều phối cả ba lớp này.
+\subsubsection*{Netting Layer}
+
+Mục tiêu của lớp này là thanh toán bằng cách bù trừ trực tiếp các intent đối ứng, 
+không cần thanh khoản ngoài. Ưu điểm là chi phí gần bằng không (chỉ phí gas), trustles 
+vì không cần solver, chất lượng thực thi tối ưu (không trượt giá). Nhược điểm là phụ thuộc 
+vào sự xuất hiện của intent đối ứng, có thể phải chờ nhiều tick trước khi tìm được match.
+
+\subsubsection*{Intent Accelerator Layer}
+Đây là lớp xử lý phần intent không match được trong Layer đầu tiên bằng
+cách cho phép người dùng đính kèm incentive fee để các solver bên ngoài cạnh tranh
+fill và hưởng phần fee này. Cụ thể cơ chế incentive Dutch auction:
+phí thưởng cho solver bắt đầu bằng không và tăng dần theo thời gian,
+tạo trò chơi giữa thực thi sớm với phần thưởng thấp và chờ phần thưởng
+cao hơn nhưng lại đối mặt rủi ro mất lượt. Khi solver commit, việc settlement cuối vẫn là
+HTLC do BridgeService phát, khác Netting Layer ở nguồn thanh khoản (solver bên ngoài thay vì
+intent nội bộ), không khác ở cơ chế settle. Ưu điểm là tốc độ thực thi gần như tức thời, 
+nhược điểm là chi phí cao hơn Lớp 1 (incentive trả cho solver).
+
+\subsubsection*{Fallback Bridge Aggregator}
+\label{sec:fallback-bridge}
+
+Để đảm bảo tính hoàn thiện của intent, lớp này hoạt động bằng cách định tuyến qua một bridge
+bên thứ ba có thanh khoản thực sự. Tuy nhiên chi phí cao hơn và độ trễ phụ thuộc vào bridge
+bên ngoài.
+
+Trong phạm vi KLTN, \textit{Across Protocol}~\cite{across_docs} được tích hợp làm bridge mặc định cho lớp
+fallback. Across hoạt động theo mô hình intent-based, dựa vào các relayer cạnh tranh để
+fill các yêu cầu chuyển tài sản. Bridge này phù hợp với các cặp Ethereum L1
+$\leftrightarrow$ L2 như Arbitrum, Base hay Optimism, có phí giao dịch thấp và thời gian
+hoàn tất nhanh.
+
+Aggregator được thiết kế không gắn cứng vào một bridge cụ thể, thay vào đó định nghĩa
+một interface chung và mỗi bridge là một adapter cài đặt theo interface đó:
+
+\begin{verbatim}
+interface BridgeAdapter {
+  name: string;
+
+  // Lấy quote: phí, ETA
+  quote(req: QuoteRequest): Promise<QuoteResponse>;
+
+  // gửi giao dịch bridge, trả về txHash trên chuỗi nguồn
+  send(req: SendRequest): Promise<SendResult>;
+
+  // Theo dõi trạng thái của một bridge đang chạy
+  status(handle: BridgeHandle): Promise<BridgeStatus>;
+}
+\end{verbatim}
+
+\subsubsection*{Vòng đời của intent}
+
+Vòng đời một intent qua ba lớp diễn ra theo trình tự sau. 
+Đầu tiên, intent được gửi và xác thực qua API Gatewway sau đó được đưa vào OrderBook với trạng thái \texttt{QUEUED}. 
+Trong cửa sổ thời gian $T_{\text{net}}$, 
+Matching Engine cố tìm cycle ở mỗi tick, nếu tìm được cycle khớp toàn bộ, 
+trạng thái chuyển \texttt{MATCHED}. Nếu khớp một phần, phần khớp được sẽ settle qua matching engine, 
+phần dư trở thành \texttt{PARTIAL} và tiếp tục chờ. 
+Khi cửa sổ $T_{\text{net}}$ đã hết thời gian mà phần dư vẫn còn, 
+intent (hoặc phần dư của nó) được chuyển sang Lớp 2,
+broadcast cho solver, chạy Dutch auction. 
+Nếu một solver commit, phần đó được settle qua cùng kênh HTLC; 
+nếu không, sang Lớp 3. Lớp 3 chọn bridge tốt nhất, 
+phát giao dịch qua adapter và theo dõi đến khi hoàn tất hoặc thất bại và là điểm cuối cùng.
+
+Trật tự leo dần này đảm bảo phần lớn intent hưởng chi phí thấp nhất có thể, một số ít chấp nhận trade-off cho tốc độ, và không có intent nào bị treo vô thời hạn.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/c3/intent-layer}
+  \caption{Vòng đời của một intent qua ba lớp thực thi.}
+  \label{fig:intent-lifecycle}
+\end{figure}
+
+Trong phạm vi triển khai của KLTN, Lớp 1 đã được cài đặt đầy đủ với matching engine, 
+HTLC multi-fill và orchestrator. Đây là phần tập trung của các mục quan trọng nhất
+Lớp 2 được trình bày ở mức thiết kế (interface, Dutch auction incentive, biểu đồ) và cài đặt cụ thể nằm ngoài scope. 
+Lớp 3 đã được tích hợp với Across Protocol làm bridge bên thứ ba mặc định. Việc mở rộng sang 
+các bridge khác để định tuyến tối ưu hơn được liệt kê trong định hướng phát triển tiếp theo.

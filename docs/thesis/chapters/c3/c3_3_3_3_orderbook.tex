@@ -1,0 +1,132 @@
+% =============================================================================
+% Draft mục 3.3.3 — Order Book (OrderStore)
+% =============================================================================
+
+\subsection{Order Book}
+\label{sec:order-book}
+
+\texttt{Order Book} là sổ lệnh của hệ thống, nơi các intent đang active 
+được lưu trữ giữa thời điểm người dùng gửi và thời điểm Matching Engine 
+khớp được chúng. 
+Thành phần này được tổ chức thành hai tầng: dữ liệu đang hoạt động được giữ trong bộ nhớ
+để matching tick truy cập nhanh, đồng thời mọi thay đổi cũng được ghi xuống database
+để không mất dữ liệu khi service khởi động lại.
+
+\subsubsection{Hai tầng dữ liệu}
+
+\subsubsection*{In-memory}
+
+Tầng này là các cấu trúc dữ liệu \texttt{Map}, gồm hydration cấu trúc chính:
+
+\begin{itemize}
+    \item Primary index dạng \texttt{Map<orderId, IntentOrder>} cho tra cứu một order theo định danh trong $O(1)$.
+    \item Pair index dạng \texttt{Map<"src-des", Set<orderId>>} cho tra cứu nhanh tập order đang hoạt động theo cặp chuỗi nguồn - đích trong $O(1)$. Pair index chỉ chứa các order \texttt{QUEUED} hoặc \texttt{PARTIAL}. Khi một order chuyển sang \texttt{MATCHED} hoặc \texttt{EXPIRED}, pair index được xoá tham chiếu tương ứng để Matching Engine không phải lọc lại.
+\end{itemize}
+
+\subsubsection*{Tầng database (Postgres)}
+
+KLTN sử dụng PostgreSQL làm hệ quản trị cơ sở dữ liệu, truy cập qua Drizzle Object-Relational Mapping (ORM). Vì khối lượng dữ liệu của
+hệ thống không quá lớn và phần lớn truy vấn được phục vụ trực tiếp ở
+tầng in-memory, Postgres chủ yếu đóng vai trò lưu trữ bền cho ba bảng chính như
+Hình~\ref{fig:database-schema}: \texttt{intent\_orders}, \texttt{match\_results}
+và \texttt{executions}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\linewidth]{figures/c3/database}
+    \caption{Lược đồ cơ sở dữ liệu của hệ thống.}
+    \label{fig:database-schema}
+\end{figure}
+
+Bảng \texttt{intent\_orders} lưu thông tin của mỗi intent do người dùng gửi vào
+hệ thống. Mỗi dòng tương ứng với một \texttt{IntentOrder}. Các trường số lượng
+(\texttt{amount}, \texttt{incentive\_fee}) được lưu dạng \texttt{text} thay vì
+\texttt{numeric} để giữ độ chính xác tuyệt đối, do lớp matching xử lý các chuỗi
+số nguyên bất kỳ.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|p{8cm}|l|}
+        \hline
+        \textbf{Trường} & \textbf{Mô tả} & \textbf{Kiểu dữ liệu} \\
+        \hline
+        \texttt{order\_id} & Mã định danh duy nhất của intent (khoá chính) & text \\
+        \hline
+        \texttt{src\_chain} & Định danh blockchain nguồn (chain id) & integer \\
+        \hline
+        \texttt{des\_chain} & Định danh blockchain đích & integer \\
+        \hline
+        \texttt{amount} & Số token người dùng muốn chuyển & text \\
+        \hline
+        \texttt{incentive\_fee} & Phí ưu tiên người dùng bỏ ra để được fill nhanh, có thể null & text \\
+        \hline
+        \texttt{deadline} & Mốc thời gian (unix timestamp) intent phải được hoàn tất & integer \\
+        \hline
+        \texttt{created\_at} & Thời điểm intent được tạo & integer \\
+        \hline
+        \texttt{status} & Trạng thái hiện tại của intent (\texttt{QUEUED}, \texttt{PARTIAL}, \texttt{MATCHED}, \texttt{EXPIRED}) & text \\
+        \hline
+        \texttt{user\_address} & Địa chỉ ví của người dùng phát sinh intent & text \\
+        \hline
+    \end{tabular}
+    \caption{Thông tin bảng \texttt{intent\_orders}.}
+    \label{tab:intent-orders}
+\end{table}
+
+Bảng \texttt{match\_results} có vai trò ghi lại các sự kiện match do
+Matching Engine tạo ra. Các trường \texttt{orders}, \texttt{cycles} và
+\texttt{raw\_cycles} được lưu dạng JSONB do hệ thống không cần truy vấn vào nội
+dung của chúng, chỉ đọc lại nguyên bản ghi khi cần.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|p{8cm}|l|}
+        \hline
+        \textbf{Trường} & \textbf{Mô tả} & \textbf{Kiểu dữ liệu} \\
+        \hline
+        \texttt{match\_id} & Mã định danh duy nhất của match (khoá chính) & text \\
+        \hline
+        \texttt{matched\_at} & Thời điểm match được tạo & integer \\
+        \hline
+        \texttt{orders} & Danh sách các intent tham gia match & jsonb \\
+        \hline
+        \texttt{cycles} & Danh sách các chu trình bù trừ được Matching Engine tìm ra & jsonb \\
+        \hline
+        \texttt{raw\_cycles} & Biểu diễn dạng cạnh đồ thị của các chu trình & jsonb \\
+        \hline
+    \end{tabular}
+    \caption{Thông tin bảng \texttt{match\_results}.}
+    \label{tab:match-results}
+\end{table}
+
+Bảng \texttt{executions} lưu trạng thái thực thi của mỗi match. Khác với
+\texttt{match\_results}, bảng này được cập nhật tại chỗ ngay khi Orchestrator
+chuyển trạng thái match từ \texttt{pending} sang \texttt{done} hoặc \texttt{error}.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|p{8cm}|l|}
+        \hline
+        \textbf{Trường} & \textbf{Mô tả} & \textbf{Kiểu dữ liệu} \\
+        \hline
+        \texttt{match\_id} & Mã định danh của match (khoá chính, tham chiếu \texttt{match\_results}) & text \\
+        \hline
+        \texttt{status} & Trạng thái thực thi của match (\texttt{pending}, \texttt{done}, \texttt{error}) & text \\
+        \hline
+        \texttt{data} & Dữ liệu thực thi chi tiết (presiding order, các responding withdraw, txHash trên các chuỗi) & jsonb \\
+        \hline
+        \texttt{error} & Mô tả lỗi khi \texttt{status} là \texttt{error}, có thể null & text \\
+        \hline
+    \end{tabular}
+    \caption{Thông tin bảng \texttt{executions}.}
+    \label{tab:executions}
+\end{table}
+
+
+Với cách tổ chức hai tầng dữ liệu như trên, Order Book vừa đáp ứng được yêu cầu về
+tốc độ truy cập của Matching Engine, vừa đảm bảo dữ liệu các intent, match và execution
+không bị mất khi service gặp sự cố. Hơn nữa, ba bảng \texttt{intent\_orders},
+\texttt{match\_results} và \texttt{executions} cũng tạo thành một nguồn dữ liệu có thể được
+khai thác trong tương lai cho các mục đích như phân tích hành vi
+giao dịch xuyên chuỗi, đánh giá hiệu quả của thuật toán matching hay cải thiện trải
+nghiệm người dùng.

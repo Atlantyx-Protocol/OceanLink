@@ -1,0 +1,59 @@
+% =============================================================================
+% Draft mục 3.3.5 — Liquidity Service
+% =============================================================================
+
+\subsection{Liquidity Service}
+\label{sec:liquidity-service}
+
+Một matching engine chỉ thực sự hữu dụng khi luôn có đủ thanh khoản để tạo thành cycle. Trong thực tế triển khai trên testnet (và trong giai đoạn đầu của một bridge mainnet), số lượng intent đến từ người dùng cuối thường thưa, dẫn đến việc nhiều intent phải chờ rất lâu trước khi tìm được đối tác. Liquidity Service của OceanLink đóng vai trò bù đắp: tự động bơm các lệnh thanh khoản (LP order) do nhà cung cấp thanh khoản phát hành, dưới một cấu trúc kích thước được thiết kế sao cho mọi nhu cầu của người dùng đều có thể được khớp.
+
+\subsubsection{Bài toán: phủ thanh khoản tất định}
+
+Đặt $A_{\max}$ là giới hạn trên của số lượng USDC mà một intent người dùng có thể yêu cầu trong scope của hệ thống (mặc định $A_{\max} = 10\,000$ USDC). Mục tiêu của Liquidity Service là đảm bảo rằng với mọi giá trị $a \in [1, A_{\max}]$, tồn tại một tổ hợp LP order có thể khớp tổng số $a$ trên đúng cặp chuỗi yêu cầu, và dùng ít LP order nhất có thể.
+
+\subsubsection{Cấu trúc luỹ thừa của 2}
+
+Liquidity Service gieo các LP order với mệnh giá là luỹ thừa của 2, tương tự cách tiền giấy được phát hành theo các mệnh giá rời rạc:
+
+\[
+  \mathcal{D} = \{ 2^0, 2^1, 2^2, \dots, 2^{13} \}
+              = \{ 1, 2, 4, 8, \dots, 8192 \}.
+\]
+
+Tổng các phần tử là $2^{14} - 1 = 16\,383 > A_{\max}$. Theo biểu diễn nhị phân của một số tự nhiên, mọi $a \in [1, 16\,383]$ đều bằng tổng một tập con của $\mathcal{D}$, và đây là tập con duy nhất. Hệ quả là matching algorithm chỉ cần chọn (greedy hoặc DP) các LP order có mệnh giá $\le a$ để phủ chính xác lượng $a$, với số lượng order phải dùng nhiều nhất là $\log_2 A_{\max} \approx 14$. Đây là phương pháp chuẩn trong các hệ thống coin selection (ví dụ Bitcoin) và ATM cash dispensing.
+
+So với cách phát hành LP order với mệnh giá tuỳ ý hoặc đồng đều, cấu trúc luỹ thừa của 2 vừa giảm số order cần duy trì ($O(\log A_{\max})$ thay vì $O(A_{\max})$), vừa cho phép phủ tất định: không có giá trị nào trong khoảng $[1, A_{\max}]$ nằm ngoài khả năng phủ.
+
+\subsubsection{Phân bổ wallet LP và cặp chuỗi}
+
+Hệ thống gắn ba ví LP với ba chuỗi nguồn. Ví $B$ trên Ethereum Sepolia tạo các LP order có đích là Base Sepolia và Arbitrum Sepolia. Ví $C$ trên Base Sepolia tạo các LP order có đích là Ethereum Sepolia và Arbitrum Sepolia. Ví $D$ trên Arbitrum Sepolia tạo các LP order có đích là Ethereum Sepolia và Base Sepolia. Như vậy mỗi ví LP có hai cặp chuỗi nguồn--đích, và mỗi cặp được phủ bởi 14 LP order (mỗi mệnh giá một order), tổng cộng $3 \times 2 \times 14 = 84$ LP order luôn được duy trì trong orderbook.
+
+\subsubsection{Pre-approval và refill loop}
+
+Khi khởi động, Liquidity Service thực hiện hai pha. Pha pre-approval cho mỗi ví LP gọi \texttt{approve} lên contract USDC trên chuỗi nguồn của mình, cấp quyền cho hợp đồng HTLC chi tiêu một lượng lớn USDC (mặc định \texttt{type(uint256).max}). Pre-approval một lần duy nhất giúp các giao dịch \texttt{newOrder} sau đó không phải chèn thêm \texttt{approve}, tiết kiệm gas đáng kể; nếu pre-approval thất bại, tiến trình crash để vận hành viên xử lý — không tự động fallback sang lịch trình chậm hơn. Pha seed initial bơm tất cả 84 LP order vào OrderStore. Mỗi LP order là một \texttt{IntentOrder} bình thường với \texttt{userAddress} là địa chỉ ví LP — nghĩa là với matching engine, nó không khác gì một intent người dùng.
+
+Sau đó, một refill loop chạy với chu kỳ \texttt{LP\_REFILL\_INTERVAL\_MS} (mặc định 10\,s). Mỗi vòng, hệ thống quét các LP order đang được active map; với những vị trí mà LP order đã chuyển sang \texttt{MATCHED} hoặc \texttt{EXPIRED}, hệ thống tạo lại một LP order mới cùng mệnh giá để duy trì độ phủ, và ghi lại quan hệ ``key (chuỗi-mệnh giá) $\rightarrow$ orderId hiện tại'' trong cấu trúc \texttt{activeOrders} nội bộ.
+
+Refill loop là cơ chế đảm bảo tính tự lành: khi một LP order được tiêu thụ bởi một cycle, một order thay thế xuất hiện trong chậm nhất 10\,s, không cần sự can thiệp của vận hành viên.
+
+\subsubsection{Lọc LP-vs-LP để tránh self-match}
+
+Một sự cố tiềm năng đáng chú ý là vì LP order trên chuỗi nguồn $X$ có đích $Y$ và LP order trên chuỗi nguồn $Y$ có đích $X$, nếu được đưa trực tiếp vào solver, hai chuỗi LP order ngược chiều có thể tạo thành cycle với nhau, dẫn đến việc các LP ``tự match'' lẫn nhau mà không có người dùng nào hưởng lợi (chỉ tốn gas).
+
+Liquidity Service xử lý điểm này tại \texttt{tick()} của chính nó, không trong solver. Mỗi tick, hệ thống liệt kê các cặp chuỗi $(s, d)$ có user order đang chờ. Khi đưa LP order vào snapshot cho matching engine, chỉ giữ lại các LP order có cặp chuỗi đối ứng $(d, s)$ trùng với một cặp $(s, d)$ trong tập trên — nghĩa là các LP order có thể đóng vai trò ``đối tác'' cho user order đang sống. Các LP order trên cặp chuỗi không có user order tương ứng bị ẩn khỏi solver trong tick đó; chúng vẫn nằm trong OrderStore, chỉ là không tham gia matching cycle này.
+
+Cách lọc đẩy lên service-level (thay vì phải sửa solver) giữ cho solver không biết khái niệm ``LP'' — solver chỉ thấy một đồ thị có hướng. Đây là một quyết định thiết kế quan trọng theo nguyên tắc separation of concerns.
+
+\subsubsection{Chọn LP order cho một user intent}
+
+Hàm \texttt{selectLpOrdersForUsers} (trong \texttt{lpSelector.ts}) nhận tập user intent và tập LP order, trả về tập LP order con tối thiểu cần thiết để phủ chính xác mỗi user amount. Vì LP order có mệnh giá là luỹ thừa của 2 và mỗi mệnh giá xuất hiện đúng một lần trên một cặp chuỗi, việc chọn quy về biểu diễn nhị phân của $a$: với mỗi bit 1 ở vị trí $i$, chọn LP order có mệnh giá $2^i$.
+
+Ví dụ với $a = 700$ USDC:
+$
+700 = 512 + 128 + 32 + 16 + 8 + 4 = 2^9 + 2^7 + 2^5 + 2^4 + 2^3 + 2^2,
+$
+sáu LP order được chọn, phủ chính xác $700$ USDC, không thừa không thiếu. Tính chất này khớp tốt với mô hình HTLC multi-fill: một order consolidated trên chuỗi đích sẽ chứa sáu fill, mỗi fill ứng với một LP order.
+
+\subsubsection{Liên kết với Matching Engine}
+
+LP order về mặt cú pháp không khác gì user intent, nên solver xử lý hỗn hợp LP và user trong cùng một đồ thị. Khác biệt chỉ nằm ở hai điểm. Thứ nhất, LP order có \texttt{userAddress} là ví LP, và Orchestrator nhận diện điều này để dùng signer tương ứng (ví LP) khi tạo HTLC trên chuỗi nguồn. Thứ hai, LP order không kèm \texttt{incentiveFee}, do trọng số cạnh trong solver bằng đúng mệnh giá; điều này làm các cạnh LP có trọng số đều và thấp hơn các intent người dùng có incentive, vì vậy solver có khuynh hướng chọn user intent vào cycle trước, đúng với mục tiêu kinh tế.

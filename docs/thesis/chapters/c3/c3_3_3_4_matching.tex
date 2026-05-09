@@ -1,0 +1,239 @@
+% =============================================================================
+% Draft mục 3.3.4 — Matching Engine
+% Đặt trong c3/ và \input{} vào c3_chapter.tex sau khi rà soát.
+% =============================================================================
+
+\subsection{Matching Engine}
+\label{sec:matching-engine}
+
+Matching Engine là một trong những thành phần quan trọng nhất, đóng vai trò đầu não của hệ thống. 
+Thành phần này nhận đầu vào là tập intent đang chờ matching sau đó
+mô hình hoá nó thành một đồ thị có hướng có trọng số (directed weighted graph), 
+rồi tìm các chu trình (cycle). 
+Đây là cơ chế giúp hệ thống có thể khớp một phần lớn nhu cầu chuyển tài sản P2P
+mà không cần qua các cơ chế như bridge truyền thống.
+Phần này mô tả ba thành phần của engine: cấu trúc dữ liệu, hoạt động điều
+ phối (\texttt{MatchingService} + \texttt{MatchScheduler}), và thành phần trọng tâm 
+ là thuật toán giảm chu trình (cycle-reduction algorithm).
+
+\subsubsection{ Cấu trúc dữ liệu }
+
+Tại một thời điểm bất kỳ, tập các intent đang ở trạng thái
+ \texttt{QUEUED} hoặc \texttt{PARTIAL} được biểu diễn thành một đồ thị
+  có hướng có trọng số $G = (V, E)$. Mỗi đỉnh $v \in V$ là một chain. 
+  Trong phạm vi KLTN, $|V| = 3$ tương ứng với ba chain Ethereum Sepolia, Arbitrum Sepolia và Base Sepolia. 
+  Mỗi cạnh có hướng $e = (u, v, w) \in E$ là một intent order trong đó: 
+  $u$ là chain nguồn, $v$ là chain đích, 
+  $w$ là trọng số của cạnh tương ứng với số lượng USDC cộng với phần 
+  \texttt{incentiveFee} (nếu có). Đồ thị là một multigraph có hướng, 
+  cho phép có thể có nhiều cạnh giữa cùng một cặp đỉnh, 
+  vì trên cùng cặp chuỗi $(u, v)$ có thể có nhiều intent của nhiều người 
+  dùng khác nhau.
+
+Một chu trình có hướng (directed cycle) trong đồ thị $G$
+tương ứng với một vòng đối ứng
+dãy intent $u_1 \to u_2 \to \dots \to u_k \to u_1$ sao cho 
+tổng tài sản chuyển vào và chuyển ra của dãy đó cân bằng nhau.
+Hình \ref{fig:matching-graph} là một minh họa ví dụ của orderbook dưới dạng 
+đồ thị có hướng có trọng số: mỗi đỉnh là một chuỗi, 
+mỗi cạnh là một intent với trọng số là số USDC của mỗi intent, 
+và các chu trình trong đồ thị chính là các lệnh cần khớp.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\linewidth]{figures/c3/graph}
+  \caption{Ví dụ mô hình orderbook là đồ thị có hướng có trọng số}
+  \label{fig:matching-graph}
+\end{figure}
+
+\subsubsection{Các thành phần điều phối}
+
+Hai thành phần cộng tác nhau để chạy việc khớp lệnh định kỳ là \texttt{MatchScheduler} và \texttt{MatchingService}. 
+\texttt{MatchScheduler} là một tác vụ chạy nền, chịu trách nhiệm 
+kích hoạt việc khớp lệnh theo chu kỳ. 
+Thay vì cố gắng
+match từng intent ngay khi vừa được gửi vào hệ thống, 
+MatchScheduler để các intent
+tích luỹ trong một khoảng thời gian ngắn rồi mới gom toàn bộ các intent
+trong Order Book thành một batch và gửi cho
+\texttt{MatchingService} thực thi việc tìm các chu trình bù trừ trên
+batch đó.
+
+Cách làm theo batch theo chu kỳ thay vì xử lý liên tục là yếu tố quan trọng đối với
+hệ thống matching ngang hàng. Khi nhiều intent cùng tồn tại trong cùng một thời điểm,
+khả năng tìm được các chu trình đối ứng (Coincidence of Wants) tăng lên đáng kể, từ
+đó cho phép hệ thống bù trừ tài sản giữa người dùng mà không cần đến nguồn thanh
+khoản bên ngoài. 
+Batch window mặc định 30 giây là sự cân bằng giữa hai phía của bài
+toán: thời gian đủ dài để các intent đối ứng kịp tích luỹ và 
+tăng khả năng hình thành cycle,
+đồng thời đủ ngắn để độ trễ từ lúc gửi intent đến lúc được match vẫn nằm trong
+ngưỡng chấp nhận được với người dùng, không làm trải nghiệm người dùng
+(User Experience -- UX) trở nên tệ hơn.
+Tham số này được cấu hình qua biến môi trường
+\texttt{MATCH\_INTERVAL\_MS}, cho phép điều chỉnh tuỳ theo mật độ giao dịch thực tế. Mỗi tick, \texttt{MatchingService} tương tác với Order Book và Execution Engine theo luồng được mô tả trong Hình~\ref{fig:matching-sequence}, thực thi tuần tự các bước:
+
+\begin{enumerate}
+    \item Lấy dữ liệu từ Order Book, đánh dấu các order có vượt qua thời hạn \texttt{deadline} thành \texttt{EXPIRED} và xoá khỏi pair index.
+    \item Lấy mảng các order còn hoạt động (\texttt{QUEUED} hoặc \texttt{PARTIAL}).
+    \item Chuyển mảng các order từ bước hai thành cấu trúc dữ liệu đồ thị có hướng có trọng số
+    \item Gọi \texttt{runAlgorithm($n$, edges, $x$)}, đây là thuật toán giảm chu trình mô tả ở phần sau.
+    \item Chuyển các chu trình lấy được thành các đối tượng \texttt{MatchResult}, đồng thời cập nhật trạng thái các order liên quan thành \texttt{MATCHED} (đã được match toàn bộ) hoặc \texttt{PARTIAL} (mới được match một phần).
+    \item Lưu các \texttt{MatchResult} xuống cơ sở dữ liệu để phục vụ việc theo dõi trạng thái match, truy vấn lịch sử khớp lệnh và khôi phục dữ liệu khi service khởi động lại.
+    \item MatchScheduler chuyển dữ liệu \texttt{MatchResult} sang Execution Engine để thực thi on-chain.
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{figures/c3/matching-engine}
+    \caption{Biểu đồ tuần tự trong Matching Engine}
+\end{figure}
+
+\subsubsection{Thuật toán giảm chu trình (cycle-reduction)}
+
+Việc tìm các chu trình tối ưu trong đồ thị và cập nhật lại đồ thị sau khi khớp
+thực chất là chức năng của solver trong hệ thống.
+Solver chịu trách nhiệm
+nhận dữ liệu đồ thị từ Matching Engine, 
+chạy thuật toán matching và trả về
+tập các chu trình bù trừ tối ưu nhất theo một tiêu chí định trước. 
+Trong các hệ
+thống lớn, solver thường được tách ra thành một dịch vụ độc lập hoặc
+một mạng các
+solver bên ngoài cạnh tranh với nhau (như mô hình của CoW Protocol~\cite{cow_protocol_docs}),
+cho phép cộng
+đồng đóng góp các thuật toán matching tối ưu hơn theo thời gian.
+Trong phạm vi
+KLTN tự xây dựng một solver đơn giản đủ để thoả mãn yêu cầu, phần mở
+rộng để hỗ trợ solver bên ngoài được xem là hướng phát triển trong tương lai.
+
+Về mặt lý thuyết, bài toán tối đa hoá tổng khối lượng được khớp trên một đồ thị
+bất kỳ là bài toán NP-hard nếu yêu cầu nghiệm tối ưu. Do hệ thống cần chạy thời
+gian thực với chu kỳ 30\,s, solver của KLTN chọn một chiến lược tham lam dựa trên
+tìm kiếm theo chiều sâu (Depth-First Search -- DFS) với một ngưỡng chấp nhận được
+(match threshold).
+
+Ngưỡng được điều khiển qua tham số $x \in [0, 1]$, cấu hình 
+qua \texttt{MATCH\_THRESHOLD} (mặc định $0.3$). 
+Một chu trình $C$ chỉ được khớp nếu
+
+\[
+  \mathrm{ratio}(C) \;=\; \frac{\min_{e \in C} w(e)}{\max_{e \in C} w(e)} \;>\; x.
+\]
+
+Tỉ lệ $\mathrm{ratio}$ đo độ cân bằng của chu trình.
+Khi $\mathrm{ratio} = 1$, mọi cạnh có cùng trọng số, 
+chu trình được khớp hoàn toàn. 
+Khi $\mathrm{ratio}$ rất nhỏ, chu trình có một cạnh có trọng số 
+quá yếu so 
+với các cạnh còn lại có nghĩa chỉ một phần rất nhỏ tài 
+sản có thể được khớp, phần còn dư phải đợi ghép nối tiếp dẫn tới 
+chi phí gas khi thực thi sẽ không đủ bù lại lợi ích. 
+Ngưỡng $x$ là cơ chế tránh khớp các chu trình lệch như vậy.
+
+Việc tìm một chu trình bất kỳ trong đồ thị có hướng được thực hiện 
+bằng DFS tô màu đỉnh với ba màu: trắng (0) cho đỉnh chưa được duyệt, 
+xám (1) cho đỉnh đang nằm trên ngăn xếp DFS hiện tại, 
+và đen (2) cho đỉnh đã duyệt xong, 
+mọi nút (node) con đã được duyệt. 
+Khi DFS tìm thấy một cạnh trỏ đến đỉnh màu xám, một chu trình tồn tại. 
+Thuật toán duy trì một ngăn xếp (stack) cho các cạnh đang ở trên đường
+DFS hiện tại, từ đó dựng lại chu trình bằng cách lấy phần cuối
+của ngăn xếp tính từ cạnh nối đến đỉnh màu xám đó.
+
+Sau khi xác định được một chu trình $C$ thỏa mãn $\mathrm{ratio}(C) > x$, thuật toán
+thực hiện ba thao tác chính sau đây:
+
+\begin{enumerate}
+    \item Lưu trữ dữ liệu các cạnh trong chu trình C tại thời điểm khớp. Đây là dữ liệu phục vụ Execution Engine tạo các \texttt{SendAction}.
+    \item Cạnh có trọng số $w_{\min} = \min_{e \in C} w(e)$ bị xoá khỏi đồ thị, intent tương ứng được đánh dấu \texttt{MATCHED} do đã được sử dụng toàn bộ.
+    \item Các cạnh còn lại trong chu trình $C$ bị giảm trọng số đi đúng $w_{\min}$. Các intent này chuyển sang trạng thái \texttt{PARTIAL} với phần còn lại được giữ trong queue chờ tick sau.
+\end{enumerate}
+
+Sau bước cập nhật, đồ thị mới loại bỏ đi ít nhất một cạnh. Thuật toán lặp lại các bước trên đồ thị mới cho đến khi không còn chu trình nào hoặc chu trình tìm được không thoả mãn ngưỡng.
+Mã giả tổng quát của thuật toán như sau:
+
+\begin{verbatim}
+function runAlgorithm(n, edges, x):
+    capturedCycles <- []
+    repeat:
+        C <- findOneCycle(n, edges)         // DFS three-colour
+        if C is empty: break
+        let w_min = min(edge.w for edge in C)
+        let w_max = max(edge.w for edge in C)
+        if w_min / w_max <= x: break
+        capturedCycles.append( snapshotOf(C) )
+        remove the edge of weight w_min from edges
+        for each remaining edge e in C:
+            e.w <- e.w - w_min
+    return capturedCycles
+\end{verbatim}
+
+Thuật toán đảm bảo dừng vì mỗi vòng lặp loại đúng một cạnh khỏi đồ thị, 
+do đó $|E|$ luôn giảm sau mỗi lần lặp. 
+Thuật toán dừng tối đa sau $|E|$ vòng lặp, 
+vì vậy độ phức tạp là 
+$O(|E| \cdot |V| \cdot |E|) = O(|V| \cdot |E|^2)$. Trong thực tế $|V|$ rất nhỏ (số chain) tổng nên chi phí là chấp nhận được.
+
+Cần lưu ý rằng đây là thuật toán mẫu, đơn giản không bảo đảm tìm được chu trình tốt nhất
+ theo bất kỳ tiêu chí nào (tổng khối lượng, tổng phí incentive, độ dài chu trình ngắn nhất). 
+Thuật toán đơn giản và dễ kiểm chứng, chỉ phụ thuộc vào DFS và phép so sánh trọng số
+Mục đích làm đơn giản việc cài đặt, dễ test, dễ debug. Việc nâng cấp lên thuật toán tối ưu (ví dụ negative-cycle Bellman-Ford hay LP relaxation) được liệt kê trong phần hướng phát triển tiếp theo.
+
+\subsubsection{Ví dụ minh hoạ}
+
+Để dễ hình dung, xét một tình huống cụ thể với ba chuỗi Ethereum, Base, Arbitrum
+và bốn intent đang chờ matching trong cùng một batch như Bảng~\ref{tab:matching-example-input}.
+Ngưỡng được đặt $x = 0.1$.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        \textbf{Intent} & \textbf{Chain nguồn} & \textbf{Chain đích} & \textbf{Số USDC} \\
+        \hline
+        $e_1$ & Ethereum & Base & 10 \\
+        \hline
+        $e_2$ & Base & Ethereum & 2 \\
+        \hline
+        $e_3$ & Base & Arbitrum & 8 \\
+        \hline
+        $e_4$ & Arbitrum & Base & 4 \\
+        \hline
+    \end{tabular}
+    \caption{Bốn intent đang chờ trong batch ví dụ.}
+    \label{tab:matching-example-input}
+\end{table}
+
+\textbf{Vòng 1.} DFS tìm thấy chu trình $\text{Ethereum} \to \text{Base} \to \text{Ethereum}$
+gồm hai intent $e_1$ và $e_2$ với
+$\mathrm{ratio} = \frac{\min(10,2)}{\max(10,2)} = \frac{2}{10} = 0.2 > x$, nên được chấp nhận.
+Solver lưu lại trạng thái của hai cạnh, 
+sau đó loại cạnh nhỏ nhất ($e_2$ với
+trọng số 2) khỏi đồ thị và trừ 2 vào trọng số của $e_1$, 
+đưa $e_1$ về còn 8.
+Như vậy, người dùng với intent $e_2$ được khớp toàn bộ (\texttt{MATCHED}), 
+người dùng với
+$e_1$ được khớp một phần (\texttt{PARTIAL}, còn 8 USDC chờ tick sau).
+
+\textbf{Vòng 2.} Trên đồ thị còn lại, DFS tìm thấy chu trình
+$\text{Base} \to \text{Arbitrum} \to \text{Base}$ gồm $e_3$ và $e_4$ với
+$\mathrm{ratio} = 4/8 = 0.5 > x$, được chấp nhận tiếp. 
+Sau snapshot, $e_4$ bị loại
+và $e_3$ giảm về còn 4.
+
+\textbf{Vòng 3.} Đồ thị còn lại chỉ gồm hai cạnh $e_1$ (giá trị 8) và $e_3$ (giá trị 4). Không tồn
+tại chu trình nào nữa nên thuật toán dừng.
+
+Kết quả của tick là hai chu trình đối ứng được khớp đồng thời, tương ứng với hai
+\texttt{MatchResult}. Phần tài sản chưa được khớp ($e_1$ còn 8 USDC, $e_3$ còn 4 USDC)
+ở lại OrderStore với trạng thái \texttt{PARTIAL} và tiếp tục tham gia các tick sau.
+
+\subsubsection{Liên kết với incentive fee}
+
+\texttt{IntentOrder} cho phép người dùng gửi kèm \texttt{incentiveFee} tuỳ chọn. 
+Trọng số của cạnh khi đó không phải là số USDC ban đầu mà được tính theo:
+
+\[
+  w(e) = \mathrm{amount}(e) + \mathrm{incentiveFee}(e).
+\]

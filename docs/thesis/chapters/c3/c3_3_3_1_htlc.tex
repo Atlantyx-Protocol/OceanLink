@@ -1,0 +1,214 @@
+% =============================================================================
+% Draft mục 3.3.1 — Smart Contract Layer (HTLC)
+% Đặt trong c3/ và \input{} vào c3_chapter.tex sau khi rà soát.
+% =============================================================================
+
+\subsection{Smart Contract Layer (HTLC)}
+\label{sec:smart-contract-layer}
+
+Lớp smart contract là tầng cao nhất quyết định việc chuyển giao tài sản
+giữa các chuỗi. Trong khuôn khổ KLTN, lớp này gồm ba phiên bản giống nhau của hợp
+đồng \texttt{HashedTimelockERC20} được triển khai trên
+các blockchain khác nhau.
+Bên cạnh đó smart contract cài đặt một biến thể multi-fill
+của giao thức HTLC nhằm hỗ trợ giao dịch
+nguyên tử cho cả các vòng khớp lệnh nhiều
+bên do Matching Engine tạo ra.
+
+\subsubsection{Thuật toán HTLC}
+
+HTLC là một thuật toán mật mã đã được phát triển từ lâu nhưng chưa được
+thương mại hoá rộng rãi. Nó được biết đến chủ yếu trong các nghiên cứu
+và một số giao thức thanh toán xuyên chuỗi điển hình như Lightning
+Network~\cite{poon2016lightning} hoặc các giao thức atomic swap giữa Bitcoin và Ethereum,
+song vẫn chưa phổ biến trong các sản phẩm bridge thương mại phổ biến
+hiện nay.
+Mô hình cơ bản giữa hai bên $A$ và $B$ trên hai chuỗi khác nhau được 
+mô tả như sau:
+
+\begin{enumerate}
+  \item Người gửi $A$ tạo một bí mật (secret) ngẫu nhiên $s$ và tính hash $h = \mathcal{H}(s)$, với $\mathcal{H}$ là hàm \texttt{sha256}.
+  \item Phase 1: khởi tạo HTLC trên chuỗi nguồn: $A$ gọi hợp đồng trên chuỗi 1, khoá tài sản với hashlock $h$ và timelock $T_A$; thông tin giao dịch được chuyển sang $B$ qua kênh off-chain.
+  \item Phase 2: khởi tạo HTLC đối ứng trên chuỗi đích: sau khi quan sát được HTLC bên chuỗi 1, $B$ tạo một HTLC tương ứng trên chuỗi 2 với cùng hashlock $h$ và timelock $T_B < T_A$ (để $B$ luôn còn đủ thời gian xử lý nếu $A$ rút trễ).
+  \item Phase 3: $A$ rút tài sản trên chuỗi đích. $A$ cung cấp preimage $s$ cho hợp đồng trên chuỗi 2 và nhận tài sản. Thao tác này sex tiết lộ $s$ on-chain để cho B có thể đọc được.
+  \item Phase 4:  $B$ rút tài sản trên chuỗi nguồn sau khi $s$ đã được công khai, $B$ đọc nó từ event của chuỗi 2 và dùng để rút tài sản đã bị $A$ khoá ở Phase 1. Nếu một trong hai bên không hoàn tất trước timelock tương ứng, hợp đồng cho phép refund tự động.
+\end{enumerate}
+
+Điểm cốt lõi của thuật toán là cùng một preimage $s$ mở khoá được nhiều HTLC khác chuỗi,
+nhờ đó mọi nhánh thanh toán hoặc cùng diễn ra hoặc cùng được hoàn lại.
+Tính nguyên tử được duy trì mà không cần tin cậy bên thứ ba.
+Hình \ref{fig:htlc-sequence} minh hoạ bốn pha trên dưới dạng sequence diagram giữa hai người dùng $A$, $B$ 
+và hai hợp đồng smart contract trên hai chuỗi.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/c3/htlc-sequence}
+  \caption{Biểu đồ tuần tự thuật toán HTLC giữa hai bên trên hai chuỗi}
+  \label{fig:htlc-sequence}
+\end{figure}
+
+\subsubsection{Multi-fill HTLC}
+
+Với thuật toán HTLC chuẩn giả định mỗi hợp đồng tương ứng với một cặp gửi - nhận. 
+Tuy nhiên khi matching theo vòng (cycle netting), 
+trên cùng một chuỗi nguồn có thể có nhiều người nhận khác nhau cần 
+được thanh toán cùng một lúc, mỗi người ứng với một hashlock riêng. 
+Để giảm tải số lượng thao tác onchain, chi phí gas và đơn giản hoá việc điều phối, 
+KTLN mở rộng HTLC theo hướng multi-fill: mỗi Order
+chứa một hoặc nhiều fill (nhánh thanh toán).
+
+Cụ thể, một Order đại diện cho tài sản được một người gửi khoá vào 
+contract, bao gồm địa chỉ người gửi, token, tổng số tiền đã nạp, 
+số tiền còn lại chưa được rút, thời gian khoá 
+(\texttt{timelock}), trạng thái (\texttt{OPEN} hoặc \texttt{REFUNDED}) 
+và số lượng nhánh (\texttt{fillCount}). 
+Trong khi đó, mỗi Fill đại diện cho một nhánh thanh toán bên
+trong order, bao gồm địa chỉ người nhận, số tiền của nhánh, hashlock và
+flag \texttt{claimed}.
+
+Cấu trúc Order - Fill cho phép một giao dịch khoá tiền duy nhất phục vụ nhiều cặp gửi - nhận, mỗi cặp được mở khoá độc lập bằng preimage tương ứng.
+
+\subsubsection{Các chức năng chính}
+
+Hợp đồng cung cấp ba thao tác bên ngoài tương ứng với vòng đời của từng order: \texttt{newOrder}, \texttt{withdraw} và \texttt{refund}.
+
+\subsubsection*{newOrder}
+
+Thao tác này tạo order và đồng thời tạo toàn bộ fill bên trong nó.
+Các tham số đầu vào được mô tả trong Bảng~\ref{tab:newOrder-params}.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|p{10cm}|}
+        \hline
+        \textbf{Tham số} & \textbf{Mô tả} \\
+        \hline
+        \texttt{token} & Địa chỉ ERC-20 của token được khoá trong order \\
+        \hline
+        \texttt{totalAmount} & Tổng số token mà người gửi nạp vào order \\
+        \hline
+        \texttt{timelock} & Mốc thời gian (timestamp) sau đó người gửi có thể \texttt{refund} các fill chưa được claim \\
+        \hline
+        \texttt{receivers} & Mảng địa chỉ người nhận tương ứng với từng fill bên trong order \\
+        \hline
+        \texttt{amounts} & Mảng số token của từng fill, tương ứng với \texttt{receivers} \\
+        \hline
+        \texttt{hashlocks} & Mảng hashlock $h_i = \mathcal{H}(s_i)$ của từng fill, tương ứng với \texttt{receivers} \\
+        \hline
+        \texttt{onBehalfOf} & Địa chỉ người gửi thực sự của order; khi gọi hàm địa chỉ này phải thuộc danh sách admin đã whitelist và token sẽ được kéo từ địa chỉ này \\
+        \hline
+    \end{tabular}
+    \caption{Các tham số của thao tác \texttt{newOrder}.}
+    \label{tab:newOrder-params}
+\end{table}
+
+Contract đầu tiên kiểm tra tính hợp lệ của các tham số đầu vào.
+Sau đó gọi \texttt{transferFrom} để khoá tài sản người dùng vào smart contract,
+ghi lại order, sinh các fill và phát các sự kiện \texttt{OrderCreated} cùng
+\texttt{FillCreated}. Nếu tổng các \texttt{amounts} nhỏ hơn lượng token thực
+sự nhận được (do token có cơ chế fee-on-transfer hoặc người gửi nạp dư),
+phần dư (dust) sẽ được trả lại cho người gửi.
+
+Contract cũng cho phép một địa chỉ admin đã được whitelist
+tạo order thay mặt một người dùng khác qua tham số
+\texttt{onBehalfOf}. Tính năng này được Orchestrator sử dụng 
+để gom nhiều fill cùng chuỗi vào một giao dịch duy nhất, 
+giúp tiết kiệm phí gas. Khi \texttt{onBehalfOf} không phải người gửi (\texttt{msg.sender}), contract yêu cầu \texttt{msg.sender} sẽ kéo token từ địa chỉ \texttt{onBehalfOf}.
+
+\subsubsection*{withdraw}
+
+Thao tác này cho phép người nhận của một fill cụ thể (hoặc một admin) cung cấp
+preimage để rút phần tiền của mình. Các tham số đầu vào được mô tả trong
+Bảng~\ref{tab:withdraw-params}.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|p{10cm}|}
+        \hline
+        \textbf{Tham số} & \textbf{Mô tả} \\
+        \hline
+        \texttt{orderId} & Định danh của order chứa fill cần rút \\
+        \hline
+        \texttt{fillId} & Định danh của fill bên trong order tương ứng với phần tài sản người nhận muốn rút \\
+        \hline
+        \texttt{preimage} & Secret $s$ thoả mãn điều kiện $\mathcal{H}(s) = \text{hashlock}$ của fill \\
+        \hline
+    \end{tabular}
+    \caption{Các tham số của thao tác \texttt{withdraw}.}
+    \label{tab:withdraw-params}
+\end{table}
+
+Contract trước tiên kiểm tra rằng order tồn tại và đang ở trạng thái \texttt{OPEN},
+fill chưa từng được claim trước đó. Quan trọng nhất là điều kiện xác thực preimage
+do người gọi cung cấp khớp với hashlock đã đăng ký từ trước:
+\begin{equation}
+    \mathcal{H}(\text{preimage}) = \text{hashlock}
+    \label{eq:hashlock-check}
+\end{equation}
+Điều kiện này đảm bảo rằng chỉ người thực sự nắm giữ secret tương ứng mới có thể rút
+được phần tài sản của fill. Bên cạnh đó, fill chỉ được phép rút trước \texttt{timelock}.
+Sau khi tất cả các điều kiện trên đều thoả mãn, contract gọi \texttt{safeTransfer}
+để chuyển token cho người nhận. Chức năng còn tích hợp modifier \texttt{nonReentrant} của OpenZeppelin nhằm loại bỏ rủi ro tấn công re-entrancy.
+
+\subsubsection*{refund}
+
+Thao tác này cho phép người gửi (hoặc admin) lấy lại toàn bộ phần tài sản chưa được claim
+sau khi \texttt{timelock} hết hạn. Tham số đầu vào được mô tả trong
+Bảng~\ref{tab:refund-params}.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|p{10cm}|}
+        \hline
+        \textbf{Tham số} & \textbf{Mô tả} \\
+        \hline
+        \texttt{orderId} & Định danh của order cần hoàn lại phần tài sản chưa được claim \\
+        \hline
+    \end{tabular}
+    \caption{Các tham số của thao tác \texttt{refund}.}
+    \label{tab:refund-params}
+\end{table}
+
+Để có thể được refund order phải ở trạng thái \texttt{OPEN} và
+\texttt{timelock} đã hết hạn. Sau đó contract cập nhật trạng
+thái order sang \texttt{REFUNDED} và đặt \texttt{remainingAmount} về 0 trước khi gọi
+\texttt{safeTransfer} chuyển phần token còn lại về cho người gửi. Tương tự
+\texttt{withdraw}, hàm này được bọc bởi modifier \texttt{nonReentrant} để loại bỏ rủi ro
+tấn công re-entrancy. Đây là cơ chế đảm bảo rằng nếu vì bất cứ lý do gì
+ preimage không được công bố trong thời gian khoá, tài sản không bị
+khoá vĩnh viễn.
+
+\subsubsection{Giao dịch nguyên tử cho multi-fill}
+
+Để minh hoạ cách multi-fill HTLC bảo đảm tính nguyên tử cho một vòng khớp lệnh nhiều bên,
+xét một vòng ba chuỗi gồm Ethereum, Base và Arbitrum như mô tả trong
+Hình~\ref{fig:multi-fill}, trong đó tài sản dịch chuyển theo chu trình
+Ethereum $\to$ Base $\to$ Arbitrum $\to$ Ethereum.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.75\linewidth]{figures/c3/multi-fill}
+    \caption{Vòng khớp lệnh theo cho 3 chain khác nhau. }
+    \label{fig:multi-fill}
+\end{figure}
+
+Trong vòng này, Orchestrator gom các nhánh thanh toán cùng chuỗi nguồn vào một
+order duy nhất trên mỗi chuỗi. Một trong các order được chọn làm
+presiding order (trong Hình~\ref{fig:multi-fill} là order trên Ethereum, nét
+xanh lá), các order còn lại đóng vai trò responding order (Base và Arbitrum,
+nét đen).
+Vai trò chính của presiding order là tạo ra secret s.
+Cụ thể, presiding order
+sinh các $s_i$ đồng thời publish các hashlock $h_i = \mathcal{H}(s_i)$ qua event
+\texttt{FillCreated}. Các responding order tái sử dụng đúng các hashlock $h_i$ này khi
+tạo HTLC trên hai chuỗi còn lại, nhờ đó mọi nhánh thuộc cùng một cặp đối ứng trong vòng
+đều bị khoá bởi cùng một secret.
+
+Khi cả ba HTLC đã được khoá trên ba chuỗi, Orchestrator lần lượt gọi \texttt{withdraw}
+với các preimage tương ứng. Mỗi lần \texttt{withdraw} thành công, 
+preimage được phát ra (emit)
+onchain qua event \texttt{FillWithdrawn}, và bất kỳ bên nhận nào ở các chuỗi khác
+cùng chia sẻ hashlock $h_i$ đều có thể đọc được preimage này để tự rút phần của mình.
+Nếu bước nào trong quy trình thất bại, chẳng hạn một HTLC không được khởi tạo kịp hoặc
+preimage không được công bố, các HTLC chưa được rút sẽ tự động được hoàn lại cho người
+gửi sau \texttt{timelock} đảm bảo không có nhánh nào bị khoá vĩnh viễn.

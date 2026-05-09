@@ -1,4 +1,29 @@
 \chapter*{Kết luận}
 \addcontentsline{toc}{chapter}{Kết luận}
 
-Tóm tắt bài toán, giải pháp và các kết quả đạt được
+Hệ sinh thái blockchain đang phân mảnh thành nhiều chain độc lập, kéo theo nhu
+cầu chuyển tài sản qua lại ngày càng lớn. Tuy nhiên các giải pháp bridge hiện
+tại phần lớn đánh đổi an toàn để lấy chi phí thấp và tốc độ cao, từ đó trở thành
+mục tiêu của nhiều vụ hack lớn. Xuất phát từ thực trạng đó, KLTN đã đề xuất và
+xây dựng OceanLink Protocol, một hệ thống bridge intent-based ngang hàng đi theo
+hướng ngược lại, giữ an toàn lên hàng đầu nhưng vẫn duy trì chi phí thấp.
+
+KLTN đã thiết kế kiến trúc ba lớp Netting - Accelerator - Fallback. Toàn bộ thiết kế đã được hiện thực hoá thành
+sản phẩm chạy trên ba chain EVM testnet (Ethereum Sepolia, Arbitrum Sepolia,
+Base Sepolia) cùng giao diện người dùng. Khi đánh giá với 1000 intent thu thập
+từ Dune Analytics, hệ thống phục vụ được khoảng 96\% số intent, trong đó riêng
+lớp Netting đã chiếm gần 1/4 với chi phí gần bằng không.
+
+Tuy vậy, hệ thống vẫn còn nhiều hạn chế. Phạm vi triển khai hiện mới dừng ở
+testnet với ba chain EVM, tài sản hỗ trợ giới hạn ở USDC, phần kiểm thử on-chain
+được giả lập qua mock do hạn chế về tài nguyên, và thuật toán matching hiện tại
+còn đơn giản, chưa đảm bảo tối ưu toàn cục.
+
+Trong tương lai, hệ thống sẽ được mở rộng sang các blockchain non-EVM như Solana
+hay Cosmos để tăng xác suất tìm được chu trình đối ứng, tích hợp thật với các
+bridge thương mại như Chainlink CCIP và LayerZero ở lớp Fallback, đồng thời nâng
+cấp thuật toán matching và mở rộng sang các loại tài sản khác ngoài USDC.
+KLTN cho thấy hướng tiếp cận intent-based ngang hàng là khả thi để
+vừa giữ an toàn vừa giảm chi phí cho bridge cross-chain hy vọng các kết
+quả trong KLTN sẽ là tiền đề để hoàn thiện giao thức và đưa vào mainnet trong
+thời gian tới.

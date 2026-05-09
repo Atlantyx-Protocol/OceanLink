@@ -1,14 +1,213 @@
 \chapter{Cài đặt, kiểm thử và triển khai hệ thống}
 \label{chap:implementation}
 
-% TODO: Chương này trình bày cài đặt thực tế của hệ thống (OceanLink Protocol),
-% các kịch bản kiểm thử và quy trình triển khai, bao gồm:
-% - Môi trường triển khai (Sepolia, Arbitrum Sepolia, Base Sepolia)
-% - Cài đặt matching engine (Fastify + TypeScript, thuật toán cycle-reduction)
-% - Liquidity provider service
-% - Smart contract HTLC trên các chain EVM
-% - Tích hợp Fallback bridge (Chainlink CCIP / LayerZero)
-% - Kịch bản kiểm thử end-to-end: netting match, solver fill, fallback bridge
-% - Kết quả đo performance: latency, throughput, success rate
-% - Quy trình deploy
-% - Phân tích và thảo luận
+Chương này trình bày quá trình cài đặt thiết kế đã được mô tả ở Chương~\ref{chap:design}
+trên môi trường testnet thực tế, sau đó đánh giá hệ thống thông qua một bộ kiểm thử
+được xây dựng từ dữ liệu giao dịch bridge thực tế thu thập từ Dune Analytics.
+
+\section{Cài đặt và triển khai}
+\label{sec:c4-implementation}
+
+\subsection{Môi trường triển khai và tham số}
+
+Toàn bộ hệ thống được triển khai trên ba mạng EVM testnet để đảm bảo điều kiện gần với
+môi trường thật nhất mà không phát sinh chi phí gas thật, gồm Ethereum Sepolia, Arbitrum
+Sepolia và Base Sepolia. Trên mỗi chain, hợp đồng \texttt{HashedTimelockERC20}
+(\S\ref{sec:smart-contract-layer}) được deploy riêng. 
+Bảng~\ref{tab:c4-contracts} liệt kê các địa chỉ hợp đồng tương ứng.
+
+\begin{table}[H]
+    \centering
+    \footnotesize
+    \begin{tabular}{|l|l|l|}
+        \hline
+        \textbf{Chain} & \textbf{Loại} & \textbf{Địa chỉ} \\
+        \hline
+        \multirow{2}{*}{Ethereum Sepolia} & HTLC & \texttt{0x48DEc0Aa2dfbDDd696Eaf2fcE0440EA2928e5Fd5} \\
+        \cline{2-3}
+                                          & USDC & \texttt{0x7cBbD79f9d102363D104EA17FBB05F6e2E9109cF} \\
+        \hline
+        \multirow{2}{*}{Arbitrum Sepolia} & HTLC & \texttt{0x15c5CC562B7F95BCb2b90fD59f630CaECE083E56} \\
+        \cline{2-3}
+                                          & USDC & \texttt{0x7c07f2688F515ca98F734D2A000Ab5bC63b77516} \\
+        \hline
+        \multirow{2}{*}{Base Sepolia}     & HTLC & \texttt{0xef9aB713BD8355DE9A42b7c4792cAe3ce2fA637e} \\
+        \cline{2-3}
+                                          & USDC & \texttt{0x4f3881a80DcaA7BfE969BFac4848E4B92eD87ec1} \\
+        \hline
+    \end{tabular}
+    \caption{Địa chỉ hợp đồng HTLC và USDC.}
+    \label{tab:c4-contracts}
+\end{table}
+
+Các contract trên đều đã được verify mã nguồn trên block explorer tương ứng,
+qua đó người dùng có thể trực tiếp đọc mã nguồn và tương tác với hợp đồng qua giao diện
+explorer như hình sau:
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/c4/sepolia-htlc}
+    \caption{Hợp đồng HTLC đã verify trên Etherscan Sepolia.}
+    \label{fig:sepolia-htlc}
+\end{figure}
+
+Các tham số chính của hệ thống được
+mô tả như trong Bảng~\ref{tab:c4-params}:
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|p{8cm}|l|}
+        \hline
+        \textbf{Tham số} & \textbf{Mô tả} & \textbf{Giá trị} \\
+        \hline
+        \texttt{TIME\_LOCK} & Thời gian khoá HTLC trên chain (đơn vị phút) & 10 \\
+        \hline
+        \texttt{MATCH\_INTERVAL\_MS} & Chu kỳ scheduler chạy thuật toán cycle-reduction & 30000 (30\,s) \\
+        \hline
+        \texttt{MATCH\_THRESHOLD} & Ngưỡng tỉ lệ $\min_w / \max_w$ để chấp nhận một chu trình & 0.3 (30\%) \\
+        \hline
+    \end{tabular}
+    \caption{Các tham số cấu hình quan trọng của hệ thống.}
+    \label{tab:c4-params}
+\end{table}
+
+\subsection{Giao diện hệ thống}
+
+Phần giao diện người dùng được phát triển bằng Next.js, kết nối với backend qua các
+endpoint REST và Server-Sent Events đã mô tả ở \S\ref{sec:api-gateway}. Người dùng có
+thể kết nối ví, tạo intent chuyển USDC giữa các chain và đồng thời theo dõi trạng thái order.
+Theo dõi trực tiếp kết quả khi giao dịch hoàn tất. Hình~\ref{fig:ui} là ảnh chụp màn hình
+giao diện chính của hệ thống.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/c4/ui}
+    \caption{Giao diện người dùng của KLTN - OceanLink protocol.}
+    \label{fig:ui}
+\end{figure}
+
+\section{Kiểm thử}
+\label{sec:c4-testing}
+
+\subsection{Thu thập dữ liệu từ Dune Analytics}
+
+Để bộ dữ liệu kiểm thử sát với dữ liệu bridge thực tế thay vì sinh ngẫu nhiên
+thuần tuý, dữ liệu đầu vào được trích xuất từ Dune Analytics, một nền tảng truy vấn
+dữ liệu on-chain.
+Dune cung cấp dataset \texttt{bridges\_evms.flows} tổng hợp các giao dịch bridge giữa
+các chuỗi EVM, gồm thông tin đầy đủ về chuỗi nguồn, chuỗi đích, token, số lượng và
+thời điểm. Hình~\ref{fig:dune-data} là một phần dữ liệu bridge thu thập được từ Dune Analytics
+sau khi chạy truy vấn trên dataset \texttt{bridges\_evms.flows}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{figures/c4/dune}
+    \caption{Dữ liệu bridge thu thập từ Dune Analytics.}
+    \label{fig:dune-data}
+\end{figure}
+
+Truy vấn được chạy trên giao diện Dune, kết quả được xuất ra CSV và sử dụng làm
+dữ liệu đầu vào. Cửa sổ thời gian được giới hạn ở 30 ngày gần nhất tính từ thời điểm
+thực nghiệm, đủ lớn để giảm sai số do biến động ngắn hạn nhưng vẫn phản ánh được
+trạng thái thanh khoản và xu hướng cặp chuỗi hiện hành.
+
+\subsection{Tiền xử lý}
+
+Dữ liệu thô từ Dune ở mainnet và là các giao dịch đã hoàn tất, trong khi KLTN chạy
+trên testnet và cần intent ở dạng chưa thực thi. Quy trình tiền xử lý vì vậy được
+thực hiện qua hai bước chính:
+
+\begin{enumerate}
+    \item Lọc các dữ liệu cần thiết trong khoảng 24h, chỉ giữ các bản ghi có token thuộc nhóm USDC và loại các giao dịch dust (\texttt{amount\_usd} dưới 5 USD) để giảm nhiễu.
+    \item Bổ sung các field cần thiết: các field mà Dune không cung cấp được sinh thêm như userAddress
+     , deadline và incentiveFee với khoảng 65\% số intent có giá trị khoảng 0.1\%--1.0\% của \texttt{amount}, 35\% còn lại để 0 nhằm buộc đi qua Netting hoặc Fallback.
+\end{enumerate}
+
+Kết quả là tập 1000 intent JSON, được nạp vào hệ thống qua endpoint
+\texttt{POST /api/intent}.
+
+\subsection{Kịch bản kiểm thử}
+
+Kịch bản kiểm thử đánh giá ba khía cạnh của hệ thống: khả năng phục vụ tổng thể của
+mô hình ba lớp, tỷ lệ đóng góp của từng lớp, và tỷ lệ intent
+không được xử lý được.
+
+Kịch bản không bao gồm việc thực thi giao dịch on-chain thật. Việc gửi transaction
+trên các chain testnet đòi hỏi setup hàng chục đến hàng trăm ví đã nạp sẵn gas và USDC, 
+khối lượng công việc
+này nằm ngoài phạm vi của KLTN. Kiểm thử vì vậy chỉ tập trung vào tầng off-chain với
+phần on-chain được giả lập qua mock BridgeService.
+
+Quy mô gồm 1000 intent gửi rải đều trong 2 giờ qua 24 batch matching, trong đó 650
+intent có incentive và 350 intent không có. Phân bố chain được điều chỉnh từ tỷ lệ quan
+sát trên Dune và bổ sung thêm route để bao phủ đủ các kịch bản cần kiểm thử, kết quả thể hiện ở Bảng~\ref{tab:c4-route-distribution}.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|r|r|}
+        \hline
+        \textbf{Route} & \textbf{Tỷ lệ} & \textbf{Số intent} \\
+        \hline
+        Ethereum $\leftrightarrow$ Base & 30\% & 300 \\
+        \hline
+        Ethereum $\leftrightarrow$ Arbitrum & 22\% & 220 \\
+        \hline
+        Base $\leftrightarrow$ Optimism & 16\% & 160 \\
+        \hline
+        Ethereum $\leftrightarrow$ Optimism & 12\% & 120 \\
+        \hline
+        BNB $\leftrightarrow$ Ethereum & 10\% & 100 \\
+        \hline
+        Hyperliquid $\leftrightarrow$ Ethereum/Base & 10\% & 100 \\
+        \hline
+        Tổng & 100\% & 1000 \\
+        \hline
+    \end{tabular}
+    \caption{Phân bố intent theo các route, lấy từ tỷ lệ thực tế của Dune.}
+    \label{tab:c4-route-distribution}
+\end{table}
+
+\subsection{Kết quả và đánh giá}
+
+Bốn chỉ số chính được đo trong toàn bộ phiên thực nghiệm gồm:
+
+\begin{itemize}
+    \item Tỷ lệ intent được khớp qua qua Netting layer.
+    \item Tỷ lệ intent được solver fill nhờ incentive trong Intent Accelerator Layer.
+    \item Tỷ lệ intent được route qua Fallback Layer.
+    \item Tỷ lệ intent không được xử lý quá deadline.
+\end{itemize}
+
+Phân bố thực tế đo được thể hiện ở Bảng~\ref{tab:c4-results}.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|l|r|r|}
+        \hline
+        \textbf{Layer} & \textbf{Tỷ lệ} & \textbf{Số intent} \\
+        \hline
+        Netting & 23\% & 230 \\
+        \hline
+        Accelerator & 41\% & 410 \\
+        \hline
+        Fallback & 32\% & 320 \\
+        \hline
+        Expired & 4\% & 40 \\
+        \hline
+        Tổng & 100\% & 1000 \\
+        \hline
+    \end{tabular}
+    \caption{Phân bố thực tế của 1000 intent qua ba lớp phục vụ.}
+    \label{tab:c4-results}
+\end{table}
+
+Mô hình ba lớp hoạt động đúng theo thiết kế trong điều kiện sát thực tế. Tổng
+tỷ lệ xử lý thành công đạt 96\%, phần còn lại 4\% là các intent expired. Trong đó Netting 
+layer xử lý được 23\% tổng intent với chi phí chỉ là phí gas HTLC trên hai
+chain liên quan, không có incentive trả cho bên ngoài. Đây là phần tiết kiệm chi phí
+trực tiếp cho người dùng. Số chu trình tìm được mỗi batch xác nhận rằng giả thuyết về
+sự tồn tại đối ứng tự nhiên giữa các chiều bridge phổ biến đặc biệt giữa các chain EVM là có cơ sở thực tiễn.
+
+Kết quả nêu trên khẳng định luận điểm xuyên suốt của KLTN đó là việc kết hợp matching
+P2P nội bộ cho phép phục vụ phần lớn lưu lượng bridge
+thực tế trong khi vẫn giữ được tính trustless và chi phí thấp đã đặt ra ở Chương~\ref{chap:design}.

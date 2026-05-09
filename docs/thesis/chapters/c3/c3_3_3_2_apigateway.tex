@@ -1,0 +1,21 @@
+% =============================================================================
+% Draft mục 3.3.2 — API Gateway
+% =============================================================================
+
+\subsection{API Gateway}
+\label{sec:api-gateway}
+
+API (Application Programming Interface) Gateway là tầng trung gian cho mọi
+tương tác giữa frontend và phần lõi off-chain (orderbook, matching, execution),
+phục vụ ba nhóm chức năng chính:
+\begin{itemize}
+  \item Submit và truy vấn intent qua \texttt{POST /api/intent}.
+  \item Stream lifecycle qua \texttt{GET /api/intent/:orderId/events}:
+    mở kết nối Server-Sent Events (SSE), đăng ký listener trên
+    \texttt{orderEvents}, lọc theo \texttt{orderId} và push
+    \texttt{OrderEvent} xuống client để hiển thị trạng thái
+  \item Truy vấn execution qua
+    \texttt{GET /api/orchestrator/execution/:matchId}: trả về
+    \texttt{ExecutionRecord} gồm presiding order, các responding withdraw và
+    trạng thái thực thi, phục vụ hiển thị kết quả cuối cùng.
+\end{itemize}

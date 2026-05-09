@@ -1,0 +1,31 @@
+% =============================================================================
+% Intro của section "Thiết kế chi tiết các thành phần"
+% Đặt ngay sau \section{Thiết kế chi tiết các thành phần} và trước các \input{}
+% =============================================================================
+
+\section{Thiết kế chi tiết các thành phần}
+\label{sec:detailed-components}
+
+Mục 3.2 đã trình bày kiến trúc tổng quan và đặt mỗi thành phần vào một vị trí trên sơ đồ off-chain/on-chain; mục \S\ref{sec:three-layer-model} bổ sung góc nhìn chiến lược thực thi bằng mô hình ba lớp Netting $\rightarrow$ Accelerator $\rightarrow$ Fallback. Hai mục đó trả lời các câu hỏi ``hệ thống có những gì'' và ``một intent đi qua đâu trước, đâu sau''.
+
+Mục này đào sâu vào từng thành phần riêng lẻ. Với mỗi thành phần, khoá luận trình bày trách nhiệm, cấu trúc dữ liệu, các thuật toán cốt lõi, quan hệ tương tác với các thành phần khác và những đánh đổi thiết kế cụ thể đã được lựa chọn. Việc tách rời mỗi thành phần thành một mục con riêng cho phép người đọc tham khảo nhanh từng module mà không phải đọc tuần tự cả chương, đồng thời tránh trùng lặp với các phần dẫn nhập ở trên.
+
+Bảy thành phần được trình bày theo thứ tự đi từ ngoài vào trong, bám sát luồng xử lý của một intent điển hình. Đầu tiên là Smart Contract Layer (HTLC), tầng on-chain và là điểm cuối nơi tài sản thực sự bị khoá và giải phóng; mục này mô tả HTLC chuẩn, biến thể multi-fill của OceanLink, và cách hashlock được chia sẻ giữa các nhánh để đảm bảo tính nguyên tử của một chu trình. Tiếp đến là API Gateway, cổng vào duy nhất của backend, với bốn nhóm route, hàm \texttt{validateIntent}, kênh Server-Sent Events, và cách module Risk engine trong sơ đồ ý đồ được hợp nhất vào tầng này ở quy mô MVP.
+
+Order Book (OrderStore) là sổ lệnh in-memory với cơ chế write-through xuống Postgres. Mục này làm rõ sự phân tách giữa ``nguồn sự thật lúc chạy'' (in-memory) và ``lưu trữ bền'' (database), cũng như quá trình \texttt{hydrate()} khi tiến trình khởi động. Matching Engine là hạt nhân của lớp Netting; mục này mô hình hoá orderbook thành đồ thị có hướng, mô tả vòng lặp điều phối tick, và đặc biệt là thuật toán giảm chu trình (cycle-reduction) với pseudocode, ví dụ minh hoạ và phân tích độ phức tạp.
+
+Execution Engine, gồm Orchestrator và BridgeService, là tầng biến \texttt{MatchResult} thành các giao dịch on-chain. Mục này trình bày mô hình presiding/responding orders, thuật toán \texttt{handleMatchResults} chín bước, và phân tích bốn tình huống lỗi để chứng minh tính nguyên tử được duy trì trong mọi trường hợp. Fallback Bridge Aggregator (chỉ ở mức thiết kế ý đồ) là lớp cuối cùng, định tuyến qua bridge bên thứ ba khi hai lớp trên không xử lý được intent; mục này trình bày interface \texttt{BridgeAdapter} và các bridge ứng cử (Across, LayerZero, Chainlink CCIP), còn cài đặt cụ thể được liệt kê ở Future Work. Cuối cùng, Event Bus và Persistence trình bày hai cơ chế tách biệt cùng đóng vai trò event log: Postgres cho durable state và \texttt{EventEmitter} trong bộ nhớ cho transient pub/sub. Mục này làm rõ tại sao thiết kế này là sự thay thế hợp lý cho một Kafka topic ở quy mô MVP.
+
+Trong mỗi mục con, các trường hợp lỗi và các đánh đổi thiết kế được nêu rõ. Phân tích đánh giá tổng thể (so sánh thuật toán, đo benchmark, so sánh với các bridge khác) được dành cho chương Đánh giá.
+
+% -----------------------------------------------------------------------------
+% Includes — uncomment phần \input dưới đây sau khi đã review từng file con.
+% -----------------------------------------------------------------------------
+
+\input{chapters/c3/c3_3_3_1_htlc}
+\input{chapters/c3/c3_3_3_2_apigateway}
+\input{chapters/c3/c3_3_3_3_orderbook}
+\input{chapters/c3/c3_3_3_4_matching}
+\input{chapters/c3/c3_3_3_6_execution}
+\input{chapters/c3/c3_3_3_7_fallback}
+\input{chapters/c3/c3_3_3_8_eventbus}
