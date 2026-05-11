@@ -2,13 +2,16 @@
  * Directed weighted graph — cycle-reduction algorithm.
  *
  * Given a directed weighted graph and a threshold x, the algorithm repeatedly:
- *   1. Finds any directed cycle using DFS.
+ *   1. Finds a directed cycle using DFS, skipping any cycle already marked
+ *      visited in this run.
  *   2. Computes  ratio = min_w / max_w  for that cycle.
- *   3. If ratio > x:
+ *   3. If ratio ≥ x:
  *        a. Records a snapshot of the cycle (original weights).
  *        b. Removes the edge with weight min_w from the graph.
  *        c. Subtracts min_w from every other edge in the cycle.
- *   4. Stops when no cycle is found or the found cycle's ratio < x (not ≥ x).
+ *      Else (ratio < x): marks the cycle as visited and continues to the next
+ *      cycle (the same cycle will not be returned again).
+ *   4. Stops when findCycle returns no qualifying cycle.
  */
 
 // ---------------------------------------------------------------------------
@@ -35,21 +38,47 @@ export interface EdgeSnapshot {
 // ---------------------------------------------------------------------------
 
 /**
- * Finds one directed cycle in `graph` using depth-first search.
+ * Canonical key for a cycle — sorted edge ids, joined.
+ *
+ * Two findCycle calls may return the same cycle in different traversal orders
+ * (different starting vertex), so order-insensitive equality is needed when
+ * tracking visited cycles. Edge ids are unique within a graph, so the sorted
+ * id list uniquely identifies the cycle's edge set.
+ */
+function cycleKey(cycle: Edge[]): string {
+  return cycle
+    .map((e) => e.id)
+    .sort((a, b) => a - b)
+    .join(',');
+}
+
+/**
+ * Finds one directed cycle in `graph` using depth-first search, skipping
+ * cycles whose canonical key is in `visited`.
  *
  * Classic three-colour scheme:
  *   0 = white  — vertex not yet visited
  *   1 = gray   — vertex is on the current DFS path
  *   2 = black  — vertex fully processed (all descendants explored)
  *
- * A back-edge (to a gray vertex) signals a cycle.  The function reconstructs
- * the cycle by maintaining a stack of edges on the current path.
+ * A back-edge (to a gray vertex) signals a candidate cycle. If the candidate
+ * is already in `visited`, DFS continues without returning so other cycles
+ * still have a chance of being discovered.
  *
- * @returns The edges forming one cycle (in traversal order), or null if the
- *          graph is acyclic.
+ * @returns The edges forming one non-visited cycle (in traversal order), or
+ *          null if no such cycle exists.
  */
-function findCycle(graph: Edge[], numVertices: number): Edge[] | null {
+function findCycle(
+  graph: Edge[],
+  numVertices: number,
+  visited: Set<string>
+): Edge[] | null {
   const color = new Array<number>(numVertices).fill(0);
+
+  // Adjacency list: outgoing edges per source vertex. Built once per call so
+  // DFS avoids scanning the whole edge list at every node.
+  const outEdges: Edge[][] = Array.from({ length: numVertices }, () => []);
+  for (const edge of graph) outEdges[edge.u]!.push(edge);
 
   // Edges on the current DFS path; pushed when descending, popped on backtrack.
   const edgeStack: Edge[] = [];
@@ -57,26 +86,31 @@ function findCycle(graph: Edge[], numVertices: number): Edge[] | null {
   /**
    * DFS from `node`.
    * Returns the "back vertex" (the gray vertex reached by a back-edge) when a
-   * cycle is detected, so the caller can slice edgeStack to recover the cycle.
-   * Returns null when no cycle is reachable from `node`.
+   * non-visited cycle is detected, so the caller can slice edgeStack to
+   * recover it. Returns null when no such cycle is reachable from `node`.
    */
   function dfs(node: number): number | null {
     color[node] = 1; // entering: mark gray
 
-    for (const edge of graph) {
-      if (edge.u !== node) continue; // only outgoing edges from this vertex
-
+    for (const edge of outEdges[node]!) {
       if (color[edge.v] === 1) {
-        // Back-edge → cycle closes here.
-        edgeStack.push(edge); // include the closing back-edge
-        return edge.v; // signal: cycle starts at this gray vertex
+        // Back-edge → candidate cycle. Reconstruct it without mutating the
+        // stack so we can keep searching if it turns out to be visited.
+        const cycleStart = edgeStack.findIndex((e) => e.u === edge.v);
+        const candidate = [...edgeStack.slice(cycleStart), edge];
+        if (!visited.has(cycleKey(candidate))) {
+          edgeStack.push(edge); // commit the closing back-edge
+          return edge.v;
+        }
+        // Visited — drop this back-edge, keep iterating other outgoing edges.
+        continue;
       }
 
       if (color[edge.v] === 0) {
         edgeStack.push(edge);
         const backVertex = dfs(edge.v);
         if (backVertex !== null) return backVertex; // propagate signal upward
-        edgeStack.pop(); // no cycle on this branch — backtrack
+        edgeStack.pop(); // no qualifying cycle on this branch — backtrack
       }
       // color === 2: cross/forward edge — ignore
     }
@@ -88,20 +122,14 @@ function findCycle(graph: Edge[], numVertices: number): Edge[] | null {
   // Launch DFS from every unvisited vertex to cover disconnected components.
   for (let v = 0; v < numVertices; v++) {
     if (color[v] !== 0) continue;
-    // edgeStack is always empty here: every push on a no-cycle path is
-    // matched by a pop, and we return immediately when a cycle is found.
     const backVertex = dfs(v);
     if (backVertex !== null) {
-      // The cycle runs from backVertex (gray) back to itself via the back-edge.
-      // Find the first edge in the stack whose source is backVertex.
       const cycleStart = edgeStack.findIndex((e) => e.u === backVertex);
-      // cycleStart ≥ 0 because backVertex was gray (on the path), so it must
-      // appear as the source of a pushed edge.
       return edgeStack.slice(cycleStart);
     }
   }
 
-  return null; // graph is acyclic
+  return null; // no non-visited cycle remains
 }
 
 // ---------------------------------------------------------------------------
@@ -111,25 +139,47 @@ function findCycle(graph: Edge[], numVertices: number): Edge[] | null {
 /**
  * Runs the cycle-reduction algorithm on a mutable edge list.
  *
- * NOTE on termination:  The algorithm stops as soon as the first cycle it
- * finds does not satisfy ratio ≥ x, i.e. ratio < x (or no cycle exists at all).  Because DFS
- * returns "any" cycle, a non-qualifying cycle found before a qualifying one
- * would cause early termination — an acceptable trade-off given n < 10 and the
- * emphasis on simplicity over completeness.
+ * Termination:
+ *   Each iteration either captures a qualifying cycle (which removes one edge
+ *   from the graph) or marks a non-qualifying cycle as visited (which strictly
+ *   grows the visited set). Both monotonic, both finite — the loop exits when
+ *   findCycle can no longer return a non-visited cycle.
+ *
+ *   Compared to the original behaviour (break on first non-qualifying cycle),
+ *   this finds significantly more matches when the graph contains a mix of
+ *   high- and low-ratio cycles — at the cost of enumerating low-ratio cycles
+ *   too. With small n (vertices = chains, < 10 in practice) the cycle space
+ *   stays small enough that the extra cost is negligible.
  *
  * @param n     Number of vertices (vertices are 0 … n-1).
  * @param edges Mutable edge list — modified in place by the algorithm.
- * @param x     Threshold: a cycle is processed only when its ratio exceeds x.
+ * @param x     Threshold: a cycle is processed only when its ratio ≥ x.
  * @returns     Array of captured cycles; each cycle is a list of EdgeSnapshots
  *              recording (u, v, w) of every edge BEFORE it was modified.
  */
 export function runAlgorithm(n: number, edges: Edge[], x: number): EdgeSnapshot[][] {
   const capturedCycles: EdgeSnapshot[][] = [];
+  const visitedCycles = new Set<string>();
+
+  // Safety cap on inner iterations. With many low-ratio cycles in a dense
+  // graph (e.g. 1000+ orders), the visited set can otherwise grow to
+  // tens of thousands of cycles per outer step. The cap bounds runtime; in
+  // practice the algorithm exits via findCycle returning null long before.
+  const MAX_ITERS = 200_000;
+  let iters = 0;
 
   while (true) {
-    // Step 1 — find any directed cycle.
-    const cycle = findCycle(edges, n);
-    if (!cycle) break; // acyclic → done
+    if (++iters > MAX_ITERS) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[runAlgorithm] iteration cap hit (${MAX_ITERS}); ` +
+          `${capturedCycles.length} cycles captured, |visited|=${visitedCycles.size}`
+      );
+      break;
+    }
+    // Step 1 — find any directed cycle that has not been visited yet.
+    const cycle = findCycle(edges, n, visitedCycles);
+    if (!cycle) break; // no non-visited cycle remains → done
 
     // Step 2 — compute the ratio for this cycle.
     const weights = cycle.map((e) => e.w);
@@ -137,8 +187,11 @@ export function runAlgorithm(n: number, edges: Edge[], x: number): EdgeSnapshot[
     const minW = Math.min(...weights);
     const ratio = minW / maxW;
 
-    // Step 3 — check the threshold.
-    if (ratio < x) break; // cycle doesn't qualify → done
+    // Step 3 — non-qualifying cycle: mark visited and continue searching.
+    if (ratio < x) {
+      visitedCycles.add(cycleKey(cycle));
+      continue;
+    }
 
     // Step 4a — snapshot original weights before any mutation.
     const snapshot: EdgeSnapshot[] = cycle.map((e) => ({
@@ -162,6 +215,19 @@ export function runAlgorithm(n: number, edges: Edge[], x: number): EdgeSnapshot[
     // Step 4d — remove the minimum-weight edge from the graph entirely.
     const graphIdx = edges.indexOf(minEdge);
     edges.splice(graphIdx, 1);
+
+    // The graph mutated. Visited cycles that don't share any edge with this
+    // captured cycle still have unchanged weights and stay correctly
+    // rejected. Visited cycles that DO share an edge may now qualify (if the
+    // shared edge was the cycle's max, the ratio increased) — we drop those
+    // so the next findCycle re-evaluates them.
+    const touchedIds = new Set(cycle.map((e) => e.id));
+    for (const key of visitedCycles) {
+      const ids = key.split(',').map(Number);
+      if (ids.some((id) => touchedIds.has(id))) {
+        visitedCycles.delete(key);
+      }
+    }
   }
 
   return capturedCycles;

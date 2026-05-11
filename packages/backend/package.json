@@ -13,6 +13,7 @@
     "test:algorithm": "tsx --test src/engine/matching/algorithm/algorithm.test.ts",
     "test:matching": "tsx --test src/engine/matching/test/matching.test.ts",
     "test:liquidity": "tsx --test src/engine/liquidity/liquidity.test.ts",
+    "bench:matching": "tsx scripts/bench-matching.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },

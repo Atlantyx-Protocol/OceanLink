@@ -26,3 +26,13 @@ export function getMatchThreshold(): number {
 export function getLpRefillIntervalMs(): number {
   return parseInt(process.env.LP_REFILL_INTERVAL_MS ?? String(DEFAULT_LP_REFILL_INTERVAL_MS), 10);
 }
+
+/**
+ * True when the process is running an offline benchmark / matching simulation
+ * (e.g. scripts/bench-matching.ts). When set, side effects that require
+ * external infrastructure — DB writes in OrderStore, on-chain calls, etc. —
+ * should be skipped. Production code never sets this.
+ */
+export function isTestingMode(): boolean {
+  return process.env.OCEAN_LINK_TESTING === '1' || process.env.OCEAN_LINK_TESTING === 'true';
+}

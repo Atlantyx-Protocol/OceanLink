@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { IntentOrder, MatchResult } from '../types.js';
 import { db, schema, logDbError } from '../../../db/client.js';
+import { isTestingMode } from '../../../config/constants.js';
 
 // ---------------------------------------------------------------------------
 // OrderStore — in-memory cache for intent orders and match results, with
@@ -91,21 +92,23 @@ export class OrderStore {
     }
     this.pairIndex.get(key)!.add(order.orderId);
 
-    void db
-      .insert(schema.intentOrders)
-      .values({
-        orderId: order.orderId,
-        srcChain: order.srcChain,
-        desChain: order.desChain,
-        amount: order.amount,
-        incentiveFee: order.incentiveFee ?? null,
-        deadline: order.deadline,
-        createdAt: order.createdAt,
-        status: order.status,
-        userAddress: order.userAddress,
-      })
-      .onConflictDoNothing()
-      .catch((err) => logDbError('orders.add', err));
+    if (!isTestingMode()) {
+      void db
+        .insert(schema.intentOrders)
+        .values({
+          orderId: order.orderId,
+          srcChain: order.srcChain,
+          desChain: order.desChain,
+          amount: order.amount,
+          incentiveFee: order.incentiveFee ?? null,
+          deadline: order.deadline,
+          createdAt: order.createdAt,
+          status: order.status,
+          userAddress: order.userAddress,
+        })
+        .onConflictDoNothing()
+        .catch((err) => logDbError('orders.add', err));
+    }
   }
 
   get(orderId: string): IntentOrder | undefined {
@@ -121,16 +124,18 @@ export class OrderStore {
     if (!order) return false;
     Object.assign(order, updates);
 
-    void db
-      .update(schema.intentOrders)
-      .set({
-        amount: order.amount,
-        incentiveFee: order.incentiveFee ?? null,
-        status: order.status,
-        deadline: order.deadline,
-      })
-      .where(eq(schema.intentOrders.orderId, orderId))
-      .catch((err) => logDbError('orders.update', err));
+    if (!isTestingMode()) {
+      void db
+        .update(schema.intentOrders)
+        .set({
+          amount: order.amount,
+          incentiveFee: order.incentiveFee ?? null,
+          status: order.status,
+          deadline: order.deadline,
+        })
+        .where(eq(schema.intentOrders.orderId, orderId))
+        .catch((err) => logDbError('orders.update', err));
+    }
     return true;
   }
 
@@ -186,12 +191,14 @@ export class OrderStore {
         count++;
       }
     }
-    for (const id of expiredIds) {
-      void db
-        .update(schema.intentOrders)
-        .set({ status: 'EXPIRED' })
-        .where(eq(schema.intentOrders.orderId, id))
-        .catch((err) => logDbError('orders.expire', err));
+    if (!isTestingMode()) {
+      for (const id of expiredIds) {
+        void db
+          .update(schema.intentOrders)
+          .set({ status: 'EXPIRED' })
+          .where(eq(schema.intentOrders.orderId, id))
+          .catch((err) => logDbError('orders.expire', err));
+      }
     }
     return count;
   }
@@ -203,17 +210,19 @@ export class OrderStore {
   addMatchResult(result: MatchResult): void {
     this.matchResults.push(result);
 
-    void db
-      .insert(schema.matchResults)
-      .values({
-        matchId: result.matchId,
-        matchedAt: result.matchedAt,
-        orders: result.orders,
-        cycles: result.cycles,
-        rawCycles: result.rawCycles,
-      })
-      .onConflictDoNothing()
-      .catch((err) => logDbError('matchResults.add', err));
+    if (!isTestingMode()) {
+      void db
+        .insert(schema.matchResults)
+        .values({
+          matchId: result.matchId,
+          matchedAt: result.matchedAt,
+          orders: result.orders,
+          cycles: result.cycles,
+          rawCycles: result.rawCycles,
+        })
+        .onConflictDoNothing()
+        .catch((err) => logDbError('matchResults.add', err));
+    }
   }
 
   /**
