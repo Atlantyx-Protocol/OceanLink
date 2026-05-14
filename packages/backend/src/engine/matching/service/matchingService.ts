@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { runAlgorithm } from '../algorithm/algorithm.js';
+import { runMaxFlow } from '../algorithm/maxFlow.js';
 import type { Edge, EdgeSnapshot } from '../algorithm/algorithm.js';
 import { orderStore } from '../store/orderStore.js';
 import type { OrderStore } from '../store/orderStore.js';
@@ -56,7 +56,7 @@ export class MatchingService {
      * The matching algorithm to use.  Defaults to the built-in runAlgorithm.
      * Pass a mock here in tests to verify the adapter contract.
      */
-    private readonly algorithmFn: AlgorithmFn = runAlgorithm,
+    private readonly algorithmFn: AlgorithmFn = runMaxFlow,
     /**
      * Ratio threshold for the algorithm.  A cycle is only matched when
      *   min_amount / max_amount  >  threshold
@@ -168,7 +168,17 @@ export class MatchingService {
 
     if (rawCycles.length === 0) return [];
 
-    // -- Step 4: interpret mutations to determine order outcomes ----------
+    // -- Step 4: build per-cycle breakdown FIRST ---------------------------
+    // cycleMapper reads activeOrders[i].amount to identify which order each
+    // snapshot edge corresponds to. Once we start mutating store amounts via
+    // `this.store.update(..., { amount: ... })` below, those amounts get
+    // overwritten with residuals (Object.assign in OrderStore.update mutates
+    // the same object reference activeOrders holds), so the snapshot ↔ order
+    // lookup would fail for any order participating in multiple cycles. Call
+    // cycleMapper here while amounts still reflect the pre-tick originals.
+    const cycles = buildCycleMatches(activeOrders, chainToVertex, rawCycles);
+
+    // -- Step 5: interpret mutations to determine order outcomes ----------
     const remainingIds = new Set(edges.map((e) => e.id));
 
     const matchedEntries: MatchedOrderEntry[] = [];
@@ -231,9 +241,6 @@ export class MatchingService {
     }
 
     if (matchedEntries.length === 0) return [];
-
-    // -- Step 5: build per-cycle breakdown --------------------------------
-    const cycles = buildCycleMatches(activeOrders, chainToVertex, rawCycles);
 
     // -- Step 6: build and persist the MatchResult -----------------------
     const result: MatchResult = {

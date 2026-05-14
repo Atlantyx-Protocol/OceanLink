@@ -41,7 +41,7 @@ và các chu trình trong đồ thị chính là các lệnh cần khớp.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.85\linewidth]{figures/c3/graph}
+  \includegraphics[width=0.6\linewidth]{figures/c3/graph}
   \caption{Ví dụ mô hình orderbook là đồ thị có hướng có trọng số}
   \label{fig:matching-graph}
 \end{figure}
@@ -188,6 +188,8 @@ Ngưỡng được đặt $x = 0.1$.
 
 \begin{table}[H]
     \centering
+    \caption{Bốn intent đang chờ trong batch ví dụ}
+    \label{tab:matching-example-input}
     \begin{tabular}{|c|c|c|c|}
         \hline
         \textbf{Intent} & \textbf{Chain nguồn} & \textbf{Chain đích} & \textbf{Số USDC} \\
@@ -201,8 +203,6 @@ Ngưỡng được đặt $x = 0.1$.
         $e_4$ & Arbitrum & Base & 4 \\
         \hline
     \end{tabular}
-    \caption{Bốn intent đang chờ trong batch ví dụ.}
-    \label{tab:matching-example-input}
 \end{table}
 
 \textbf{Vòng 1.} DFS tìm thấy chu trình $\text{Ethereum} \to \text{Base} \to \text{Ethereum}$

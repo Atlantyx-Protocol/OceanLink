@@ -39,7 +39,23 @@ const CHAIN_ID: Record<string, number> = {
   base: 8453,
   optimism: 10,
   polygon: 137,
+  zksync: 324,
+  hyperliquid: 999,
 };
+
+const CHAIN_NAME: Record<number, string> = Object.fromEntries(
+  Object.entries(CHAIN_ID).map(([name, id]) => [id, name])
+);
+
+// Lower-bound USD filter for dust deposits (matches the preprocessing
+// step described in Chapter 4).
+const MIN_AMOUNT_USD = 5;
+
+// Per-order deadline (seconds from creation). Chosen at 15 min so that orders
+// have a realistic max wait that still comfortably accommodates the HTLC
+// TIME_LOCK of 10 min — past this an order is considered "stale" and would
+// be handed off to the Accelerator/Fallback layer in production.
+const ORDER_DEADLINE_SEC = 15 * 60;
 
 interface Row {
   ts: number; // unix seconds (virtual time from CSV)
@@ -64,7 +80,7 @@ function parseCsv(filePath: string): Row[] {
       continue;
     }
     const amt = Number(amtStr);
-    if (!Number.isFinite(amt) || amt <= 0) {
+    if (!Number.isFinite(amt) || amt < MIN_AMOUNT_USD) {
       skipped++;
       continue;
     }
@@ -97,6 +113,27 @@ function parseCsv(filePath: string): Row[] {
 }
 
 // ---------------------------------------------------------------------------
+// Route distribution (symmetric pairs)
+// ---------------------------------------------------------------------------
+
+function reportRouteDistribution(rows: Row[]): void {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const a = CHAIN_NAME[r.src] ?? `chain${r.src}`;
+    const b = CHAIN_NAME[r.des] ?? `chain${r.des}`;
+    const key = a < b ? `${a}<->${b}` : `${b}<->${a}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const total = rows.length;
+  const sorted = [...counts.entries()].sort((x, y) => y[1] - x[1]);
+  console.log('\n=== Route distribution (symmetric pairs) ===');
+  for (const [route, n] of sorted) {
+    console.log(`  ${route.padEnd(24)}  ${String(n).padStart(5)}   ${((100 * n) / total).toFixed(1)}%`);
+  }
+  console.log(`  ${'TOTAL'.padEnd(24)}  ${String(total).padStart(5)}   100.0%`);
+}
+
+// ---------------------------------------------------------------------------
 // Single bench run
 // ---------------------------------------------------------------------------
 
@@ -105,8 +142,10 @@ interface BenchResult {
   matched: number;
   partial: number;
   queued: number;
+  expired: number;
   matchedVolumeUsd: number;
   totalVolumeUsd: number;
+  expiredVolumeUsd: number;
   ticks: number;
   avgLatencySec: number; // mean (matchedAt - createdAt) for matched orders
   p50LatencySec: number;
@@ -133,7 +172,7 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
       srcChain: row.src,
       desChain: row.des,
       amount: row.amount,
-      deadline: virtualNow + 365 * 24 * 3600, // effectively no expiry in the window we care about
+      deadline: virtualNow + ORDER_DEADLINE_SEC,
       createdAt: virtualNow,
       status: 'QUEUED',
       userAddress: '0xbenchuser',
@@ -142,12 +181,30 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
     store.add(order);
   };
 
+  // Virtual-clock expiry: order.deadline is in virtual seconds, but
+  // store.expireStale() uses wall clock (Date.now). Walk the internal map and
+  // flip stale ones to EXPIRED ourselves, against the current bucket boundary.
+  const expireStaleVirtual = (now: number): number => {
+    const internal = (store as unknown as { orders: Map<string, IntentOrder> }).orders;
+    let n = 0;
+    for (const o of internal.values()) {
+      if ((o.status === 'QUEUED' || o.status === 'PARTIAL') && o.deadline < now) {
+        o.status = 'EXPIRED';
+        store.removeFromPairIndex(o.orderId);
+        n++;
+      }
+    }
+    return n;
+  };
+
   while (i < rows.length) {
     const bucketEnd = baseTs + (bucketIdx + 1) * windowSec;
     while (i < rows.length && rows[i]!.ts < bucketEnd) {
       insertOrder(rows[i]!, i, rows[i]!.ts);
       i++;
     }
+
+    expireStaleVirtual(bucketEnd);
 
     const active = store.getActiveOrders();
     if (active.length > 0) {
@@ -165,12 +222,19 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
     ticks++;
   }
 
+  // Final sweep: any orders whose deadline passed during the last bucket(s)
+  // still need to be flipped to EXPIRED before tallying.
+  const finalNow = baseTs + bucketIdx * windowSec;
+  expireStaleVirtual(finalNow);
+
   // Tally outcomes from the OrderStore + match-result history.
   let matched = 0;
   let partial = 0;
   let queued = 0;
+  let expired = 0;
   let matchedVolume = 0;
   let totalVolume = 0;
+  let expiredVolume = 0;
   const allOrders: IntentOrder[] = (store as unknown as { orders: Map<string, IntentOrder> }).orders
     ? [...(store as unknown as { orders: Map<string, IntentOrder> }).orders.values()]
     : [];
@@ -178,7 +242,10 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
     totalVolume += Number(o.amount); // for partial / queued this is the *remaining* amount
     if (o.status === 'MATCHED') matched++;
     else if (o.status === 'PARTIAL') partial++;
-    else queued++;
+    else if (o.status === 'EXPIRED') {
+      expired++;
+      expiredVolume += Number(o.amount);
+    } else queued++;
   }
   // For a true volume baseline, sum the original amounts from the CSV.
   const baselineVolume = rows.reduce((s, r) => s + Number(r.amount), 0);
@@ -210,8 +277,10 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
     matched,
     partial,
     queued,
+    expired,
     matchedVolumeUsd: matchedVolume,
     totalVolumeUsd: baselineVolume,
+    expiredVolumeUsd: expiredVolume,
     ticks,
     avgLatencySec: latencies.length
       ? latencies.reduce((s, x) => s + x, 0) / latencies.length
@@ -255,7 +324,9 @@ function main(): void {
       `total volume = $${totalVol.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
   );
 
-  const windows = [5, 10, 15, 20, 30, 60, 120];
+  reportRouteDistribution(rows);
+
+  const windows = [5, 30, 60, 120];
   const thresholds = [0, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95];
 
   // Run every (window, threshold) combo once and reuse for both tables.
@@ -293,13 +364,10 @@ function main(): void {
   // ---------- Detailed breakdown for a few representative configs ----------
   console.log('\n=== Detailed breakdown for representative configs ===');
   const configs: Array<[number, number]> = [
-    [5, 0],
-    [5, 0.5],
-    [5, 0.9],
-    [15, 0.3],
-    [30, 0.5],
-    [60, 0.8],
-    [120, 0.9],
+    [60, 0.3],
+    [60, 0.5],
+    [30, 0.3],
+    [120, 0.3],
   ];
   for (const [w, t] of configs) {
     const r = bench(rows, w, t);
@@ -311,9 +379,11 @@ function main(): void {
     console.log(
       `\n  window=${w}s threshold=${t}` +
         `\n    matched=${r.matched}/${r.total} (${((100 * r.matched) / r.total).toFixed(1)}%)` +
-        `, partial=${r.partial}, queued=${r.queued}` +
+        `, partial=${r.partial}, queued=${r.queued}, expired=${r.expired}` +
         `\n    volume settled = $${r.matchedVolumeUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} / $${r.totalVolumeUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} ` +
         `(${((100 * r.matchedVolumeUsd) / r.totalVolumeUsd).toFixed(1)}%)` +
+        `\n    volume expired = $${r.expiredVolumeUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} ` +
+        `(${((100 * r.expiredVolumeUsd) / r.totalVolumeUsd).toFixed(1)}%)` +
         `\n    latency: avg=${r.avgLatencySec.toFixed(1)}s, p50=${r.p50LatencySec}s, p95=${r.p95LatencySec}s` +
         `\n    cycles: ${cyclesStr}` +
         `\n    ticks=${r.ticks}, runtime=${r.elapsedMs}ms`

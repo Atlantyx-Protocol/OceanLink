@@ -68,9 +68,9 @@ nghĩa vụ.
 Tuy nhiên, mô hình HTLC vẫn gặp hạn chế về khả năng mở rộng và khó áp dụng trong các hệ 
 thống hiện nay.
 
-\section{Các pattern phân loại bridge}
+\section{Các mẫu phân loại bridge}
 
-\subsection{Phân loại theo messaging protocol}
+\subsection{Phân loại theo giao thức truyền tin (messaging protocol)}
 
 Các bridge có thể được phân loại dựa trên cách mà chain đích xác minh trạng thái hoặc giao dịch 
 từ chain nguồn. Dựa trên mức độ tin cậy khác nhau giữa các bên tham gia, chia thành bốn nhóm chính, 
@@ -112,8 +112,8 @@ hiệu quả để đảm bảo sự an toàn.
 
 \subsubsection*{Phân tích giả định tin cậy}
 
-Bốn nhóm messaging protocol ở trên có thể được nhìn nhận qua \textit{trust assumption}
-đối với tập hợp $n$ thực thể trung gian (validator, relayer, watcher, ...).
+Bốn nhóm giao thức truyền tin ở trên có thể được nhìn nhận qua \textit{trust assumption}
+đối với tập hợp $n$ thực thể trung gian (validator, relayer, watcher, v.v.).
 Mức độ tin cậy mà mỗi mô hình dựa vào tập trung gian này cũng khác nhau dẫn tới các hệ quả cũng khác nhau.
 
 Phổ biến nhất hiện nay là third-party attestation protocols, hoạt động dưới giả định
@@ -139,7 +139,7 @@ mất hoàn toàn ý nghĩa.
 Hai nhóm còn lại, state validating và consensus verifying không cần đặt
 giả định tin cậy lên bất kỳ trung gian nào mà dựa trực tiếp vào tính đúng đắn của
 blockchain nguồn. Về mặt thiết kế, đây là mức bảo đảm chặt nhất, tuy nhiên chi phí
-triển khai và xác minh on-chain rất cao, vì vậy số lượng sản phẩm thương mại còn rất hạn chế.
+triển khai và xác minh on-chain cao, vì vậy số lượng sản phẩm thương mại còn hạn chế.
 
 Có thể thấy mỗi mô hình đều có ưu điểm và nhược điểm riêng giữa độ an toàn, chi phí
 và hiệu năng thực tế. Nhận định này góp phần định hình thiết kế của Chương 3,
@@ -147,9 +147,9 @@ thay vì chạy theo việc tăng $n$ hay siết chặt ngưỡng $m$ trong mô 
 KLTN hướng tới loại bỏ hoàn toàn thực thể trung gian cần tin cậy ở khâu xác thực
 giao dịch xuyên chuỗi.
 
-\subsection{Phân loại theo type of operation}
+\subsection{Phân loại theo loại hoạt động (type of operation)}
 
-Bên cạnh messaging protocol, bridge còn được phân loại theo cách thức xử lý tài sản 
+Bên cạnh giao thức truyền tin, bridge còn được phân loại theo cách thức xử lý tài sản
 và giao dịch giữa các chain.
 
 \subsubsection*{Liquidity networks}
@@ -183,20 +183,20 @@ nhưng đồng thời làm tăng đáng kể độ phức tạp của hệ thố
 \subsection{Phân loại}
 
 Để có cái nhìn tổng quan về các kiến trúc bridge hiện nay,
-KLTN tiến hành phân loại các bridge dựa trên các pattern đã trình bày ở mục 2.2
+KLTN tiến hành phân loại các bridge dựa trên các mẫu đã trình bày ở mục 2.2
 và kế thừa cách hệ thống hoá của Notland ~\cite{notland2024sok},
 theo hai cách phân loại cơ chế truyền thông giữa các chain
 và loại hình vận hành.
 Kết quả được biểu diễn dưới dạng một bảng, 
 trong đó các cột tương ứng với các 
-messaging protocol (state validating, consensus verifying, third-party attestation, optimistic),
+giao thức truyền tin (state validating, consensus verifying, third-party attestation, optimistic),
  còn các hàng tương ứng với các loại bridge (liquidity network, token bridge, coordination protocol).
 
 \begin{figure}[H]
   \begin{center}
   \includegraphics[width=\linewidth]{figures/c1/bridge-taxonomy}
   \end{center}
-  \caption{Phân loại các bridge theo pattern tương ứng (nguồn:~\cite{notland2024sok})}
+  \caption{Phân loại các bridge theo mẫu tương ứng (nguồn:~\cite{notland2024sok})}
   \label{fig:bridge-taxonomy}
 \end{figure}
 
@@ -269,7 +269,7 @@ Tháng 02/2022, một lỗi trong khâu kiểm tra chữ ký của smart contrac
 mà không cần được các guardian ký, gây thiệt hại khoảng \textbf{326 triệu USD}~\cite{wormhole_chainalysis}.
 
 \paragraph{Kelp DAO qua LayerZero.}
-LayerZero V2 là một omnichain messaging protocol, trong đó việc xác thực
+LayerZero V2 là một giao thức truyền tin omnichain, trong đó việc xác thực
 thông điệp cross-chain được uỷ quyền cho một tập hợp \textit{Decentralized
 Verifier Network} (DVN) do mỗi ứng dụng tự cấu hình. Mỗi thông điệp được coi
 là hợp lệ khi đủ ngưỡng $m$-of-$n$ DVN ký xác nhận, tuỳ thuộc vào cấu hình
