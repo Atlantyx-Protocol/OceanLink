@@ -46,6 +46,8 @@ số nguyên bất kỳ.
 
 \begin{table}[H]
     \centering
+    \caption{Thông tin bảng \texttt{intent\_orders}}
+    \label{tab:intent-orders}
     \begin{tabular}{|l|p{8cm}|l|}
         \hline
         \textbf{Trường} & \textbf{Mô tả} & \textbf{Kiểu dữ liệu} \\
@@ -69,8 +71,6 @@ số nguyên bất kỳ.
         \texttt{user\_address} & Địa chỉ ví của người dùng phát sinh intent & text \\
         \hline
     \end{tabular}
-    \caption{Thông tin bảng \texttt{intent\_orders}.}
-    \label{tab:intent-orders}
 \end{table}
 
 Bảng \texttt{match\_results} có vai trò ghi lại các sự kiện match do
@@ -80,6 +80,8 @@ dung của chúng, chỉ đọc lại nguyên bản ghi khi cần.
 
 \begin{table}[H]
     \centering
+    \caption{Thông tin bảng \texttt{match\_results}}
+    \label{tab:match-results}
     \begin{tabular}{|l|p{8cm}|l|}
         \hline
         \textbf{Trường} & \textbf{Mô tả} & \textbf{Kiểu dữ liệu} \\
@@ -95,8 +97,6 @@ dung của chúng, chỉ đọc lại nguyên bản ghi khi cần.
         \texttt{raw\_cycles} & Biểu diễn dạng cạnh đồ thị của các chu trình & jsonb \\
         \hline
     \end{tabular}
-    \caption{Thông tin bảng \texttt{match\_results}.}
-    \label{tab:match-results}
 \end{table}
 
 Bảng \texttt{executions} lưu trạng thái thực thi của mỗi match. Khác với
@@ -105,6 +105,8 @@ chuyển trạng thái match từ \texttt{pending} sang \texttt{done} hoặc \te
 
 \begin{table}[H]
     \centering
+    \caption{Thông tin bảng \texttt{executions}}
+    \label{tab:executions}
     \begin{tabular}{|l|p{8cm}|l|}
         \hline
         \textbf{Trường} & \textbf{Mô tả} & \textbf{Kiểu dữ liệu} \\
@@ -118,8 +120,6 @@ chuyển trạng thái match từ \texttt{pending} sang \texttt{done} hoặc \te
         \texttt{error} & Mô tả lỗi khi \texttt{status} là \texttt{error}, có thể null & text \\
         \hline
     \end{tabular}
-    \caption{Thông tin bảng \texttt{executions}.}
-    \label{tab:executions}
 \end{table}
 
 

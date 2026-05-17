@@ -27,7 +27,7 @@ Với mỗi \texttt{MatchResult}, Orchestrator thực hiện các bước sau:
 
 Nếu bất kỳ bước nào lỗi throw, hệ thống không có rollback on-chain. Các HTLC đã được tạo sẽ tự hoàn lại sau 
 \texttt{timelock} hết hạn (cơ chế refund của hợp đồng — 
-xem \S\ref{sec:smart-contract-layer}).
+xem Mục~\ref{sec:smart-contract-layer}).
 
 \subsubsection{Phân tích tính nguyên tử (atomicity)}
 
@@ -88,8 +88,8 @@ bên ngoài.
 
 Trong phạm vi KLTN, \textit{Across Protocol}~\cite{across_docs} được tích hợp làm bridge mặc định cho lớp
 fallback. Across hoạt động theo mô hình intent-based, dựa vào các relayer cạnh tranh để
-fill các yêu cầu chuyển tài sản. Bridge này phù hợp với các cặp Ethereum L1
-$\leftrightarrow$ L2 như Arbitrum, Base hay Optimism, có phí giao dịch thấp và thời gian
+fill các yêu cầu chuyển tài sản. Bridge này phù hợp với các cặp Ethereum L1 -- L2
+như Arbitrum, Base hay Optimism, có phí giao dịch thấp và thời gian
 hoàn tất nhanh.
 
 Aggregator được thiết kế không gắn cứng vào một bridge cụ thể, thay vào đó định nghĩa

@@ -7,12 +7,12 @@
 \label{sec:smart-contract-layer}
 
 Lớp smart contract là tầng cao nhất quyết định việc chuyển giao tài sản
-giữa các chuỗi. Trong khuôn khổ KLTN, lớp này gồm ba phiên bản giống nhau của hợp
+giữa các chuỗi. Lớp này gồm ba phiên bản của hợp
 đồng \texttt{HashedTimelockERC20} được triển khai trên
 các blockchain khác nhau.
 Bên cạnh đó smart contract cài đặt một biến thể multi-fill
-của giao thức HTLC nhằm hỗ trợ giao dịch
-nguyên tử cho cả các vòng khớp lệnh nhiều
+của thuật toán HTLC nhằm hỗ trợ giao dịch
+nguyên tử cho các vòng khớp lệnh nhiều
 bên do Matching Engine tạo ra.
 
 \subsubsection{Thuật toán HTLC}
@@ -79,6 +79,8 @@ Các tham số đầu vào được mô tả trong Bảng~\ref{tab:newOrder-para
 
 \begin{table}[H]
     \centering
+    \caption{Các tham số của thao tác \texttt{newOrder}}
+    \label{tab:newOrder-params}
     \begin{tabular}{|l|p{10cm}|}
         \hline
         \textbf{Tham số} & \textbf{Mô tả} \\
@@ -98,8 +100,6 @@ Các tham số đầu vào được mô tả trong Bảng~\ref{tab:newOrder-para
         \texttt{onBehalfOf} & Địa chỉ người gửi thực sự của order; khi gọi hàm địa chỉ này phải thuộc danh sách admin đã whitelist và token sẽ được kéo từ địa chỉ này \\
         \hline
     \end{tabular}
-    \caption{Các tham số của thao tác \texttt{newOrder}.}
-    \label{tab:newOrder-params}
 \end{table}
 
 Contract đầu tiên kiểm tra tính hợp lệ của các tham số đầu vào.
@@ -123,6 +123,8 @@ Bảng~\ref{tab:withdraw-params}.
 
 \begin{table}[H]
     \centering
+    \caption{Các tham số của thao tác \texttt{withdraw}}
+    \label{tab:withdraw-params}
     \begin{tabular}{|l|p{10cm}|}
         \hline
         \textbf{Tham số} & \textbf{Mô tả} \\
@@ -134,8 +136,6 @@ Bảng~\ref{tab:withdraw-params}.
         \texttt{preimage} & Secret $s$ thoả mãn điều kiện $\mathcal{H}(s) = \text{hashlock}$ của fill \\
         \hline
     \end{tabular}
-    \caption{Các tham số của thao tác \texttt{withdraw}.}
-    \label{tab:withdraw-params}
 \end{table}
 
 Contract trước tiên kiểm tra rằng order tồn tại và đang ở trạng thái \texttt{OPEN},
@@ -158,6 +158,8 @@ Bảng~\ref{tab:refund-params}.
 
 \begin{table}[H]
     \centering
+    \caption{Các tham số của thao tác \texttt{refund}}
+    \label{tab:refund-params}
     \begin{tabular}{|l|p{10cm}|}
         \hline
         \textbf{Tham số} & \textbf{Mô tả} \\
@@ -165,8 +167,6 @@ Bảng~\ref{tab:refund-params}.
         \texttt{orderId} & Định danh của order cần hoàn lại phần tài sản chưa được claim \\
         \hline
     \end{tabular}
-    \caption{Các tham số của thao tác \texttt{refund}.}
-    \label{tab:refund-params}
 \end{table}
 
 Để có thể được refund order phải ở trạng thái \texttt{OPEN} và
