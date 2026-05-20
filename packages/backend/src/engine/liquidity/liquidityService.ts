@@ -12,30 +12,22 @@ import {
 } from '../../config/constants.js';
 import { selectLpOrdersForUsers } from './lpSelector.js';
 
-// ---------------------------------------------------------------------------
-// Liquidity Market Service
-//
-// Maintains deterministic liquidity coverage by creating power-of-2 orders
-// for each LP on their assigned chain routes.  On startup every order is
-// seeded; a periodic refill loop recreates any that get matched or expire.
+// liquidity market service — seeds power-of-2 LP orders per route and
+// refills them after matches/expiries. tick() filters LP orders to prevent
+// LP<->LP self-matching.
 //
 // LP assignments (from env private keys):
-//   B → Ethereum Sepolia   (creates orders TO Base & Arbitrum Sepolia)
-//   C → Base Sepolia       (creates orders TO Ethereum & Arbitrum Sepolia)
-//   D → Arbitrum Sepolia   (creates orders TO Ethereum & Base Sepolia)
-//
-// Important: LP orders on opposite routes would match against each other
-// if fed into the algorithm together.  The `tick()` method prevents this
-// by only including LP counter-orders for routes that have user orders.
-// ---------------------------------------------------------------------------
+//   B → Ethereum Sepolia   (orders TO Base & Arbitrum Sepolia)
+//   C → Base Sepolia       (orders TO Ethereum & Arbitrum Sepolia)
+//   D → Arbitrum Sepolia   (orders TO Ethereum & Base Sepolia)
 
-// Chain IDs derived from chain config
+// chain IDs derived from chain config
 const SEPOLIA = getChainConfig('sepolia')!.chainId;
 const BASE_SEPOLIA = getChainConfig('baseSepolia')!.chainId;
 const ARBITRUM_SEPOLIA = getChainConfig('arbitrumSepolia')!.chainId;
 
-// Powers of 2 from 2^0 to 2^13  (all <= 10 000)
-// Sum = 16 383, so any integer amount in [1, 10 000] can be covered.
+// powers of 2 from 2^0 to 2^13 (all <= 10 000)
+// sum = 16 383, so any integer amount in [1, 10 000] can be covered
 export const POWER_OF_TWO_AMOUNTS = Array.from({ length: 14 }, (_, i) => 2 ** i);
 
 export interface LPConfig {
@@ -45,10 +37,7 @@ export interface LPConfig {
   desChainIds: number[];
 }
 
-/**
- * Build LP configs from environment private keys.
- * Throws if any key is missing.
- */
+// build LP configs from env private keys; throws if any key is missing
 export function loadLPConfigsFromEnv(): LPConfig[] {
   const defs = [
     { name: 'B', envKey: 'PRIVATE_KEY_B', src: SEPOLIA, des: [BASE_SEPOLIA, ARBITRUM_SEPOLIA] },
@@ -64,7 +53,7 @@ export function loadLPConfigsFromEnv(): LPConfig[] {
 }
 
 export class LiquidityService {
-  private readonly activeOrders = new Map<string, string>(); // key → orderId
+  private readonly activeOrders = new Map<string, string>(); // key -> orderId
   private readonly lpAddresses: Set<string>;
   private matchTimer: ReturnType<typeof setInterval> | null = null;
   private refillTimer: ReturnType<typeof setInterval> | null = null;
@@ -78,8 +67,6 @@ export class LiquidityService {
     this.lpAddresses = new Set(lpConfigs.map((lp) => lp.address));
   }
 
-  // ---- Key helpers ----------------------------------------------------------
-
   private orderKey(address: string, src: number, des: number, amount: number): string {
     return `${address}-${src}-${des}-${amount}`;
   }
@@ -88,9 +75,7 @@ export class LiquidityService {
     return Math.floor(Date.now() / 1000) + LP_DEADLINE_SECONDS;
   }
 
-  // ---- Core logic -----------------------------------------------------------
-
-  /** Seed the full set of liquidity orders for every LP + route + amount. */
+  // seed the full set of liquidity orders for every LP + route + amount
   seed(): { created: number; skipped: number } {
     let created = 0;
     let skipped = 0;
@@ -109,7 +94,7 @@ export class LiquidityService {
     return { created, skipped };
   }
 
-  /** Check every tracked slot and recreate consumed / expired orders. */
+  // recreate any consumed or expired slots
   refill(): number {
     let refilled = 0;
     for (const lp of this.lpConfigs) {
@@ -127,26 +112,16 @@ export class LiquidityService {
     return refilled;
   }
 
-  // ---- Matching tick --------------------------------------------------------
-
-  /**
-   * Run a matching tick that only matches user orders against LP counter-orders.
-   * Prevents LP→LP self-matching by filtering: only LP orders whose route is
-   * the reverse of a user order are included in the matching pass.
-   *
-   * Selection strategy: for each user order of amount A, pick the LP
-   * counter-orders whose amounts form the binary decomposition of A (e.g.
-   * A=10 → 8+2 → 2 LP orders, not 1+2+4+3). This yields the minimum number
-   * of cycles and avoids unnecessary partials.
-   *
-   * Call this instead of `matchingService.runTick()` when liquidity is active.
-   */
+  // matching tick that only pairs user orders against LP counter-orders.
+  // LP orders are picked via binary decomposition of each user amount
+  // (A=10 -> 8+2) to minimize cycles. use this instead of runTick() when
+  // liquidity is active.
   tick(): TickStats {
     const expired = this.store.expireStale();
     const allActive = this.store.getActiveOrders();
     const queuedBefore = allActive.length;
 
-    // Separate user orders from LP orders
+    // separate user orders from LP orders
     const userOrders = allActive.filter((o) => !this.lpAddresses.has(o.userAddress));
 
     let matchResults: MatchResult[] = [];
@@ -156,7 +131,7 @@ export class LiquidityService {
       matchResults = this.service.runMatchingPass([...userOrders, ...selectedLpOrders]);
     }
 
-    // Refill any LP orders that were consumed
+    // refill any LP orders that were consumed
     this.refill();
 
     const queuedAfter = this.store.getActiveOrders().length;
@@ -170,23 +145,17 @@ export class LiquidityService {
     return { queuedBefore, expired, matchResults, matchedOrders, partialOrders, queuedAfter };
   }
 
-  // ---- Lifecycle ------------------------------------------------------------
-
-  /**
-   * Verify that every LP has a near-max USDC allowance for the HTLC contract
-   * on its source chain. Throws listing every missing pair — approvals must be
-   * pre-arranged (the bridge signer is admin, not the LP, and cannot approve
-   * on the LP's behalf).
-   */
+  // verify every LP has a near-max USDC allowance for the HTLC contract on
+  // its source chain. throws listing all missing pairs — approvals must be
+  // pre-arranged since admin cannot approve on the LP's behalf.
   async verifyApprovals(): Promise<void> {
     const chainIdToKey = new Map<number, string>();
     for (const [key, cfg] of Object.entries(getAllChainConfigs())) {
       chainIdToKey.set(cfg.chainId, key);
     }
 
-    // Any allowance large enough to exceed a realistic total pull counts as
-    // "approved max". 2^200 is well below MaxUint256 and well above any
-    // plausible sum of LP amounts.
+    // 2^200 sits well below MaxUint256 but above any plausible total pull,
+    // so anything >= MIN_ALLOWANCE counts as "approved max"
     const MIN_ALLOWANCE = 2n ** 200n;
     const missing: string[] = [];
 
@@ -217,7 +186,7 @@ export class LiquidityService {
     console.log(`[LiquidityService] Verified approvals for ${this.lpConfigs.length} LP(s)`);
   }
 
-  /** Verify approvals, seed all orders, and start the matching + refill loops. */
+  // verify approvals, seed all orders, then start the matching + refill loops
   async start(): Promise<void> {
     await this.verifyApprovals();
 
@@ -246,7 +215,7 @@ export class LiquidityService {
       }, matchIntervalMs);
     }
 
-    // Separate refill loop for expired orders (runs independently of matching)
+    // separate refill loop for expired orders, runs independently of matching
     if (this.refillTimer === null) {
       this.refillTimer = setInterval(() => this.refill(), this.refillIntervalMs);
     }
@@ -268,26 +237,19 @@ export class LiquidityService {
     console.log('[LiquidityService] Stopped');
   }
 
-  /** Whether an address belongs to an LP. */
   isLPAddress(address: string): boolean {
     return this.lpAddresses.has(address);
   }
 
-  // ---- Internal -------------------------------------------------------------
-
-  /**
-   * Creates an LP order if the slot is not currently covered by an active order.
-   * Returns true when a new order was created.
-   */
+  // creates an LP order if the slot isn't currently covered; returns true on create
   private createIfMissing(address: string, src: number, des: number, amount: number): boolean {
     const key = this.orderKey(address, src, des, amount);
     const existingId = this.activeOrders.get(key);
 
     if (existingId) {
       const existing = this.store.get(existingId);
-      // Only skip if the order is still QUEUED at its original amount.
-      // PARTIAL orders have a reduced amount and no longer cover the slot,
-      // so we recreate a fresh order with the full power-of-2 amount.
+      // only skip if the order is still QUEUED at its original amount.
+      // PARTIAL orders no longer cover the slot, so recreate at full amount.
       if (existing && existing.status === 'QUEUED') {
         return false;
       }
@@ -311,8 +273,6 @@ export class LiquidityService {
     );
     return false;
   }
-
-  // ---- Diagnostics ----------------------------------------------------------
 
   get trackedCount(): number {
     return this.activeOrders.size;

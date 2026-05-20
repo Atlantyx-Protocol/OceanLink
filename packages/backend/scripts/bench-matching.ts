@@ -1,23 +1,11 @@
-// ---------------------------------------------------------------------------
-// Offline matching-engine benchmark.
+// offline matching-engine benchmark: replays a CSV of bridge deposits through
+// MatchingService and reports matching rate over a (window, threshold) grid.
+// time is virtual (CSV timestamps bucket into runMatchingPass calls), so a
+// 1-hour CSV runs in well under a second. no DB/wallet/on-chain side effects —
+// OCEAN_LINK_TESTING is set before importing OrderStore.
 //
-// Replays a CSV of historical bridge deposits through MatchingService and
-// reports the matching rate (and a few related metrics) for a grid of
-// (window, threshold) configurations.
-//
-// Time is purely virtual: orders are bucketed by their CSV timestamp, not by
-// wall clock. Each bucket is fed to MatchingService.runMatchingPass(), so a
-// 1-hour CSV completes in well under a second of CPU.
-//
-// No DB / wallet / on-chain side effects. The OCEAN_LINK_TESTING flag is set
-// before importing OrderStore so DB writes are short-circuited.
-//
-// Usage:
-//   pnpm --filter @ocean-link/backend run bench:matching [csv_path]
-//
-// Default csv_path: data/bridge_data.mapped.clean.peak_hour.csv (relative to
-// the monorepo root).
-// ---------------------------------------------------------------------------
+// usage: pnpm --filter @ocean-link/backend run bench:matching [csv_path]
+// default csv: data/bridge_data.mapped.clean.peak_hour.csv (from monorepo root).
 
 process.env.OCEAN_LINK_TESTING = '1';
 
@@ -29,9 +17,7 @@ import { OrderStore } from '../src/engine/matching/store/orderStore.js';
 import { MatchingService } from '../src/engine/matching/service/matchingService.js';
 import type { IntentOrder } from '../src/engine/matching/types.js';
 
-// ---------------------------------------------------------------------------
-// CSV row → IntentOrder mapping
-// ---------------------------------------------------------------------------
+// CSV row to IntentOrder mapping
 
 const CHAIN_ID: Record<string, number> = {
   ethereum: 1,
@@ -47,18 +33,15 @@ const CHAIN_NAME: Record<number, string> = Object.fromEntries(
   Object.entries(CHAIN_ID).map(([name, id]) => [id, name])
 );
 
-// Lower-bound USD filter for dust deposits (matches the preprocessing
-// step described in Chapter 4).
+// dust filter (matches Chapter 4 preprocessing).
 const MIN_AMOUNT_USD = 5;
 
-// Per-order deadline (seconds from creation). Chosen at 15 min so that orders
-// have a realistic max wait that still comfortably accommodates the HTLC
-// TIME_LOCK of 10 min — past this an order is considered "stale" and would
-// be handed off to the Accelerator/Fallback layer in production.
+// per-order deadline: 15 min comfortably exceeds the 10 min HTLC TIME_LOCK.
+// past this an order is "stale" and would fall through to Accelerator/Fallback.
 const ORDER_DEADLINE_SEC = 15 * 60;
 
 interface Row {
-  ts: number; // unix seconds (virtual time from CSV)
+  ts: number; // unix seconds, virtual time from CSV
   src: number;
   des: number;
   amount: string;
@@ -90,7 +73,7 @@ function parseCsv(filePath: string): Row[] {
       skipped++;
       continue;
     }
-    // "2026-04-10 12:18:39.000 UTC" → ISO
+    // "2026-04-10 12:18:39.000 UTC" -> ISO
     const iso = tsStr.replace(' UTC', 'Z').replace(' ', 'T');
     const tMs = Date.parse(iso);
     if (Number.isNaN(tMs)) {
@@ -112,9 +95,7 @@ function parseCsv(filePath: string): Row[] {
   return rows;
 }
 
-// ---------------------------------------------------------------------------
-// Route distribution (symmetric pairs)
-// ---------------------------------------------------------------------------
+// route distribution (symmetric pairs)
 
 function reportRouteDistribution(rows: Row[]): void {
   const counts = new Map<string, number>();
@@ -133,9 +114,7 @@ function reportRouteDistribution(rows: Row[]): void {
   console.log(`  ${'TOTAL'.padEnd(24)}  ${String(total).padStart(5)}   100.0%`);
 }
 
-// ---------------------------------------------------------------------------
-// Single bench run
-// ---------------------------------------------------------------------------
+// single bench run
 
 interface BenchResult {
   total: number;
@@ -147,7 +126,7 @@ interface BenchResult {
   totalVolumeUsd: number;
   expiredVolumeUsd: number;
   ticks: number;
-  avgLatencySec: number; // mean (matchedAt - createdAt) for matched orders
+  avgLatencySec: number; // mean (matchedAt - createdAt) over matched orders
   p50LatencySec: number;
   p95LatencySec: number;
   cyclesByLength: Record<number, number>;
@@ -164,7 +143,7 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
   let i = 0;
   let ticks = 0;
 
-  // Track creation times so we can compute matching latency from match results
+  // track creation times for latency
   const createdAtById = new Map<string, number>();
   const insertOrder = (row: Row, idx: number, virtualNow: number) => {
     const order: IntentOrder = {
@@ -181,9 +160,8 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
     store.add(order);
   };
 
-  // Virtual-clock expiry: order.deadline is in virtual seconds, but
-  // store.expireStale() uses wall clock (Date.now). Walk the internal map and
-  // flip stale ones to EXPIRED ourselves, against the current bucket boundary.
+  // virtual-clock expiry: store.expireStale uses wall clock, so flip stale
+  // orders to EXPIRED ourselves against the current bucket boundary.
   const expireStaleVirtual = (now: number): number => {
     const internal = (store as unknown as { orders: Map<string, IntentOrder> }).orders;
     let n = 0;
@@ -208,10 +186,8 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
 
     const active = store.getActiveOrders();
     if (active.length > 0) {
-      // The matching service stamps matchedAt with Date.now()/1000 internally,
-      // which is wall-clock — it's the only impure part. We capture the result
-      // and overwrite matchedAt with our virtual tick boundary so latency
-      // measurements stay in virtual time.
+      // matching service stamps matchedAt from wall clock; overwrite with the
+      // virtual tick boundary so latency stays in virtual time.
       const results = service.runMatchingPass(active);
       const virtualMatchedAt = bucketEnd;
       for (const r of results) {
@@ -222,12 +198,11 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
     ticks++;
   }
 
-  // Final sweep: any orders whose deadline passed during the last bucket(s)
-  // still need to be flipped to EXPIRED before tallying.
+  // final sweep for any deadlines that passed in the last bucket.
   const finalNow = baseTs + bucketIdx * windowSec;
   expireStaleVirtual(finalNow);
 
-  // Tally outcomes from the OrderStore + match-result history.
+  // tally outcomes from OrderStore + match-result history.
   let matched = 0;
   let partial = 0;
   let queued = 0;
@@ -239,7 +214,7 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
     ? [...(store as unknown as { orders: Map<string, IntentOrder> }).orders.values()]
     : [];
   for (const o of allOrders) {
-    totalVolume += Number(o.amount); // for partial / queued this is the *remaining* amount
+    totalVolume += Number(o.amount); // for partial/queued this is the *remaining* amount
     if (o.status === 'MATCHED') matched++;
     else if (o.status === 'PARTIAL') partial++;
     else if (o.status === 'EXPIRED') {
@@ -247,10 +222,10 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
       expiredVolume += Number(o.amount);
     } else queued++;
   }
-  // For a true volume baseline, sum the original amounts from the CSV.
+  // true volume baseline: sum original CSV amounts.
   const baselineVolume = rows.reduce((s, r) => s + Number(r.amount), 0);
 
-  // Latency + cycle-length distribution from match-result history.
+  // latency + cycle-length distribution from match-result history.
   const matchResults = store.getMatchResults(1, Number.MAX_SAFE_INTEGER).data;
   const latencies: number[] = [];
   const cyclesByLength: Record<number, number> = {};
@@ -292,9 +267,7 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Main: load CSV + sweep grid
-// ---------------------------------------------------------------------------
+// main: load CSV + sweep grid
 
 function main(): void {
   const here = path.dirname(fileURLToPath(import.meta.url));
@@ -329,7 +302,7 @@ function main(): void {
   const windows = [5, 30, 60, 120];
   const thresholds = [0, 0.3, 0.5, 0.7, 0.8, 0.9, 0.95];
 
-  // Run every (window, threshold) combo once and reuse for both tables.
+  // run each (window, threshold) once and reuse for both tables.
   type Cell = { match: string; volume: string };
   const cells: Map<string, Cell> = new Map();
   for (const w of windows) {
@@ -361,7 +334,7 @@ function main(): void {
     console.log(`${(w + 's').padStart(6)}  | ${row}`);
   }
 
-  // ---------- Detailed breakdown for a few representative configs ----------
+  // detailed breakdown for a few representative configs
   console.log('\n=== Detailed breakdown for representative configs ===');
   const configs: Array<[number, number]> = [
     [60, 0.3],

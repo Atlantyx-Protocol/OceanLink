@@ -1,11 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { orchestrator } from '../orchestrator.js';
 
-// ---------------------------------------------------------------------------
-// Orchestrator Routes
-//
+// orchestrator routes
 //   GET /match-execution/:matchId — poll execution status for a match
-// ---------------------------------------------------------------------------
 
 const orchestratorRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Params: { matchId: string } }>(

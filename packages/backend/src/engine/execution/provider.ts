@@ -1,9 +1,5 @@
-// ---------------------------------------------------------------------------
-// Shared provider & signer factory
-//
-// Caches JsonRpcProvider and NonceManager instances per chain to avoid
-// creating new connections on every call.
-// ---------------------------------------------------------------------------
+// shared provider & signer factory — caches JsonRpcProvider and NonceManager
+// instances per chain to avoid creating new connections on every call
 
 import { JsonRpcProvider, NonceManager, Wallet, Contract } from 'ethers';
 import { getChainConfig } from '../../config/chains.js';

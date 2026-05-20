@@ -15,10 +15,6 @@ import type { wagmiConfig } from '@/lib/wagmi';
 type ConfiguredChainId = (typeof wagmiConfig)['chains'][number]['id'];
 import { USDC_DECIMALS } from '@/hooks/funds/constants';
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const NETWORKS: Network[] = [
   { id: 'ethereum-sepolia', name: 'Ethereum Sepolia', icon: '\u27E0' },
   { id: 'arbitrum-sepolia', name: 'Arbitrum Sepolia', icon: '\uD83D\uDD35' },
@@ -30,10 +26,6 @@ const USDC_TOKEN: Token = {
   name: 'USD Coin',
   icon: '\uD83D\uDCB2',
 };
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 interface BridgeCardProps {
   isConnected: boolean;
@@ -51,8 +43,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
 
   const { step, orderId, approvalTxHash, error, isLoading, bridge, reset } = useOceanBridge();
 
-  // ---- Derived state --------------------------------------------------------
-
+  // derived state
   const srcChain = fromNetwork.id as SupportedChain;
   const desChain = toNetwork.id as SupportedChain;
   const srcChainId = getChainId(srcChain) as ConfiguredChainId;
@@ -60,8 +51,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   const parsedAmount = parseFloat(fromAmount) || 0;
   const hasValidAmount = parsedAmount > 0;
 
-  // ---- Read USDC balance on source chain ------------------------------------
-
+  // read USDC balance on source chain
   const usdcAddress = getUsdcAddress(srcChain);
 
   const { data: rawBalance } = useReadContract({
@@ -84,7 +74,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
         })
       : undefined;
 
-  // Read balance on destination chain
+  // read balance on destination chain
   const desChainId = getChainId(desChain) as ConfiguredChainId;
   const desUsdcAddress = getUsdcAddress(desChain);
 
@@ -108,15 +98,14 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
         })
       : undefined;
 
-  // ---- Reset bridge status when form changes --------------------------------
-
+  // reset bridge status when form changes
   useEffect(() => {
     if (step === 'done' || step === 'error') {
-      // Don't auto-dismiss — user uses the X button
+      // don't auto-dismiss — user uses the X button
     }
   }, [fromAmount, fromNetwork, toNetwork]);
 
-  // Reset form after successful bridge
+  // reset form after a successful bridge
   useEffect(() => {
     if (step === 'done') {
       setFromAmount('');
@@ -124,8 +113,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
     }
   }, [step]);
 
-  // ---- Handlers -------------------------------------------------------------
-
+  // handlers
   const handleSwapDirection = () => {
     if (isLoading) return;
     const tempNetwork = fromNetwork;
@@ -149,7 +137,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   const handleBridge = async () => {
     if (!walletAddress || !hasValidAmount) return;
 
-    // Switch chain if needed
+    // switch chain if needed
     if (!isOnCorrectChain) {
       switchChain({ chainId: srcChainId as ConfiguredChainId });
       return;
@@ -171,10 +159,9 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
     })}`;
   };
 
-  // ---- Button label & state -------------------------------------------------
-
+  // button label & state
   const getButtonContent = () => {
-    if (!isConnected) return null; // handled by Connect Wallet button
+    if (!isConnected) return null; // handled by connect wallet button
 
     if (isLoading) {
       const labels: Record<string, string> = {
@@ -198,8 +185,6 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   };
 
   const isButtonDisabled = isLoading || !hasValidAmount || fromNetwork.id === toNetwork.id;
-
-  // ---- Render ---------------------------------------------------------------
 
   return (
     <div className="w-full max-w-md mx-auto">
@@ -254,7 +239,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
           disabled={isLoading}
         />
 
-        {/* Bridge / Connect button */}
+        {/* bridge / connect button */}
         <div className="mt-4">
           {isConnected ? (
             <Button
@@ -275,7 +260,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
           )}
         </div>
 
-        {/* Status feedback */}
+        {/* status feedback */}
         <BridgeStatus
           step={step}
           orderId={orderId}

@@ -1,14 +1,5 @@
-/**
- * Liquidity Market Service — tests
- * Runner: node:test (via `tsx --test`)
- *
- * Covers:
- *  1. Seeding — correct number of orders, no duplicates
- *  2. Refill — recreates matched / expired orders, skips active ones
- *  3. Matching coverage — random user amounts [1, 10 000] fully match
- *  4. Multi-chain pairs — all 6 directional routes work
- *  5. E2E flow — seed -> user intent -> match -> refill -> verify
- */
+// tests for the liquidity market service (node:test via tsx --test).
+// covers seeding, refill, random-amount matching, all 6 routes, and e2e flow.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,15 +9,12 @@ import { MatchingService } from '../matching/service/matchingService.js';
 import { LiquidityService, POWER_OF_TWO_AMOUNTS } from './liquidityService.js';
 import type { LPConfig } from './liquidityService.js';
 
-// ---------------------------------------------------------------------------
-// Constants — same chain IDs used by the service
-// ---------------------------------------------------------------------------
-
+// same chain IDs used by the service
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
 const ARBITRUM_SEPOLIA = 421614;
 
-// Test LP configs (deterministic addresses, no real private keys needed)
+// deterministic addresses, no real private keys needed
 const TEST_LP_CONFIGS: LPConfig[] = [
   {
     name: 'B',
@@ -48,10 +36,6 @@ const TEST_LP_CONFIGS: LPConfig[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 function nowSec(): number {
   return Math.floor(Date.now() / 1000);
 }
@@ -60,7 +44,7 @@ function futureDeadline(offset = 3600): number {
   return nowSec() + offset;
 }
 
-/** Creates a fresh (store, service, liquidityService) triple. Threshold = 0. */
+// fresh (store, service, liquidityService) triple, threshold = 0
 function makeSetup() {
   const store = new OrderStore();
   const service = new MatchingService(store, undefined, 0);
@@ -68,12 +52,8 @@ function makeSetup() {
   return { store, service, liq };
 }
 
-// Expected order count: 3 LPs x 2 dest chains x 14 amounts = 84
+// expected order count: 3 LPs x 2 dest chains x 14 amounts = 84
 const EXPECTED_TOTAL_ORDERS = TEST_LP_CONFIGS.length * 2 * POWER_OF_TWO_AMOUNTS.length;
-
-// ---------------------------------------------------------------------------
-// 1. Seeding
-// ---------------------------------------------------------------------------
 
 describe('LiquidityService.seed', () => {
   it('creates the correct number of LP orders', () => {
@@ -101,7 +81,7 @@ describe('LiquidityService.seed', () => {
           `LP ${lp.name} route ${lp.srcChainId}->${des} should have all power-of-2 amounts`
         );
 
-        // All should belong to the correct LP address
+        // all should belong to the correct LP address
         for (const o of pairOrders) {
           assert.equal(o.userAddress, lp.address);
           assert.equal(o.status, 'QUEUED');
@@ -122,16 +102,12 @@ describe('LiquidityService.seed', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// 2. Refill
-// ---------------------------------------------------------------------------
-
 describe('LiquidityService.refill', () => {
   it('recreates orders that have been matched', () => {
     const { store, service, liq } = makeSetup();
     liq.seed();
 
-    // User wants Base->Sepolia, matched against LP B (Sepolia->Base)
+    // user wants Base->Sepolia, matched against LP B (Sepolia->Base)
     const userResult = service.createOrder({
       srcChain: BASE_SEPOLIA,
       desChain: SEPOLIA,
@@ -141,14 +117,14 @@ describe('LiquidityService.refill', () => {
     });
     assert.ok('order' in userResult);
 
-    // Run LP-filtered matching (prevents LP<->LP self-matching)
+    // run LP-filtered matching (prevents LP<->LP self-matching)
     liq.tick();
 
-    // Verify the user order was matched
+    // verify the user order was matched
     const userOrder = store.get((userResult as { order: { orderId: string } }).order.orderId);
     assert.equal(userOrder?.status, 'MATCHED', 'user order should be matched');
 
-    // After tick (which includes refill), the 1024 slot should be covered again
+    // after tick (which includes refill), the 1024 slot should be covered again
     const afterRefill = store.getByPair(SEPOLIA, BASE_SEPOLIA);
     const restored = afterRefill.some((o) => Number(o.amount) === 1024 && o.status === 'QUEUED');
     assert.ok(restored, '1024 order should be restored after refill');
@@ -158,7 +134,7 @@ describe('LiquidityService.refill', () => {
     const { store, liq } = makeSetup();
     liq.seed();
 
-    // Manually expire one order by setting its deadline to the past
+    // manually expire one order by setting its deadline to the past
     const pairOrders = store.getByPair(SEPOLIA, BASE_SEPOLIA);
     const target = pairOrders.find((o) => Number(o.amount) === 512);
     assert.ok(target, 'should find a 512 order');
@@ -185,13 +161,9 @@ describe('LiquidityService.refill', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// 3. Matching coverage — random user amounts
-// ---------------------------------------------------------------------------
-
 describe('Matching coverage — random amounts', () => {
   it('fully matches random user amounts in [1, 10000] on a single route', () => {
-    // Route: user sends Base->Sepolia, matched against LP B (Sepolia->Base)
+    // route: user sends Base->Sepolia, matched against LP B (Sepolia->Base)
     const amounts = [1, 7, 42, 100, 255, 1000, 1298, 5000, 7777, 9999, 10000];
 
     for (const userAmount of amounts) {
@@ -216,7 +188,7 @@ describe('Matching coverage — random amounts', () => {
         `user order for amount ${userAmount} should be MATCHED (got ${userOrder?.status})`
       );
 
-      // Verify match result records the full amount
+      // verify match result records the full amount
       const totalMatched = stats.matchResults
         .flatMap((r) => r.orders)
         .filter((o) => o.orderId === userOrder!.orderId)
@@ -231,7 +203,7 @@ describe('Matching coverage — random amounts', () => {
   });
 
   it('matches 20 random amounts between 1 and 10000', () => {
-    // Deterministic "random" using a simple LCG
+    // deterministic "random" using a simple LCG
     let seed = 12345;
     const nextRand = () => {
       seed = (seed * 1103515245 + 12345) & 0x7fffffff;
@@ -263,10 +235,6 @@ describe('Matching coverage — random amounts', () => {
     }
   });
 });
-
-// ---------------------------------------------------------------------------
-// 4. Multi-chain pairs
-// ---------------------------------------------------------------------------
 
 describe('Matching coverage — all chain pairs', () => {
   const ALL_PAIRS = [
@@ -305,20 +273,16 @@ describe('Matching coverage — all chain pairs', () => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// 5. E2E flow — seed -> match -> refill -> match again
-// ---------------------------------------------------------------------------
-
 describe('E2E — full lifecycle', () => {
   it('seed -> user match -> refill -> second user match', () => {
     const { store, service, liq } = makeSetup();
 
-    // Step 1: Seed liquidity
+    // seed liquidity
     liq.seed();
     const initialActive = store.getActiveOrders().length;
     assert.equal(initialActive, EXPECTED_TOTAL_ORDERS);
 
-    // Step 2: User intent — consumes some LP orders
+    // user intent — consumes some LP orders
     const user1 = service.createOrder({
       srcChain: ARBITRUM_SEPOLIA,
       desChain: BASE_SEPOLIA,
@@ -334,8 +298,8 @@ describe('E2E — full lifecycle', () => {
     const u1Order = store.get((user1 as { order: { orderId: string } }).order.orderId);
     assert.equal(u1Order?.status, 'MATCHED', 'first user should be fully matched');
 
-    // Step 3: Second user on the SAME route should also match
-    // (tick's refill already recreated consumed LP orders)
+    // second user on the SAME route should also match — tick's refill already
+    // recreated the consumed LP orders
     const user2 = service.createOrder({
       srcChain: ARBITRUM_SEPOLIA,
       desChain: BASE_SEPOLIA,
@@ -355,7 +319,7 @@ describe('E2E — full lifecycle', () => {
     const { store, service, liq } = makeSetup();
     liq.seed();
 
-    // Match exactly 4096 on Sepolia->Arb route
+    // match exactly 4096 on Sepolia->Arb route
     const result = service.createOrder({
       srcChain: SEPOLIA,
       desChain: ARBITRUM_SEPOLIA,
@@ -370,7 +334,7 @@ describe('E2E — full lifecycle', () => {
     const order = store.get((result as { order: { orderId: string } }).order.orderId);
     assert.equal(order?.status, 'MATCHED');
 
-    // Verify the LP 4096 slot on ArbSepolia->Sepolia is restored (refill runs inside tick)
+    // verify the LP 4096 slot on ArbSepolia->Sepolia is restored (refill runs inside tick)
     const pairOrders = store.getByPair(ARBITRUM_SEPOLIA, SEPOLIA);
     const has4096 = pairOrders.some(
       (o) => Number(o.amount) === 4096 && (o.status === 'QUEUED' || o.status === 'PARTIAL')
@@ -386,7 +350,7 @@ describe('E2E — full lifecycle', () => {
     liq.seed();
     liq.refill();
 
-    // Count orders per (address, src, des, amount) — each should appear exactly once
+    // count orders per (address, src, des, amount) — each should appear exactly once
     const seen = new Map<string, number>();
     for (const order of store.getActiveOrders()) {
       const key = `${order.userAddress}-${order.srcChain}-${order.desChain}-${order.amount}`;

@@ -1,44 +1,14 @@
-/**
- * Cycle-cancellation max-circulation matching.
- *
- *   runMaxFlow(n, edges, x): EdgeSnapshot[][]
- *
- * Chain-level cycle patterns are enumerated explicitly (O(n^2) two-cycles +
- * O(n^3) three-cycles for n vertices). For each pattern we pick the best
- * concrete 1-to-1 order assignment, choosing the cycle with the LARGEST
- * bottleneck (subject to ratio ≥ x) — greedy in this dimension closely
- * tracks max-circulation: every cancellation removes the maximum amount
- * of capacity allowed by the residual graph.
- *
- * One order per leg is preserved (no aggregation), so each captured cycle
- * stays a clean 1-to-1 N-tuple — the orchestrator pairs sender→receiver
- * edge-by-edge for HTLC settlement.
- *
- * Phases:
- *   1. Exhaust all 2-cycles. Cheaper (one HTLC pair), fully balanced (the
- *      standard P2P swap shape), and dominate real-world bridge traffic.
- *   2. Exhaust 3-cycles on the residual. Longer cycles aren't enumerated —
- *      4+ chains are rare in practice and the marginal coverage is tiny.
- */
+// cycle-cancellation max-circulation matching.
+// enumerates 2-cycles then 3-cycles, greedily picking the largest bottleneck
+// per pattern (ratio ≥ x). one order per leg, no aggregation, so cycles stay
+// clean N-tuples for HTLC settlement. 4+ chain cycles are skipped (rare).
 
 import type { Edge, EdgeSnapshot } from '../types.js';
 
 export type { Edge, EdgeSnapshot } from '../types.js';
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Applies a cancellation step to a captured cycle:
- *   - Identify the edge with weight equal to minW (first occurrence).
- *   - Splice that edge out of `edges`.
- *   - Subtract minW from every other edge's weight in-place.
- *
- * This is the only side effect on `edges`. The snapshot returned by the
- * caller captures pre-mutation weights so downstream interpretation
- * (matchingService + cycleMapper) keeps working unchanged.
- */
+// splice out the min-weight edge and subtract minW from the rest in-place.
+// pre-mutation weights are captured by the caller's snapshot.
 function applyCancellation(edges: Edge[], cycle: Edge[], minW: number): void {
   const minIdx = cycle.findIndex((e) => e.w === minW);
   const minEdge = cycle[minIdx]!;
@@ -55,17 +25,9 @@ function snapshotOf(cycle: Edge[]): EdgeSnapshot[] {
   return cycle.map((e) => ({ u: e.u, v: e.v, w: e.w }));
 }
 
-// ---------------------------------------------------------------------------
-// 2-cycle search
-// ---------------------------------------------------------------------------
-
-/**
- * Finds the best qualifying 2-cycle (u → v → u) across all chain pairs.
- * "Best" = largest bottleneck (= matched volume contributed by this cycle).
- * Returns null if no pair (a, b) has min(a.w, b.w) > 0 and ratio ≥ threshold.
- */
+// finds the largest-bottleneck 2-cycle satisfying the ratio threshold.
 function findBest2Cycle(edges: Edge[], n: number, threshold: number): [Edge, Edge] | null {
-  // Group edges by (u, v) for O(1) leg lookup.
+  // group edges by (u, v) for O(1) leg lookup.
   const byUV = new Map<number, Edge[]>();
   for (const e of edges) {
     if (e.w <= 0) continue;
@@ -100,16 +62,8 @@ function findBest2Cycle(edges: Edge[], n: number, threshold: number): [Edge, Edg
   return best ? [best.a, best.b] : null;
 }
 
-// ---------------------------------------------------------------------------
-// 3-cycle search
-// ---------------------------------------------------------------------------
-
-/**
- * Enumerates 3-cycle chain patterns canonically. For vertices {0, 1, 2}, both
- * (0→1→2→0) and (0→2→1→0) are valid distinct cycles — we keep the rotation
- * starting at the smallest vertex to avoid emitting the same cycle three
- * times under cyclic shift.
- */
+// enumerates 3-cycle patterns canonically (rotation starts at smallest vertex
+// to avoid emitting the same cycle thrice).
 function enumerate3CyclePatterns(n: number): number[][] {
   const patterns: number[][] = [];
   for (let a = 0; a < n; a++) {
@@ -144,7 +98,7 @@ function findBest3Cycle(edges: Edge[], n: number, threshold: number): [Edge, Edg
 
     for (const eAB of legAB) {
       for (const eBC of legBC) {
-        // Early pruning — current best bottleneck must beat min(eAB.w, eBC.w).
+        // early pruning — current best bottleneck must beat min(eAB.w, eBC.w).
         const partialMin = eAB.w < eBC.w ? eAB.w : eBC.w;
         if (best && partialMin <= best.bottleneck) continue;
 
@@ -164,14 +118,7 @@ function findBest3Cycle(edges: Edge[], n: number, threshold: number): [Edge, Edg
   return best ? [best.ab, best.bc, best.ca] : null;
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
-/**
- * See module-level docstring. Returns one EdgeSnapshot[] per captured cycle
- * with pre-mutation weights.
- */
+// returns one EdgeSnapshot[] per captured cycle with pre-mutation weights.
 export function runMaxFlow(
   n: number,
   edges: Edge[],
@@ -179,7 +126,7 @@ export function runMaxFlow(
 ): EdgeSnapshot[][] {
   const captured: EdgeSnapshot[][] = [];
 
-  // Phase 1 — saturate 2-cycles.
+  // phase 1 — saturate 2-cycles.
   while (true) {
     const pair = findBest2Cycle(edges, n, threshold);
     if (!pair) break;
@@ -189,7 +136,7 @@ export function runMaxFlow(
     applyCancellation(edges, [a, b], minW);
   }
 
-  // Phase 2 — saturate 3-cycles on the residual graph.
+  // phase 2 — saturate 3-cycles on the residual graph.
   while (true) {
     const triple = findBest3Cycle(edges, n, threshold);
     if (!triple) break;

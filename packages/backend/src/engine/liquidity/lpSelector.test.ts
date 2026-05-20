@@ -29,8 +29,8 @@ describe('selectLpOrdersForUsers', () => {
   const lpAddresses = new Set([LP_ADDR]);
 
   it('selects LP orders matching binary decomposition of user amount', () => {
-    // User wants 10 on route 1→2, so LP needs reverse route 2→1
-    // Binary decomposition of 10 = 8 + 2
+    // user wants 10 on route 1->2, so LP needs reverse route 2->1.
+    // binary decomposition of 10 = 8 + 2
     const userOrders = [makeOrder('user1', 1, 2, '10', USER_ADDR)];
 
     const allActive = [
@@ -71,7 +71,7 @@ describe('selectLpOrdersForUsers', () => {
     ];
 
     const selected = selectLpOrdersForUsers(userOrders, allActive, lpAddresses);
-    // Only one user can get it
+    // only one user can get it
     assert.equal(selected.length, 1);
   });
 

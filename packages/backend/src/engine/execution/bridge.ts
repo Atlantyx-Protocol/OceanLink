@@ -9,7 +9,7 @@ export interface FillInfo {
   receiver: string;
   amount: string;
   hashlock: string;
-  secret?: string; // Only populated if isPresiding is true
+  secret?: string; // only populated when isPresiding is true
 }
 
 export interface CreateOrderResult {
@@ -33,28 +33,28 @@ export interface RefundResult {
 }
 
 class BridgeService {
-  // Generate 256-bit secret and SHA256 hashlock
+  // generate 256-bit secret and SHA256 hashlock
   generateSecret(): { secret: string; hashlock: string } {
     const secret = ethers.hexlify(ethers.randomBytes(32));
     const hashlock = ethers.sha256(secret);
     return { secret, hashlock };
   }
 
-  // Create order with multiple fills (signed by admin)
+  // create order with multiple fills (signed by admin)
   async createOrder(params: {
     receivers: string[];
     amounts: string[];
     chain?: string;
-    isPresiding?: boolean; // if true, generate new secrets; if false, use provided hashlocks
+    isPresiding?: boolean; // true => generate new secrets; false => use provided hashlocks
     hashlocks?: string[]; // required when isPresiding = false
-    onBehalfOf?: string; // optional: tokens are pulled from this address instead of msg.sender
+    onBehalfOf?: string; // pull tokens from this address instead of msg.sender
   }): Promise<CreateOrderResult> {
     const chainKey = params.chain || 'sepolia';
     const config = getChainConfig(chainKey)!;
     const signer = getAdminSigner(chainKey);
     const senderAddress = params.onBehalfOf || (await signer.getAddress());
 
-    // Validate inputs
+    // validate inputs
     if (params.receivers.length !== params.amounts.length) {
       throw new Error('receivers and amounts arrays must have the same length');
     }
@@ -64,11 +64,11 @@ class BridgeService {
 
     console.log(`[${chainKey}] Creating order from ${senderAddress}`);
 
-    // Convert human-readable USDC amounts to micro-USDC
+    // convert human-readable USDC amounts to micro-USDC
     const microAmounts = params.amounts.map((a) => ethers.parseUnits(a, USDC_DECIMALS));
     const totalAmount = microAmounts.reduce((sum, amt) => sum + amt, 0n);
 
-    // Step 1: Check USDC allowance
+    // check USDC allowance
     const usdc = new Contract(config.usdcAddress, ERC20_ABI, signer);
     const currentAllowance = await usdc.allowance(senderAddress, config.htlcAddress);
     const signerAddress = await signer.getAddress();
@@ -94,7 +94,7 @@ class BridgeService {
       console.log(`[${chainKey}] Allowance check passed: ${currentAllowance}`);
     }
 
-    // Step 2: Generate secrets and hashlocks (only if isPresiding = true)
+    // generate secrets and hashlocks (only when isPresiding = true)
     const secrets: string[] = [];
     const hashlocks: string[] = [];
 
@@ -115,14 +115,14 @@ class BridgeService {
       console.log(`[${chainKey}] Using provided hashlocks`);
     }
 
-    // Step 3: Calculate timelock
+    // calculate timelock
     const timelockMinutes = getTimelockMinutes();
     const timelock = Math.floor(Date.now() / 1000) + timelockMinutes * 60;
     console.log(
       `[${chainKey}] Timelock: ${new Date(timelock * 1000).toISOString()} (${timelockMinutes} minutes)`
     );
 
-    // Step 4: Create order
+    // create order
     const htlc = getHTLCContract(chainKey, signer);
 
     console.log(`[${chainKey}] Creating order...`);
@@ -144,7 +144,7 @@ class BridgeService {
     console.log(`[${chainKey}] TX sent: ${tx.hash}`);
     const receipt = await tx.wait();
 
-    // Parse events to get order ID and fill IDs
+    // parse events to get order ID and fill IDs
     let orderId = '';
     const fillInfos: FillInfo[] = [];
 
@@ -181,7 +181,7 @@ class BridgeService {
     };
   }
 
-  // Withdraw from a specific fill with preimage (signed by admin)
+  // withdraw from a specific fill with preimage (signed by admin)
   async withdraw(params: {
     orderId: string;
     fillId: string;
@@ -208,7 +208,7 @@ class BridgeService {
     };
   }
 
-  // Refund order after timelock expires (signed by admin)
+  // refund order after timelock expires (signed by admin)
   async refund(params: { orderId: string; chain?: string }): Promise<RefundResult> {
     const chainKey = params.chain || 'sepolia';
     const signer = getAdminSigner(chainKey);
@@ -223,7 +223,7 @@ class BridgeService {
     const receipt = await tx.wait();
     console.log(`  Confirmed in block ${receipt.blockNumber}`);
 
-    // Parse OrderRefunded event to get refunded amount
+    // parse OrderRefunded event to get refunded amount
     let refundedAmount = '0';
     for (const log of receipt.logs) {
       try {
@@ -244,7 +244,7 @@ class BridgeService {
     };
   }
 
-  // Get order details (read-only, no signer needed)
+  // get order details (read-only, no signer needed)
   async getOrder(params: { orderId: string; chain?: string }) {
     const chainKey = params.chain || 'sepolia';
     const htlc = getHTLCContract(chainKey);
@@ -261,7 +261,7 @@ class BridgeService {
     };
   }
 
-  // Get fill details (read-only)
+  // get fill details (read-only)
   async getFill(params: { orderId: string; fillId: string; chain?: string }) {
     const chainKey = params.chain || 'sepolia';
     const htlc = getHTLCContract(chainKey);
@@ -275,7 +275,7 @@ class BridgeService {
     };
   }
 
-  // Get all fills for an order (read-only)
+  // get all fills for an order (read-only)
   async getOrderFills(params: { orderId: string; chain?: string }) {
     const chainKey = params.chain || 'sepolia';
     const htlc = getHTLCContract(chainKey);
@@ -290,14 +290,14 @@ class BridgeService {
     }));
   }
 
-  // Check if order exists (read-only)
+  // check if order exists (read-only)
   async orderExists(params: { orderId: string; chain?: string }): Promise<boolean> {
     const chainKey = params.chain || 'sepolia';
     const htlc = getHTLCContract(chainKey);
     return await htlc.orderExistsCheck(BigInt(params.orderId));
   }
 
-  // Get next order ID (read-only)
+  // get next order ID (read-only)
   async getNextOrderId(params: { chain?: string }): Promise<string> {
     const chainKey = params.chain || 'sepolia';
     const htlc = getHTLCContract(chainKey);
@@ -305,7 +305,7 @@ class BridgeService {
     return id.toString();
   }
 
-  // Get claim status for an order (read-only)
+  // get claim status for an order (read-only)
   async getClaimStatus(params: {
     orderId: string;
     chain?: string;

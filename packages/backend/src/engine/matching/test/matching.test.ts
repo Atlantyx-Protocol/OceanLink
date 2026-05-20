@@ -1,10 +1,5 @@
-/**
- * Matching Engine — integration tests
- * Runner: node:test  (via `tsx --test`)
- *
- * Tests are self-contained: each creates its own OrderStore and
- * MatchingService instances so they share no mutable state.
- */
+// matching engine integration tests. each test owns its own store/service
+// for isolation. runner: node:test via tsx --test.
 
 import { describe, it, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,10 +8,6 @@ import { OrderStore } from '../store/orderStore.js';
 import { MatchingService } from '../service/matchingService.js';
 import type { AlgorithmFn } from '../service/matchingService.js';
 import type { Edge, EdgeSnapshot } from '../types.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function nowSec(): number {
   return Math.floor(Date.now() / 1000);
@@ -30,17 +21,14 @@ function pastDeadline(offsetSeconds = 1): number {
   return nowSec() - offsetSeconds;
 }
 
-/** Creates a fresh (store, service) pair for each test. */
+// fresh (store, service) pair per test.
 function makeSetup(algorithmFn?: AlgorithmFn, threshold = 0.8) {
   const store = new OrderStore();
   const service = new MatchingService(store, algorithmFn, threshold);
   return { store, service };
 }
 
-// ---------------------------------------------------------------------------
-// Test 1 — Create order OK
-// ---------------------------------------------------------------------------
-
+// test 1 — create order ok
 describe('MatchingService.createOrder', () => {
   it('returns a QUEUED order with a generated orderId when input is valid', () => {
     const { store, service } = makeSetup();
@@ -68,16 +56,13 @@ describe('MatchingService.createOrder', () => {
     assert.equal(order!.amount, '100');
     assert.equal(store.totalCount(), 1);
 
-    // Verify it is retrievable from the store
+    // verify it is retrievable from the store
     const stored = store.get(order!.orderId);
     assert.ok(stored, 'order should be stored');
     assert.equal(stored!.status, 'QUEUED');
   });
 
-  // -------------------------------------------------------------------------
-  // Test 2 — Reject past deadline
-  // -------------------------------------------------------------------------
-
+  // test 2 — reject past deadline
   it('returns an error when deadline is in the past', () => {
     const { service } = makeSetup();
 
@@ -121,15 +106,12 @@ describe('MatchingService.createOrder', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Test 3 — Scheduler expire order
-// ---------------------------------------------------------------------------
-
+// test 3 — scheduler expire order
 describe('OrderStore.expireStale', () => {
   it('marks orders past their deadline as EXPIRED and removes from pair index', () => {
     const { store, service } = makeSetup();
 
-    // Add one order that is already expired
+    // add one order that is already expired
     const r = service.createOrder({
       srcChain: 10,
       desChain: 20,
@@ -138,12 +120,12 @@ describe('OrderStore.expireStale', () => {
 
       userAddress: '0x123',
     });
-    // createOrder rejects past deadlines, so we insert directly into the store
-    // to simulate an order whose deadline passes after creation.
+    // createOrder rejects past deadlines, so we insert directly to simulate
+    // an order whose deadline passes after creation.
     assert.ok('error' in r); // confirm service rejects it
     void r;
 
-    // Insert directly as if deadline just passed
+    // insert directly as if deadline just passed
     store.add({
       orderId: 'test-expired-order',
       srcChain: 10,
@@ -167,7 +149,7 @@ describe('OrderStore.expireStale', () => {
 
     assert.equal(store.getActiveOrders().length, 0, 'No active orders after expiry');
 
-    // Pair index should be cleared
+    // pair index should be cleared
     assert.deepEqual(
       store.getByPair(10, 20),
       [],
@@ -197,13 +179,10 @@ describe('OrderStore.expireStale', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Test 4 — Scheduler calls the algorithm with the correct dataset
-// ---------------------------------------------------------------------------
-
+// test 4 — scheduler calls the algorithm with the correct dataset
 describe('MatchingService adapter', () => {
   it('calls the algorithm with n=unique chains, edges mapped from orders', () => {
-    // Capture what the adapter passes to the algorithm
+    // capture what the adapter passes to the algorithm
     let capturedN: number | undefined;
     let capturedEdges: Edge[] | undefined;
     let capturedX: number | undefined;
@@ -212,12 +191,12 @@ describe('MatchingService adapter', () => {
       capturedN = n;
       capturedEdges = edges.map((e) => ({ ...e })); // snapshot before mutation
       capturedX = x;
-      return []; // return no cycles — we only test the inputs here
+      return []; // no cycles — we only test the inputs here
     };
 
     const { store, service } = makeSetup(mockAlgorithm, 0.8);
 
-    // Two orders: chain 1 → chain 2 and chain 2 → chain 1
+    // two orders: chain 1 → chain 2 and chain 2 → chain 1
     store.add({
       orderId: 'order-a',
       srcChain: 1,
@@ -248,29 +227,24 @@ describe('MatchingService adapter', () => {
     assert.equal(capturedEdges!.length, 2, 'should have one edge per order');
     assert.equal(capturedX, 0.8, 'threshold should match configured value');
 
-    // The two edges form a pair (u→v, v→u) with respective amounts
+    // the two edges form a pair (u→v, v→u) with respective amounts
     const edgeA = capturedEdges!.find((e) => e.id === 0)!;
     const edgeB = capturedEdges!.find((e) => e.id === 1)!;
 
     assert.equal(edgeA.w, 100, 'order-a weight should be 100');
     assert.equal(edgeB.w, 90, 'order-b weight should be 90');
-    // They should form opposite directions
+    // they should form opposite directions
     assert.equal(edgeA.u, edgeB.v, 'order-a src vertex == order-b dst vertex');
     assert.equal(edgeA.v, edgeB.u, 'order-a dst vertex == order-b src vertex');
   });
 });
 
-// ---------------------------------------------------------------------------
-// Test 5 — Order status changes to MATCHED / PARTIAL when a match is found
-// ---------------------------------------------------------------------------
-
+// test 5 — order status changes to MATCHED / PARTIAL when a match is found
 describe('MatchingService.runMatchingPass — real algorithm', () => {
   it('marks the smaller order MATCHED and the larger order PARTIAL', () => {
-    // Use the real algorithm with threshold 0 so all cycles are captured.
-    // Two orders: A (chain1→chain2, 100) and B (chain2→chain1, 90).
-    // The algorithm finds cycle [A, B]:
-    //   minW = 90 (edge B), maxW = 100 (edge A), ratio = 0.9 > 0
-    //   → B is removed (MATCHED), A.w reduced to 10 (PARTIAL)
+    // real algorithm with threshold 0 so all cycles are captured.
+    // A (chain1→chain2, 100) and B (chain2→chain1, 90) form cycle [A, B]:
+    //   minW=90 (B), maxW=100 (A) → B MATCHED, A.w reduced to 10 (PARTIAL)
     const { store, service } = makeSetup(undefined, 0);
 
     store.add({
@@ -316,7 +290,7 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
     assert.equal(entryX!.matchedAmount, '90');
     assert.equal(entryX!.remainingAmount, '10');
 
-    // Verify store state
+    // verify store state
     assert.equal(store.get('order-y')?.status, 'MATCHED');
     assert.equal(store.get('order-x')?.status, 'PARTIAL');
     assert.equal(
@@ -361,13 +335,13 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
 
     service.runMatchingPass(store.getActiveOrders());
 
-    // Both should be MATCHED because ratio = 1.0 > 0
+    // both should be MATCHED because ratio = 1.0 > 0
     assert.equal(store.get('eq-a')?.status, 'MATCHED');
     assert.equal(store.get('eq-b')?.status, 'MATCHED');
   });
 
   it('does not match when ratio is below the threshold', () => {
-    // threshold = 0.95, but ratio = 50/100 = 0.5 < 0.95 → no match
+    // threshold=0.95, ratio=50/100=0.5 < 0.95 → no match
     const { store, service } = makeSetup(undefined, 0.95);
 
     store.add({
@@ -400,10 +374,7 @@ describe('MatchingService.runMatchingPass — real algorithm', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Test 6 — IncentiveFee
-// ---------------------------------------------------------------------------
-
+// test 6 — incentiveFee
 describe('MatchingService.createOrder — incentiveFee', () => {
   it('creates order without incentiveFee (backward compatible)', () => {
     const { store, service } = makeSetup();
@@ -479,16 +450,11 @@ describe('MatchingService.createOrder — incentiveFee', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Test 7 — IncentiveFee improves matching
-// ---------------------------------------------------------------------------
-
+// test 7 — incentiveFee improves matching
 describe('IncentiveFee — matching behavior', () => {
   it('order with incentiveFee has higher effective amount in matching', () => {
-    // threshold = 0.95 — orders 100 vs 50 would NOT match (ratio 0.5).
-    // But with incentiveFee of 45 on the 50-order, effective = 95 → ratio 95/100 = 0.95.
-    // Since the algorithm uses strict > threshold, 0.95 > 0.95 is false, so still no match.
-    // Use fee of 50 → effective = 100 → ratio 1.0 > 0.95 → matches!
+    // threshold=0.95 — 100 vs 50 would NOT match (ratio 0.5).
+    // fee=50 on the 50-order → effective=100, ratio=1.0 > 0.95 → matches.
     const { store, service } = makeSetup(undefined, 0.95);
 
     store.add({
@@ -503,7 +469,7 @@ describe('IncentiveFee — matching behavior', () => {
       userAddress: '0x111',
     });
 
-    // This order has effective amount = 50 + 50 = 100 (fee already folded in)
+    // this order has effective amount = 50 + 50 = 100 (fee already folded in)
     store.add({
       orderId: 'fee-b',
       srcChain: 8,

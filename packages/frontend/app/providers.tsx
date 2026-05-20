@@ -8,9 +8,7 @@ import { AuthProvider } from '@/lib/auth-context';
 import { ThemeProvider } from '@/app/components/ui/theme-provider';
 
 export function Providers({ children }: { children: ReactNode }) {
-  // QueryClient must be created inside a client component so each browser
-  // session gets its own cache (vs. a shared module-level instance that
-  // could leak between requests in SSR).
+  // QueryClient must live inside a client component so each session has its own cache (SSR-safe)
   const [queryClient] = useState(
     () =>
       new QueryClient({

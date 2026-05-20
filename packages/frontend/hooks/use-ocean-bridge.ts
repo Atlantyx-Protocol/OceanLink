@@ -14,10 +14,6 @@ import {
 import { USDC_DECIMALS } from '@/hooks/funds/constants';
 import { toast } from '@/hooks/use-toast';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type OceanBridgeStep = 'idle' | 'checking' | 'approving' | 'submitting' | 'done' | 'error';
 
 export interface OceanBridgeState {
@@ -36,10 +32,6 @@ export interface OceanBridgeParams {
   incentiveFee?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const INITIAL_STATE: OceanBridgeState = {
   step: 'idle',
   approvalTxHash: null,
@@ -48,13 +40,13 @@ const INITIAL_STATE: OceanBridgeState = {
   isLoading: false,
 };
 
-/** Intent orders are valid for 30 minutes. */
+// intent orders are valid for 30 minutes
 const INTENT_DEADLINE_SECONDS = 30 * 60;
 
-/** Timeout for the intent submission request (30 seconds). */
+// timeout for intent submission (30s)
 const INTENT_SUBMIT_TIMEOUT_MS = 30_000;
 
-/** Backend base URL — SSE must hit the backend directly (not via Next.js proxy). */
+// backend base URL — SSE must hit the backend directly, not via Next.js proxy
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
 
 interface ServerOrderEvent {
@@ -65,11 +57,7 @@ interface ServerOrderEvent {
   timestamp: number;
 }
 
-/**
- * Open an SSE stream for the given orderId, log every server event, and
- * toast each one. The stream auto-closes when the server sends a 'done'
- * or 'error' event.
- */
+// open SSE stream for orderId, toast each event, auto-close on done/error
 function subscribeToOrderEvents(orderId: string): void {
   const url = `${BACKEND_URL}/api/orders/${orderId}/events`;
   const es = new EventSource(url);
@@ -102,10 +90,6 @@ function subscribeToOrderEvents(orderId: string): void {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
-
 export function useOceanBridge() {
   const [state, setState] = useState<OceanBridgeState>(INITIAL_STATE);
   const { data: walletClient } = useWalletClient();
@@ -134,7 +118,7 @@ export function useOceanBridge() {
     });
 
     try {
-      // ----- Step 1: Check current USDC allowance ---------------------------
+      // step 1: check current USDC allowance
       setState({
         step: 'checking',
         approvalTxHash: null,
@@ -171,7 +155,7 @@ export function useOceanBridge() {
         needsApproval: currentAllowance < amountWei,
       });
 
-      // ----- Step 2: Approve HTLC if allowance is insufficient ---------------
+      // step 2: approve HTLC if allowance is insufficient
       let approvalTxHash: `0x${string}` | null = null;
 
       if (currentAllowance < amountWei) {
@@ -213,7 +197,7 @@ export function useOceanBridge() {
         toast({ title: 'Approval confirmed' });
       }
 
-      // ----- Step 3: Submit intent order to backend -------------------------
+      // step 3: submit intent order to backend
       setState((s) => ({ ...s, step: 'submitting' }));
 
       const deadline = Math.floor(Date.now() / 1000) + INTENT_DEADLINE_SECONDS;
@@ -258,7 +242,7 @@ export function useOceanBridge() {
         throw new Error(data.error || `Intent submission failed (${res.status})`);
       }
 
-      // ----- Done -----------------------------------------------------------
+      // done
       const submittedOrderId = data.order?.orderId ?? null;
       setState({
         step: 'done',

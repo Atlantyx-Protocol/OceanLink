@@ -1,9 +1,6 @@
 import { sepolia, arbitrumSepolia, baseSepolia, type Chain } from 'viem/chains';
 
-// ---------------------------------------------------------------------------
-// Supported chains
-// ---------------------------------------------------------------------------
-
+// supported chains
 export const SUPPORTED_CHAINS = {
   ETHEREUM: 'ethereum-sepolia',
   ARBITRUM: 'arbitrum-sepolia',
@@ -12,10 +9,7 @@ export const SUPPORTED_CHAINS = {
 
 export type SupportedChain = (typeof SUPPORTED_CHAINS)[keyof typeof SUPPORTED_CHAINS];
 
-// ---------------------------------------------------------------------------
-// Chain config lookups
-// ---------------------------------------------------------------------------
-
+// chain config lookups
 const CHAIN_MAP: Record<SupportedChain, Chain> = {
   [SUPPORTED_CHAINS.ETHEREUM]: sepolia,
   [SUPPORTED_CHAINS.ARBITRUM]: arbitrumSepolia,
@@ -50,10 +44,7 @@ export function getChainId(id: SupportedChain): number {
   return getChain(id).id;
 }
 
-// ---------------------------------------------------------------------------
 // OceanLink HTLC contract addresses
-// ---------------------------------------------------------------------------
-
 const HTLC_ADDRESSES: Record<SupportedChain, `0x${string}`> = {
   [SUPPORTED_CHAINS.ETHEREUM]: '0xedc85Fe98519109be0137Ca17bAA32F323c42796',
   [SUPPORTED_CHAINS.ARBITRUM]: '0xbd9CCa55C35EEBa20984745dC3e9bAc60453BcfD',
@@ -66,10 +57,7 @@ export function getHtlcAddress(id: SupportedChain): `0x${string}` {
   return addr;
 }
 
-// ---------------------------------------------------------------------------
-// Network ID → SupportedChain reverse lookup
-// ---------------------------------------------------------------------------
-
+// chain ID → SupportedChain reverse lookup
 const CHAIN_ID_TO_SUPPORTED: Record<number, SupportedChain> = {
   [sepolia.id]: SUPPORTED_CHAINS.ETHEREUM,
   [arbitrumSepolia.id]: SUPPORTED_CHAINS.ARBITRUM,

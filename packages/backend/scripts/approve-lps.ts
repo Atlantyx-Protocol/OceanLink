@@ -1,13 +1,5 @@
-/**
- * One-shot pre-approval for liquidity providers.
- *
- * Each LP signs an approve(MaxUint256) against the HTLC contract on its OWN
- * source chain — only the source chain, because that's the only chain from
- * which its tokens will ever be pulled.
- *
- * Keys are read from PRIVATE_KEY_B / PRIVATE_KEY_C / PRIVATE_KEY_D.
- * Run from packages/backend via: `pnpm approve-lps`.
- */
+// one-shot pre-approval for LPs: each signs approve(MaxUint256) against the HTLC on its own source chain.
+// keys come from PRIVATE_KEY_B/C/D. run via `pnpm approve-lps`.
 
 import dotenv from 'dotenv';
 dotenv.config({ path: '../../.env' });
@@ -19,14 +11,14 @@ const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;
 const ARBITRUM_SEPOLIA = 421614;
 
-// Must match the definitions in loadLPConfigsFromEnv.
+// must match definitions in loadLPConfigsFromEnv.
 const LP_DEFS = [
   { name: 'B', envKey: 'PRIVATE_KEY_B', srcChainId: SEPOLIA },
   { name: 'C', envKey: 'PRIVATE_KEY_C', srcChainId: BASE_SEPOLIA },
   { name: 'D', envKey: 'PRIVATE_KEY_D', srcChainId: ARBITRUM_SEPOLIA },
 ];
 
-// Treat any allowance above this as "already at max" and skip.
+// allowance above this counts as "already at max".
 const ALREADY_APPROVED_THRESHOLD = 2n ** 200n;
 
 async function main(): Promise<void> {

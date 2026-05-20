@@ -1,11 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { IntentOrder, CreateIntentInput } from '../types.js';
 
-/**
- * Validates intent order input and creates an IntentOrder object.
- * Returns { order } on success or { error } on validation failure.
- * This is a pure function — no side effects, no store dependency.
- */
+// pure validator: returns { order } or { error }. no side effects.
 export function validateAndCreateOrder(
   input: CreateIntentInput
 ): { order: IntentOrder } | { error: string } {
@@ -25,7 +21,7 @@ export function validateAndCreateOrder(
     return { error: 'amount must be a positive number' };
   }
 
-  // Validate and compute incentive fee
+  // validate and compute incentive fee
   let incentiveFee: string | undefined;
   if (input.incentiveFee !== undefined && input.incentiveFee !== null) {
     const parsedFee = Number(input.incentiveFee);
@@ -37,7 +33,7 @@ export function validateAndCreateOrder(
     }
   }
 
-  // Effective amount = base amount + incentive fee
+  // effective amount = base amount + incentive fee
   const effectiveAmount = incentiveFee ? String(parsedAmount + Number(incentiveFee)) : amount;
 
   const now = Math.floor(Date.now() / 1000);

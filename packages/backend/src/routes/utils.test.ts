@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { wrapHandler, validateChainKey } from './utils.js';
 
-// Minimal mock for FastifyRequest and FastifyReply
+// minimal mocks for FastifyRequest and FastifyReply.
 function mockRequest(serverLogError?: (err: unknown) => void) {
   return {
     server: {

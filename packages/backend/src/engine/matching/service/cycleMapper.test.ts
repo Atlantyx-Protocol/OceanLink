@@ -25,7 +25,7 @@ describe('buildCycleMatches', () => {
       [2, 1],
     ]);
 
-    // Simulate rawCycles: one cycle with edges u=0→v=1 w=10 and u=1→v=0 w=15
+    // simulate rawCycles: one cycle with edges u=0→v=1 w=10 and u=1→v=0 w=15
     const rawCycles = [
       [
         { u: 0, v: 1, w: 10 },
@@ -53,8 +53,8 @@ describe('buildCycleMatches', () => {
       [2, 1],
     ]);
 
-    // First cycle: A(10) + B(30) → minW=10, B becomes 20
-    // Second cycle: C(20) + B(20) → minW=20
+    // first cycle: A(10) + B(30) → minW=10, B becomes 20
+    // second cycle: C(20) + B(20) → minW=20
     const rawCycles = [
       [
         { u: 0, v: 1, w: 10 },
@@ -69,11 +69,11 @@ describe('buildCycleMatches', () => {
     const result = buildCycleMatches(orders, chainToVertex, rawCycles);
     assert.equal(result.length, 2);
 
-    // First cycle
+    // first cycle
     assert.equal(result[0].matchedAmount, '10');
     assert.equal(result[0].orders.length, 2);
 
-    // Second cycle
+    // second cycle
     assert.equal(result[1].matchedAmount, '20');
     assert.equal(result[1].orders.length, 2);
   });

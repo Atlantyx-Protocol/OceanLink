@@ -1,11 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { db, schema, logDbError } from '../../db/client.js';
 
-// ---------------------------------------------------------------------------
-// Execution state — stored per matchId so the API can expose it.
-// In-memory map mirrors the `executions` table; writes are fire-and-forget,
-// hydrate() rebuilds the map from the DB on startup.
-// ---------------------------------------------------------------------------
+// execution state per matchId, exposed via the API. in-memory map mirrors
+// the `executions` table; writes are fire-and-forget. hydrate() rebuilds the
+// map from the DB on startup.
 
 export interface ExecutionWithdraw {
   fillId: string;

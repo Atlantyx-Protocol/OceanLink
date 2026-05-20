@@ -3,19 +3,13 @@ import { matchingService } from '../service/matchingService.js';
 import { orderStore } from '../store/orderStore.js';
 import { orderEvents, type OrderEvent } from '../../events/orderEvents.js';
 
-// ---------------------------------------------------------------------------
-// Intent & Match Routes
-//
+// intent & match routes:
 //   POST /intent           — submit an intent order
 //   GET  /orders/:id       — query a single order's status
 //   GET  /matches          — paginated list of recent match results
-// ---------------------------------------------------------------------------
 
 const intentRoutes: FastifyPluginAsync = async (fastify) => {
-  // -------------------------------------------------------------------------
-  // POST /intent
-  // Body: { srcChain, desChain, amount, deadline }
-  // -------------------------------------------------------------------------
+  // POST /intent — body: { srcChain, desChain, amount, deadline }
   fastify.post<{
     Body: {
       srcChain: unknown;
@@ -28,7 +22,7 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
   }>('/intent', async (request, reply) => {
     const body = request.body as Record<string, unknown>;
 
-    // Coarse presence check before passing to service validation
+    // coarse presence check before passing to service validation
     const required = ['srcChain', 'desChain', 'amount', 'deadline', 'userAddress'] as const;
     for (const field of required) {
       if (body[field] === undefined || body[field] === null) {
@@ -52,9 +46,7 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.code(201).send({ order: result.order });
   });
 
-  // -------------------------------------------------------------------------
   // GET /orders/:id
-  // -------------------------------------------------------------------------
   fastify.get<{ Params: { id: string } }>('/orders/:id', async (request, reply) => {
     const order = orderStore.get(request.params.id);
     if (!order) {
@@ -63,11 +55,8 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.send({ order });
   });
 
-  // -------------------------------------------------------------------------
-  // GET /orders/:id/events
-  // Server-Sent Events stream of lifecycle events for a single order.
-  // The stream auto-closes after a 'done' or 'error' event.
-  // -------------------------------------------------------------------------
+  // GET /orders/:id/events — SSE stream of lifecycle events.
+  // auto-closes after 'done' or 'error'.
   fastify.get<{ Params: { id: string } }>('/orders/:id/events', async (request, reply) => {
     const { id } = request.params;
 
@@ -80,7 +69,7 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
     });
     reply.hijack();
 
-    // Nudge the client to consider the stream "open" immediately.
+    // nudge the client to consider the stream "open" immediately.
     reply.raw.write(': connected\n\n');
 
     const listener = (event: OrderEvent) => {
@@ -98,9 +87,7 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
     });
   });
 
-  // -------------------------------------------------------------------------
   // GET /matches?page=1&pageSize=20
-  // -------------------------------------------------------------------------
   fastify.get<{
     Querystring: { page?: string; pageSize?: string };
   }>('/matches', async (request, reply) => {

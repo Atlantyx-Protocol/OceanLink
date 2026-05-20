@@ -10,8 +10,7 @@ export default function BridgePage() {
   const { isAuthenticated } = useAuth();
   const { connect, connectors } = useConnect();
 
-  // Fallback connect action for the in-card "Connect Wallet" button:
-  // pick the first available connector (usually injected).
+  // fallback connect for in-card button — picks first available connector
   const handleConnectWallet = () => {
     const connector = connectors[0];
     if (connector) connect({ connector });

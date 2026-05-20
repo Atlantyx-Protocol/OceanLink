@@ -1,19 +1,13 @@
 import type { IntentOrder, CycleMatch, CycleMatchEntry } from '../types.js';
 
-/**
- * Replays the algorithm's weight-mutation steps to map each EdgeSnapshot
- * back to a concrete IntentOrder, producing one CycleMatch per raw cycle.
- *
- * The algorithm mutates the edge list in place (splice + subtract), so we
- * maintain a parallel `simEdges` map that mirrors those mutations as we
- * iterate through each captured cycle.
- */
+// replays the algorithm's weight mutations against a parallel simEdges map
+// to map each EdgeSnapshot back to a concrete IntentOrder.
 export function buildCycleMatches(
   activeOrders: IntentOrder[],
   chainToVertex: Map<number, number>,
   rawCycles: Array<Array<{ u: number; v: number; w: number }>>
 ): CycleMatch[] {
-  // Working copy of edge weights keyed by order index (= edge.id).
+  // working copy of edge weights keyed by order index (= edge.id).
   const simEdges = new Map<number, { u: number; v: number; w: number }>(
     activeOrders.map((order, idx) => [
       idx,
@@ -29,7 +23,7 @@ export function buildCycleMatches(
     const minW = Math.min(...snapshot.map((s) => s.w));
     const minSnapIdx = snapshot.findIndex((s) => s.w === minW);
 
-    // Map each snapshot entry {u, v, w} to the matching edge id in simEdges.
+    // map each snapshot entry {u, v, w} to the matching edge id in simEdges.
     const usedIds = new Set<number>();
     const matchedIds: (number | undefined)[] = snapshot.map(({ u, v, w }) => {
       for (const [id, edge] of simEdges) {
@@ -41,7 +35,7 @@ export function buildCycleMatches(
       return undefined;
     });
 
-    // Build the per-cycle order entries.
+    // build the per-cycle order entries.
     const orders: CycleMatchEntry[] = matchedIds
       .map((id) => {
         if (id === undefined) return null;
@@ -55,7 +49,7 @@ export function buildCycleMatches(
       })
       .filter((e): e is CycleMatchEntry => e !== null);
 
-    // Replay the algorithm's mutation so the next cycle sees updated weights.
+    // replay the algorithm's mutation so the next cycle sees updated weights.
     for (let i = 0; i < matchedIds.length; i++) {
       const id = matchedIds[i];
       if (id === undefined) continue;

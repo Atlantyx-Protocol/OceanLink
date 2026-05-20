@@ -3,46 +3,24 @@ import type { IntentOrder, MatchResult } from '../types.js';
 import { db, schema, logDbError } from '../../../db/client.js';
 import { isTestingMode } from '../../../config/constants.js';
 
-// ---------------------------------------------------------------------------
-// OrderStore — in-memory cache for intent orders and match results, with
-// write-through persistence to Postgres.
-//
-// The matching tick still runs against the in-memory maps for speed; every
-// mutation is mirrored asynchronously to the database (fire-and-forget with
-// an error log). On boot, hydrate() rebuilds the in-memory state from the DB.
-//
-// Primary index : Map<orderId, IntentOrder>
-//   → O(1) lookup by order id.
-//
-// Secondary index : Map<`${srcChain}-${desChain}`, Set<orderId>>
-//   → O(1) lookup of all active orders for a given chain pair.
-//   → Entries are removed when an order is MATCHED or EXPIRED.
-//
-// Match results : MatchResult[] (append-only, newest-first on query)
-// ---------------------------------------------------------------------------
+// OrderStore — in-memory cache with write-through persistence to Postgres.
+// matching tick runs against in-memory maps; mutations are mirrored async
+// (fire-and-forget). hydrate() rebuilds state from the DB on boot.
+//   orders     : Map<orderId, IntentOrder>            — O(1) lookup by id
+//   pairIndex  : Map<`${src}-${des}`, Set<orderId>>   — active orders per pair
+//   matchResults: MatchResult[]                       — append-only
 
 export class OrderStore {
   private readonly orders = new Map<string, IntentOrder>();
   private readonly pairIndex = new Map<string, Set<string>>();
   private readonly matchResults: MatchResult[] = [];
 
-  // -------------------------------------------------------------------------
-  // Helpers
-  // -------------------------------------------------------------------------
-
   private pairKey(srcChain: number, desChain: number): string {
     return `${srcChain}-${desChain}`;
   }
 
-  // -------------------------------------------------------------------------
-  // Hydration
-  // -------------------------------------------------------------------------
-
-  /**
-   * Loads all persisted orders and match results into memory. Called once
-   * on process startup, before the matching scheduler starts. Active orders
-   * (QUEUED|PARTIAL) are added to the pair index.
-   */
+  // loads persisted orders and match results into memory at boot.
+  // active orders (QUEUED|PARTIAL) get added to the pair index.
   async hydrate(): Promise<void> {
     const [orderRows, matchRows] = await Promise.all([
       db.select().from(schema.intentOrders),
@@ -80,10 +58,6 @@ export class OrderStore {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Order CRUD
-  // -------------------------------------------------------------------------
-
   add(order: IntentOrder): void {
     this.orders.set(order.orderId, order);
     const key = this.pairKey(order.srcChain, order.desChain);
@@ -115,10 +89,7 @@ export class OrderStore {
     return this.orders.get(orderId);
   }
 
-  /**
-   * Applies partial updates to an existing order.
-   * Returns false when the order is not found.
-   */
+  // applies partial updates. returns false when the order is not found.
   update(orderId: string, updates: Partial<IntentOrder>): boolean {
     const order = this.orders.get(orderId);
     if (!order) return false;
@@ -139,15 +110,12 @@ export class OrderStore {
     return true;
   }
 
-  /**
-   * All orders whose status is QUEUED or PARTIAL — these are candidates for
-   * the next matching pass.
-   */
+  // candidates for the next matching pass (QUEUED or PARTIAL).
   getActiveOrders(): IntentOrder[] {
     return [...this.orders.values()].filter((o) => o.status === 'QUEUED' || o.status === 'PARTIAL');
   }
 
-  /** Quick lookup of active orders for a specific chain pair. */
+  // quick lookup of active orders for a specific chain pair.
   getByPair(srcChain: number, desChain: number): IntentOrder[] {
     const key = this.pairKey(srcChain, desChain);
     const ids = this.pairIndex.get(key);
@@ -157,28 +125,16 @@ export class OrderStore {
       .filter((o): o is IntentOrder => o !== undefined);
   }
 
-  /**
-   * Removes an order from the secondary pair index.
-   * Call this after an order transitions to MATCHED (so it is no longer
-   * a candidate for future matching passes).
-   * Expired orders are handled automatically by expireStale().
-   */
+  // call after an order transitions to MATCHED so it stops being a candidate.
+  // expired orders are handled by expireStale().
   removeFromPairIndex(orderId: string): void {
     const order = this.orders.get(orderId);
     if (!order) return;
     this.pairIndex.get(this.pairKey(order.srcChain, order.desChain))?.delete(orderId);
   }
 
-  // -------------------------------------------------------------------------
-  // Garbage collection
-  // -------------------------------------------------------------------------
-
-  /**
-   * Marks all active (QUEUED or PARTIAL) orders whose deadline has passed
-   * as EXPIRED, and removes them from the pair index.
-   *
-   * @returns number of orders that were newly expired.
-   */
+  // marks past-deadline active orders as EXPIRED, drops them from the pair index.
+  // returns the count of newly-expired orders.
   expireStale(): number {
     const now = Math.floor(Date.now() / 1000);
     let count = 0;
@@ -203,10 +159,6 @@ export class OrderStore {
     return count;
   }
 
-  // -------------------------------------------------------------------------
-  // Match results
-  // -------------------------------------------------------------------------
-
   addMatchResult(result: MatchResult): void {
     this.matchResults.push(result);
 
@@ -225,10 +177,7 @@ export class OrderStore {
     }
   }
 
-  /**
-   * Returns match results in reverse-chronological order (newest first),
-   * with simple page/pageSize pagination.
-   */
+  // newest-first paginated list of match results.
   getMatchResults(
     page: number,
     pageSize: number
@@ -239,15 +188,11 @@ export class OrderStore {
     return { data, total, page, pageSize };
   }
 
-  // -------------------------------------------------------------------------
-  // Diagnostics / testing helpers
-  // -------------------------------------------------------------------------
-
   totalCount(): number {
     return this.orders.size;
   }
 
-  /** Wipes in-memory state — intended for tests only. Does not touch the DB. */
+  // wipes in-memory state — tests only, does not touch the DB.
   clear(): void {
     this.orders.clear();
     this.pairIndex.clear();
@@ -255,5 +200,5 @@ export class OrderStore {
   }
 }
 
-/** Module-level singleton used throughout the application. */
+// module-level singleton.
 export const orderStore = new OrderStore();

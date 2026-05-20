@@ -3,7 +3,7 @@ import { bridgeService } from '../engine/execution/bridge.js';
 import { wrapHandler } from './utils.js';
 
 const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
-  // Create order with multiple fills: approve + newOrder
+  // create order with multiple fills: approve + newOrder.
   fastify.post<{
     Body: {
       receivers: string[];
@@ -62,13 +62,13 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
     })
   );
 
-  // Generate secret/hashlock pair
+  // generate a secret/hashlock pair.
   fastify.get('/bridge/generate-secret', async () => {
     const { secret, hashlock } = bridgeService.generateSecret();
     return { secret, hashlock };
   });
 
-  // Withdraw: receiver claims tokens by providing the correct preimage
+  // withdraw: receiver claims tokens with the correct preimage.
   fastify.post<{
     Body: { orderId: string; fillId: string; preimage: string; chain?: string };
   }>(
@@ -97,7 +97,7 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
     })
   );
 
-  // Refund: sender reclaims tokens after timelock expires
+  // refund: sender reclaims tokens after timelock expires.
   fastify.post<{ Body: { orderId: string; chain?: string } }>(
     '/bridge/refund',
     wrapHandler(async (request, reply) => {
@@ -112,7 +112,7 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
     })
   );
 
-  // Get order details
+  // get order details.
   fastify.get<{ Params: { orderId: string }; Querystring: { chain?: string } }>(
     '/bridge/order/:orderId',
     wrapHandler(async (request) => {
@@ -123,7 +123,7 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
     })
   );
 
-  // Get fill details
+  // get fill details.
   fastify.get<{ Params: { orderId: string; fillId: string }; Querystring: { chain?: string } }>(
     '/bridge/order/:orderId/fill/:fillId',
     wrapHandler(async (request) => {
@@ -134,7 +134,7 @@ const bridgeRoutes: FastifyPluginAsync = async (fastify) => {
     })
   );
 
-  // Get all fills for an order
+  // get all fills for an order.
   fastify.get<{ Params: { orderId: string }; Querystring: { chain?: string } }>(
     '/bridge/order/:orderId/fills',
     wrapHandler(async (request) => {

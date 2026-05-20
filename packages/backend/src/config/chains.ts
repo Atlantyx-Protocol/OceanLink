@@ -6,7 +6,7 @@ export interface ChainConfig {
   htlcAddress: string;
 }
 
-// Use getter function to read env vars at runtime (after dotenv loads)
+// getter so env vars are read at runtime, after dotenv loads.
 export const getChainConfig = (chainKey: string): ChainConfig | undefined => {
   const configs: Record<string, ChainConfig> = {
     sepolia: {

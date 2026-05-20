@@ -19,22 +19,14 @@ import {
   type ExecutionWithdraw,
 } from './executionStore.js';
 
-// Re-export types for consumers
+// re-export types for consumers
 export type { ExecutionWithdraw, ExecutionData, ExecutionRecord };
 
-// ---------------------------------------------------------------------------
-// Orchestrator
-//
-// Converts matched cycles from the matching engine into on-chain HTLC orders
-// via bridgeService.createOrder().
-//
-// Consolidation model:
-//   All cycles from a match result are collected into "send actions". Actions
-//   on the same chain are consolidated into a single bridge order with
-//   multiple receivers / amounts. The first consolidated group is the
-//   "presiding" order that generates fresh secrets. Subsequent orders reuse
-//   hashlocks for atomic unlocking.
-// ---------------------------------------------------------------------------
+// turns matched cycles into on-chain HTLC orders via bridgeService.createOrder().
+// cycles become "send actions"; actions on the same chain are consolidated
+// into one bridge order with multiple receivers. the first group is the
+// "presiding" order that generates fresh secrets; the rest reuse hashlocks
+// for atomic unlocking.
 
 export class Orchestrator {
   private readonly chainIdToKey: Map<number, string>;
@@ -44,7 +36,7 @@ export class Orchestrator {
     this.chainIdToKey = buildChainIdMap();
   }
 
-  /** Loads persisted execution records into memory. Call once on boot. */
+  // loads persisted execution records into memory; call once on boot
   async hydrate(): Promise<void> {
     await this.executionStore.hydrate();
   }
@@ -53,10 +45,7 @@ export class Orchestrator {
     return this.executionStore.get(matchId);
   }
 
-  // -------------------------------------------------------------------------
-  // Entry point — called by the scheduler after each tick
-  // -------------------------------------------------------------------------
-
+  // entry point — called by the scheduler after each tick
   async handleMatchResults(matchResults: MatchResult[]): Promise<void> {
     for (const result of matchResults) {
       this.executionStore.set(result.matchId, { status: 'pending' });
@@ -86,10 +75,7 @@ export class Orchestrator {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // Core consolidated execution
-  // -------------------------------------------------------------------------
-
+  // core consolidated execution
   private async executeConsolidated(
     cycles: CycleMatch[],
     matchId: string,
@@ -167,7 +153,7 @@ export class Orchestrator {
 
     console.log(`[Orchestrator] All ${groupEntries.length} consolidated order(s) on-chain`);
 
-    // Build and store execution record for API access
+    // build and store execution record for API access
     const executionData: ExecutionData = {
       presidingOrder: {
         orderId: presidingResult.orderId,
@@ -289,7 +275,7 @@ export class Orchestrator {
   ): Promise<{ chain: string; txHash: string }[]> {
     const withdrawTxs: { chain: string; txHash: string }[] = [];
 
-    // Verify and withdraw presiding order
+    // verify and withdraw presiding order
     await this.verifyOrder(presidingKey, presidingResult.orderId, 'presiding');
     for (let i = 0; i < presidingResult.fills.length; i++) {
       const preimage = presidingResult.fills[i].secret;
@@ -303,7 +289,7 @@ export class Orchestrator {
       withdrawTxs.push({ chain: presidingKey, txHash });
     }
 
-    // Verify and withdraw each non-presiding order
+    // verify and withdraw each non-presiding order
     for (const { chainKey, orderId, fills, actions } of nonPresidingResults) {
       await this.verifyOrder(chainKey, orderId, `non-presiding (${chainKey})`);
       for (let i = 0; i < fills.length; i++) {
@@ -349,5 +335,5 @@ export class Orchestrator {
   }
 }
 
-/** Application-level singleton. */
+// application-level singleton
 export const orchestrator = new Orchestrator(orderStore);

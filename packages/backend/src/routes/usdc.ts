@@ -4,7 +4,7 @@ import { getAllChainConfigs } from '../config/chains.js';
 import { wrapHandler, validateChainKey } from './utils.js';
 
 const usdcRoutes: FastifyPluginAsync = async (fastify) => {
-  // Get USDC allowance for an address on a specific chain
+  // USDC allowance for an address on a chain.
   fastify.get<{ Params: { chain: string }; Querystring: { address: string } }>(
     '/usdc/allowance/:chain',
     wrapHandler(async (request, reply) => {
@@ -29,7 +29,7 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
     })
   );
 
-  // Get USDC balance for an address on a specific chain
+  // USDC balance for an address on a chain.
   fastify.get<{ Params: { chain: string }; Querystring: { address: string } }>(
     '/usdc/balance/:chain',
     wrapHandler(async (request, reply) => {
@@ -48,7 +48,7 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
     })
   );
 
-  // Approve USDC spending on a specific chain
+  // approve USDC spending on a chain.
   fastify.post<{ Params: { chain: string }; Body: { privateKey: string; amount?: string } }>(
     '/usdc/approve/:chain',
     wrapHandler(async (request, reply) => {
@@ -65,7 +65,7 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
     })
   );
 
-  // Derive wallet address from private key
+  // derive wallet address from private key.
   fastify.post<{ Body: { privateKey: string } }>(
     '/usdc/wallet-address',
     wrapHandler(async (request, reply) => {
@@ -80,7 +80,7 @@ const usdcRoutes: FastifyPluginAsync = async (fastify) => {
     })
   );
 
-  // Get available chains
+  // list available chains.
   fastify.get('/usdc/chains', async () => {
     const configs = getAllChainConfigs();
     return {

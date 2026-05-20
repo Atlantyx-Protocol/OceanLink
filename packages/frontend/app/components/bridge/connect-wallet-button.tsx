@@ -27,7 +27,7 @@ export function ConnectWalletButton() {
 
   const isSupportedChain = chainId !== undefined && SUPPORTED_CHAINS.some((c) => c.id === chainId);
 
-  // Disconnected — show connector picker
+  // disconnected — show connector picker
   if (!isConnected) {
     return (
       <DropdownMenu>
@@ -55,7 +55,7 @@ export function ConnectWalletButton() {
     );
   }
 
-  // Connected, wrong network — prompt switch
+  // connected on wrong network — prompt switch
   if (!isSupportedChain) {
     return (
       <Button
@@ -69,7 +69,7 @@ export function ConnectWalletButton() {
     );
   }
 
-  // Connected — show address + dropdown
+  // connected — show address + dropdown
   const activeChain = SUPPORTED_CHAINS.find((c) => c.id === chainId);
 
   return (

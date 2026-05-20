@@ -39,11 +39,11 @@ describe('groupActionsByChainKey', () => {
     const groups = groupActionsByChainKey(actions);
     assert.equal(groups.length, 2);
 
-    // First group: 0xA on sepolia (2 actions)
+    // first group: 0xA on sepolia (2 actions)
     assert.equal(groups[0][0], 'sepolia:0xA');
     assert.equal(groups[0][1].length, 2);
 
-    // Second group: 0xB on arbitrumSepolia (1 action)
+    // second group: 0xB on arbitrumSepolia (1 action)
     assert.equal(groups[1][0], 'arbitrumSepolia:0xB');
     assert.equal(groups[1][1].length, 1);
   });

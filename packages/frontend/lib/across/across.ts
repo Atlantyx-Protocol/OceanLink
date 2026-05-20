@@ -10,11 +10,7 @@ import {
 import { USDC_DECIMALS } from '@/hooks/funds/constants';
 import { config } from '@/lib/config/config';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/** Raw quote response from the Across API (swap/approval endpoint). */
+// raw quote response from the Across swap/approval endpoint
 export interface AcrossQuote {
   expectedOutputAmount?: string;
   swapTx?: { to: string; data: string; value?: string; gas?: string };
@@ -29,14 +25,7 @@ interface LabeledQuote {
 // Across perps USDC token address (Hypercore destination)
 const USDC_PERPS_TOKEN_ADDRESS = '0x2100000000000000000000000000000000000000';
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Picks the quote with the highest expectedOutputAmount from a set of
- * candidates. Quotes without a swapTx are discarded.
- */
+// picks the quote with the highest expectedOutputAmount; quotes without swapTx are discarded
 function bestQuote(quotes: LabeledQuote[]): AcrossQuote {
   const valid = quotes.filter(({ quote, label }) => {
     if (!quote.swapTx) {
@@ -77,14 +66,7 @@ async function fetchQuote(params: URLSearchParams, label: string): Promise<Label
   }
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/**
- * Creates a viem PublicClient for the given origin chain.
- * Uses configured RPC endpoints when available, falls back to chain defaults.
- */
+// viem PublicClient for the origin chain — uses configured RPC, falls back to chain default
 export function createOriginPublicClient(originChain: SupportedChain): PublicClient {
   const originChainConfig = getChain(originChain);
   const httpEndpoint =
@@ -97,12 +79,7 @@ export function createOriginPublicClient(originChain: SupportedChain): PublicCli
   }) as PublicClient;
 }
 
-/**
- * Fetches the best Across bridge quote for a USDC cross-chain swap.
- *
- * Queries both Spot-USDC and Perps-USDC output tokens in parallel and
- * returns whichever gives the highest output amount.
- */
+// fetches the best Across quote — queries Spot-USDC and Perps-USDC in parallel and picks the higher output
 export async function getQuote(
   inputAmount: string,
   chains: {
@@ -151,10 +128,7 @@ export async function getQuote(
   return bestQuote(quotes);
 }
 
-/**
- * Sends any required ERC-20 approval transactions before the bridge swap.
- * No-ops when the quote requires no approvals.
- */
+// sends any ERC-20 approvals required by the quote — no-ops when none are needed
 export async function executeApproval(
   quote: AcrossQuote,
   walletClient: WalletClient,
@@ -179,10 +153,7 @@ export async function executeApproval(
   }
 }
 
-/**
- * Executes the bridge swap transaction from the quote.
- * Returns the transaction hash on success.
- */
+// executes the bridge swap tx from the quote, returns the tx hash
 export async function executeQuote(
   quote: AcrossQuote,
   walletClient: WalletClient,

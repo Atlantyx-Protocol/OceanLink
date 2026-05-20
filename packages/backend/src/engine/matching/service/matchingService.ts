@@ -17,59 +17,26 @@ import type {
   TickStats,
 } from '../types.js';
 
-// ---------------------------------------------------------------------------
-// Matching algorithm adapter — design notes
-//
-// algorithmFn(n, edges, x): EdgeSnapshot[][]
-//   n      — number of distinct vertices (chain indices, 0-based)
-//   edges  — directed weighted edge list, MUTATED IN PLACE by the algorithm
-//   x      — threshold ratio: a cycle is matched only when min_w/max_w > x
-//
-// Mapping  IntentOrder  →  Edge:
-//   edge.id  = index of the order in the snapshot array passed to the algorithm
-//   edge.u   = chainToVertex[order.srcChain]
-//   edge.v   = chainToVertex[order.desChain]
-//   edge.w   = Number(order.amount)
-//
-//   ⚠ Precision note: amount is stored as a decimal string; converting to
-//   Number() is safe for USDC values up to ~9 × 10^15 micro-units
-//   (≈ 9 quadrillion micro-USDC, or 9 billion USDC).  For amounts beyond
-//   that, replace with a BigInt-aware graph implementation.
-//
-// Interpreting the mutation after the algorithm runs:
-//   • edge.id no longer in the surviving edge list  →  order FULLY MATCHED
-//     (its edge was the minimum-weight edge in a cycle and was splice-d out)
-//   • edge.id still present but edge.w < originalWeight  →  order PARTIAL
-//     (minW was subtracted from it; the remainder stays in the queue)
-// ---------------------------------------------------------------------------
+// matching algorithm adapter contract:
+//   algorithmFn(n, edges, x): EdgeSnapshot[][]
+//   - edges are mutated in place; surviving edges with reduced w are PARTIAL,
+//     splice-d edges are MATCHED.
+//   - precision: Number() is safe for USDC up to ~9e15 micro-units. For larger
+//     values switch to a BigInt-aware graph.
 
-/** Type alias so tests can inject a mock without importing the concrete fn. */
+// alias so tests can inject a mock.
 export type AlgorithmFn = (n: number, edges: Edge[], x: number) => EdgeSnapshot[][];
 
 export class MatchingService {
   constructor(
     private readonly store: OrderStore,
-    /**
-     * The matching algorithm to use.  Defaults to runMaxFlow (cycle-cancellation).
-     * Pass a mock here in tests to verify the adapter contract.
-     */
+    // algorithm to use; defaults to runMaxFlow. mockable in tests.
     private readonly algorithmFn: AlgorithmFn = runMaxFlow,
-    /**
-     * Ratio threshold for the algorithm.  A cycle is only matched when
-     *   min_amount / max_amount  >  threshold
-     * ENV: MATCH_THRESHOLD (default 0)
-     */
+    // ratio threshold: cycle matched only when min/max > threshold. env: MATCH_THRESHOLD.
     private readonly threshold: number = getMatchThreshold()
   ) {}
 
-  // -------------------------------------------------------------------------
-  // Public API
-  // -------------------------------------------------------------------------
-
-  /**
-   * Validates input, creates an IntentOrder, stores it, and returns it.
-   * Returns { error } on validation failure.
-   */
+  // validates input, creates an IntentOrder, stores it. returns { error } on failure.
   createOrder(input: CreateIntentInput): { order: IntentOrder } | { error: string } {
     const result = validateAndCreateOrder(input);
     if ('error' in result) return result;
@@ -87,15 +54,7 @@ export class MatchingService {
     return { order };
   }
 
-  /**
-   * Executes one full matching tick:
-   *   1. Expire stale orders (deadline < now).
-   *   2. Collect active orders (QUEUED + PARTIAL).
-   *   3. Build graph input for the algorithm.
-   *   4. Run the algorithm; interpret mutations to determine MATCHED / PARTIAL.
-   *   5. Persist MatchResult records; update order statuses.
-   *   6. Return TickStats for the caller (scheduler) to log.
-   */
+  // one full matching tick: expire stale, run algorithm, persist results.
   runTick(): TickStats {
     const expired = this.store.expireStale();
     const activeOrders = this.store.getActiveOrders();
@@ -121,20 +80,11 @@ export class MatchingService {
     };
   }
 
-  // -------------------------------------------------------------------------
-  // Internal — matching pass (also used in tests)
-  // -------------------------------------------------------------------------
-
-  /**
-   * Core matching logic.  Accepts an explicit order list so tests can
-   * control exactly which orders are fed into the algorithm.
-   *
-   * @returns array of MatchResult produced (one per qualifying cycle group).
-   */
+  // core matching logic. takes an explicit order list so tests can control input.
   runMatchingPass(activeOrders: IntentOrder[]): MatchResult[] {
     if (activeOrders.length === 0) return [];
 
-    // -- Step 1: map chainId → vertex index (0-based) ---------------------
+    // map chainId → vertex index (0-based)
     const chainToVertex = new Map<number, number>();
     for (const order of activeOrders) {
       if (!chainToVertex.has(order.srcChain)) {
@@ -146,8 +96,7 @@ export class MatchingService {
     }
     const n = chainToVertex.size;
 
-    // -- Step 2: build Edge[] from orders ---------------------------------
-    // IMPORTANT: edge.id === index into activeOrders so we can map back after
+    // build Edge[] from orders. edge.id === index into activeOrders for mapping back.
     const edges: Edge[] = activeOrders.map((order, idx) => ({
       id: idx,
       u: chainToVertex.get(order.srcChain)!,
@@ -155,26 +104,21 @@ export class MatchingService {
       w: Number(order.amount), // see precision note at top of file
     }));
 
-    // Snapshot original state before the algorithm mutates edges
+    // snapshot original state before the algorithm mutates edges
     const originalWeights = new Map<number, number>(edges.map((e) => [e.id, e.w]));
     const originalIds = new Set(edges.map((e) => e.id));
 
-    // -- Step 3: run algorithm (MUTATES edges) ----------------------------
+    // run algorithm (mutates edges)
     const rawCycles = this.algorithmFn(n, edges, this.threshold);
 
     if (rawCycles.length === 0) return [];
 
-    // -- Step 4: build per-cycle breakdown FIRST ---------------------------
-    // cycleMapper reads activeOrders[i].amount to identify which order each
-    // snapshot edge corresponds to. Once we start mutating store amounts via
-    // `this.store.update(..., { amount: ... })` below, those amounts get
-    // overwritten with residuals (Object.assign in OrderStore.update mutates
-    // the same object reference activeOrders holds), so the snapshot ↔ order
-    // lookup would fail for any order participating in multiple cycles. Call
-    // cycleMapper here while amounts still reflect the pre-tick originals.
+    // build per-cycle breakdown BEFORE mutating store amounts — cycleMapper
+    // reads activeOrders[i].amount to match snapshot edges to orders, and
+    // store.update() (via Object.assign) overwrites those amounts with residuals.
     const cycles = buildCycleMatches(activeOrders, chainToVertex, rawCycles);
 
-    // -- Step 5: interpret mutations to determine order outcomes ----------
+    // interpret mutations to determine order outcomes
     const remainingIds = new Set(edges.map((e) => e.id));
 
     const matchedEntries: MatchedOrderEntry[] = [];
@@ -184,7 +128,7 @@ export class MatchingService {
       const originalW = originalWeights.get(id)!;
 
       if (!remainingIds.has(id)) {
-        // Edge was splice-d out → order FULLY MATCHED
+        // edge was splice-d out → order fully MATCHED
         matchedEntries.push({
           orderId: order.orderId,
           srcChain: order.srcChain,
@@ -196,15 +140,14 @@ export class MatchingService {
         this.store.update(order.orderId, { status: 'MATCHED' });
         this.store.removeFromPairIndex(order.orderId);
       } else {
-        // Edge survived — check whether its weight was reduced
+        // edge survived — check whether its weight was reduced
         const survivingEdge = edges.find((e) => e.id === id)!;
         if (survivingEdge.w < originalW) {
           const consumed = originalW - survivingEdge.w;
 
           if (survivingEdge.w === 0) {
-            // Weight reduced to exactly 0 → fully consumed, same as MATCHED.
-            // This happens when two equal-weight edges are in a cycle: the
-            // algorithm removes the first (by findIndex) and zeroes the second.
+            // weight reduced to exactly 0 → fully consumed, treat as MATCHED.
+            // happens when two equal-weight edges share a cycle.
             matchedEntries.push({
               orderId: order.orderId,
               srcChain: order.srcChain,
@@ -216,7 +159,7 @@ export class MatchingService {
             this.store.update(order.orderId, { status: 'MATCHED' });
             this.store.removeFromPairIndex(order.orderId);
           } else {
-            // Weight reduced but still > 0 → genuinely partial
+            // weight reduced but still > 0 → genuinely partial
             matchedEntries.push({
               orderId: order.orderId,
               srcChain: order.srcChain,
@@ -225,8 +168,7 @@ export class MatchingService {
               remainingAmount: String(survivingEdge.w),
               status: 'PARTIAL',
             });
-            // Update stored amount to remaining so the next tick uses the
-            // correct (reduced) weight for this order.
+            // update stored amount to remainder so the next tick sees the reduced weight.
             this.store.update(order.orderId, {
               status: 'PARTIAL',
               amount: String(survivingEdge.w),
@@ -238,7 +180,7 @@ export class MatchingService {
 
     if (matchedEntries.length === 0) return [];
 
-    // -- Step 6: build and persist the MatchResult -----------------------
+    // build and persist the MatchResult
     const result: MatchResult = {
       matchId: randomUUID(),
       matchedAt: Math.floor(Date.now() / 1000),
@@ -266,5 +208,5 @@ export class MatchingService {
   }
 }
 
-/** Application-level singleton. */
+// app-level singleton.
 export const matchingService = new MatchingService(orderStore);

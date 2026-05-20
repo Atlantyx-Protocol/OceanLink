@@ -12,32 +12,25 @@ import {
 } from '@/lib/across/across';
 import type { SupportedChain } from '@/lib/web3/web3';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type BridgeStep = 'idle' | 'quoting' | 'approving' | 'bridging' | 'done' | 'error';
 
 export interface BridgeState {
-  /** Current step in the bridge pipeline. */
+  // current step in the bridge pipeline
   step: BridgeStep;
-  /** The fetched quote (available after "quoting" succeeds). */
+  // fetched quote (available after "quoting" succeeds)
   quote: AcrossQuote | null;
-  /** Transaction hash of the bridge swap (available after "bridging" succeeds). */
+  // tx hash of the bridge swap (available after "bridging" succeeds)
   txHash: `0x${string}` | null;
-  /** Human-readable error message (set when step === "error"). */
+  // error message (set when step === "error")
   error: string | null;
-  /** True while any async work is in progress. */
+  // true while any async work is in progress
   isLoading: boolean;
 }
 
 export interface UseAcrossBridgeReturn extends BridgeState {
-  /**
-   * Kick off the full bridge flow: quote -> approve -> swap.
-   * Rejects if the wallet is disconnected.
-   */
+  // run the full flow: quote -> approve -> swap. rejects if wallet is disconnected
   bridge: (params: BridgeParams) => Promise<void>;
-  /** Reset state back to idle (e.g. after closing a success/error dialog). */
+  // reset state back to idle
   reset: () => void;
 }
 
@@ -45,15 +38,11 @@ export interface BridgeParams {
   inputAmount: string;
   originChain: SupportedChain;
   destinationChain: SupportedChain;
-  /** Depositor address (the connected wallet). */
+  // depositor address (the connected wallet)
   depositor: `0x${string}`;
-  /** Recipient address (defaults to depositor if omitted). */
+  // defaults to depositor if omitted
   recipient?: `0x${string}`;
 }
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
 
 const INITIAL_STATE: BridgeState = {
   step: 'idle',
@@ -69,7 +58,7 @@ export function useAcrossBridge(): UseAcrossBridgeReturn {
   const walletClientRef = useRef(walletClient);
   walletClientRef.current = walletClient;
 
-  // Guard against double-submits
+  // guard against double-submits
   const inflightRef = useRef(false);
 
   const reset = useCallback(() => {
@@ -87,7 +76,7 @@ export function useAcrossBridge(): UseAcrossBridgeReturn {
     let publicClient: PublicClient;
 
     try {
-      // --- Step 1: Quote ------------------------------------------------
+      // step 1: quote
       setState({
         step: 'quoting',
         quote: null,
@@ -103,7 +92,7 @@ export function useAcrossBridge(): UseAcrossBridgeReturn {
         recipient
       );
 
-      // --- Step 2: Approve ----------------------------------------------
+      // step 2: approve
       setState((s) => ({ ...s, step: 'approving', quote }));
 
       const wc = walletClientRef.current;
@@ -112,12 +101,12 @@ export function useAcrossBridge(): UseAcrossBridgeReturn {
 
       await executeApproval(quote, wc, publicClient);
 
-      // --- Step 3: Bridge ------------------------------------------------
+      // step 3: bridge
       setState((s) => ({ ...s, step: 'bridging' }));
 
       const txHash = await executeQuote(quote, wc, publicClient);
 
-      // --- Done ----------------------------------------------------------
+      // done
       setState((s) => ({ ...s, step: 'done', txHash, isLoading: false }));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Bridge transaction failed';

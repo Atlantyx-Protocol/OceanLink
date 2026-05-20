@@ -3,17 +3,9 @@ import type { MatchingService } from '../service/matchingService.js';
 import { orchestrator } from '../../orchestrator/orchestrator.js';
 import { getMatchIntervalMs, getMatchThreshold } from '../../../config/constants.js';
 
-// ---------------------------------------------------------------------------
-// MatchScheduler
-//
-// Runs a periodic "tick" that drives the matching engine.
-// ENV variables:
-//   MATCH_INTERVAL_MS  — how often to tick (default: 5000 ms)
-//
-// Concurrency safety:
-//   isRunning flag prevents overlapping ticks.  Because Node.js is
-//   single-threaded, a plain boolean is sufficient — no real mutex needed.
-// ---------------------------------------------------------------------------
+// MatchScheduler — periodic tick driving the matching engine.
+// env: MATCH_INTERVAL_MS (default 5000ms).
+// isRunning flag prevents overlapping ticks (single-threaded Node).
 
 export class MatchScheduler {
   private isRunning = false;
@@ -24,7 +16,7 @@ export class MatchScheduler {
     private readonly intervalMs: number = getMatchIntervalMs()
   ) {}
 
-  /** Starts the scheduler.  Idempotent — safe to call multiple times. */
+  // idempotent — safe to call multiple times.
   start(): void {
     if (this.timer !== null) return;
     this.timer = setInterval(() => {
@@ -35,7 +27,6 @@ export class MatchScheduler {
     );
   }
 
-  /** Stops the scheduler. */
   stop(): void {
     if (this.timer !== null) {
       clearInterval(this.timer);
@@ -44,7 +35,7 @@ export class MatchScheduler {
     }
   }
 
-  /** Exposed for testing — runs one tick synchronously from the caller. */
+  // exposed for testing — runs one tick synchronously from the caller.
   async tick(): Promise<void> {
     if (this.isRunning) {
       console.warn('[MatchScheduler] Tick skipped — previous tick still running');
@@ -88,5 +79,5 @@ export class MatchScheduler {
   }
 }
 
-/** Application-level singleton. */
+// app-level singleton.
 export const matchScheduler = new MatchScheduler(matchingService);

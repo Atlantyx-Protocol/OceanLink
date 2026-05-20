@@ -4,7 +4,7 @@ import { config } from '@/lib/config/config';
 const TESTNET_BASE_URL = 'https://testnet.across.to/api';
 const MAINNET_BASE_URL = 'https://app.across.to/api';
 
-/** Only forward recognized parameters to the upstream Across API. */
+// only forward recognized params to the upstream Across API
 const ALLOWED_PARAMS = new Set([
   'tradeType',
   'originChainId',
@@ -20,14 +20,14 @@ const ALLOWED_PARAMS = new Set([
 export async function GET(request: NextRequest) {
   const incoming = request.nextUrl.searchParams;
 
-  // Build a sanitized query string with only whitelisted keys
+  // sanitized query string with only whitelisted keys
   const filtered = new URLSearchParams();
   for (const key of ALLOWED_PARAMS) {
     const value = incoming.get(key);
     if (value) filtered.set(key, value);
   }
 
-  // Minimum required params
+  // minimum required params
   if (!filtered.get('amount') || !filtered.get('originChainId') || !filtered.get('depositor')) {
     return NextResponse.json(
       { success: false, error: 'Missing required parameters' },
