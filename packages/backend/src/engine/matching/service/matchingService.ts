@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { runMaxFlow } from '../algorithm/maxFlow.js';
-import type { Edge, EdgeSnapshot } from '../algorithm/algorithm.js';
+import type { Edge, EdgeSnapshot } from '../types.js';
 import { orderStore } from '../store/orderStore.js';
 import type { OrderStore } from '../store/orderStore.js';
 import { orderEvents } from '../../events/orderEvents.js';
@@ -18,9 +18,9 @@ import type {
 } from '../types.js';
 
 // ---------------------------------------------------------------------------
-// runAlgorithm adapter — design notes
+// Matching algorithm adapter — design notes
 //
-// runAlgorithm(n, edges, x): EdgeSnapshot[][]
+// algorithmFn(n, edges, x): EdgeSnapshot[][]
 //   n      — number of distinct vertices (chain indices, 0-based)
 //   edges  — directed weighted edge list, MUTATED IN PLACE by the algorithm
 //   x      — threshold ratio: a cycle is matched only when min_w/max_w > x
@@ -41,9 +41,6 @@ import type {
 //     (its edge was the minimum-weight edge in a cycle and was splice-d out)
 //   • edge.id still present but edge.w < originalWeight  →  order PARTIAL
 //     (minW was subtracted from it; the remainder stays in the queue)
-//
-// If the runAlgorithm signature ever changes, update the adapter below and
-// mark the old adapter with a TODO: ADAPTER UPDATE REQUIRED comment.
 // ---------------------------------------------------------------------------
 
 /** Type alias so tests can inject a mock without importing the concrete fn. */
@@ -53,7 +50,7 @@ export class MatchingService {
   constructor(
     private readonly store: OrderStore,
     /**
-     * The matching algorithm to use.  Defaults to the built-in runAlgorithm.
+     * The matching algorithm to use.  Defaults to runMaxFlow (cycle-cancellation).
      * Pass a mock here in tests to verify the adapter contract.
      */
     private readonly algorithmFn: AlgorithmFn = runMaxFlow,
@@ -94,7 +91,7 @@ export class MatchingService {
    * Executes one full matching tick:
    *   1. Expire stale orders (deadline < now).
    *   2. Collect active orders (QUEUED + PARTIAL).
-   *   3. Build graph input for runAlgorithm.
+   *   3. Build graph input for the algorithm.
    *   4. Run the algorithm; interpret mutations to determine MATCHED / PARTIAL.
    *   5. Persist MatchResult records; update order statuses.
    *   6. Return TickStats for the caller (scheduler) to log.
@@ -163,7 +160,6 @@ export class MatchingService {
     const originalIds = new Set(edges.map((e) => e.id));
 
     // -- Step 3: run algorithm (MUTATES edges) ----------------------------
-    // TODO: ADAPTER UPDATE REQUIRED if runAlgorithm signature changes
     const rawCycles = this.algorithmFn(n, edges, this.threshold);
 
     if (rawCycles.length === 0) return [];

@@ -77,6 +77,25 @@ export interface CreateIntentInput {
   userAddress: string;
 }
 
+// ---------------------------------------------------------------------------
+// Graph types consumed by the matching algorithm.
+// ---------------------------------------------------------------------------
+
+/** A directed, weighted edge in the matching graph. */
+export interface Edge {
+  id: number; // stable unique id (set at construction, never changed)
+  u: number; // source vertex (0-indexed)
+  v: number; // destination vertex (0-indexed)
+  w: number; // current weight (mutated as the algorithm runs)
+}
+
+/** Immutable record of an edge captured at the time a cycle is stored. */
+export interface EdgeSnapshot {
+  u: number;
+  v: number;
+  w: number; // weight BEFORE the cancellation step
+}
+
 /** Summary returned by a single scheduler tick (used for logging). */
 export interface TickStats {
   queuedBefore: number;

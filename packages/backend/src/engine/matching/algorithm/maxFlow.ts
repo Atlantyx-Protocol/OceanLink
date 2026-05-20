@@ -1,51 +1,36 @@
 /**
  * Cycle-cancellation max-circulation matching.
  *
- * Same input/output contract as runAlgorithm (see algorithm.ts) so the two
- * implementations are interchangeable from MatchingService's perspective:
- *
  *   runMaxFlow(n, edges, x): EdgeSnapshot[][]
  *
- * Key differences vs the DFS-greedy runAlgorithm:
+ * Chain-level cycle patterns are enumerated explicitly (O(n^2) two-cycles +
+ * O(n^3) three-cycles for n vertices). For each pattern we pick the best
+ * concrete 1-to-1 order assignment, choosing the cycle with the LARGEST
+ * bottleneck (subject to ratio ≥ x) — greedy in this dimension closely
+ * tracks max-circulation: every cancellation removes the maximum amount
+ * of capacity allowed by the residual graph.
  *
- *   - Cycle patterns at the *chain* level are enumerated explicitly
- *     (O(n^2) two-cycles + O(n^3) three-cycles for n vertices). The combinatorial
- *     explosion in the original came from treating each order as a distinct
- *     parallel edge; this implementation iterates chain-cycle patterns and
- *     picks the best concrete (1-to-1) order assignment per pattern.
- *
- *   - At each step we pick the cycle with the LARGEST bottleneck (subject to
- *     ratio ≥ x) instead of the first one DFS happens to find. Greedy in this
- *     dimension closely tracks max-circulation: every cancellation removes
- *     the maximum amount of capacity allowed by the residual graph.
- *
- *   - One order per leg is preserved (no aggregation), so each captured cycle
- *     stays a clean 1-to-1 N-tuple — the orchestrator can still pair
- *     sender→receiver edge-by-edge for HTLC settlement.
+ * One order per leg is preserved (no aggregation), so each captured cycle
+ * stays a clean 1-to-1 N-tuple — the orchestrator pairs sender→receiver
+ * edge-by-edge for HTLC settlement.
  *
  * Phases:
- *   1. Exhaust all 2-cycles. They are cheaper, fully balanced (the standard
- *      P2P swap shape), and the orchestrator handles them in a single HTLC pair.
+ *   1. Exhaust all 2-cycles. Cheaper (one HTLC pair), fully balanced (the
+ *      standard P2P swap shape), and dominate real-world bridge traffic.
  *   2. Exhaust 3-cycles on the residual. Longer cycles aren't enumerated —
  *      4+ chains are rare in practice and the marginal coverage is tiny.
  */
 
-import type { Edge, EdgeSnapshot } from './algorithm.js';
+import type { Edge, EdgeSnapshot } from '../types.js';
 
-export type { Edge, EdgeSnapshot } from './algorithm.js';
+export type { Edge, EdgeSnapshot } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function cycleRatio(weights: number[]): number {
-  const max = Math.max(...weights);
-  if (max === 0) return 0;
-  return Math.min(...weights) / max;
-}
-
 /**
- * Mimics runAlgorithm's mutation step on a captured cycle:
+ * Applies a cancellation step to a captured cycle:
  *   - Identify the edge with weight equal to minW (first occurrence).
  *   - Splice that edge out of `edges`.
  *   - Subtract minW from every other edge's weight in-place.
@@ -185,7 +170,7 @@ function findBest3Cycle(edges: Edge[], n: number, threshold: number): [Edge, Edg
 
 /**
  * See module-level docstring. Returns one EdgeSnapshot[] per captured cycle
- * with pre-mutation weights, matching the runAlgorithm output contract.
+ * with pre-mutation weights.
  */
 export function runMaxFlow(
   n: number,

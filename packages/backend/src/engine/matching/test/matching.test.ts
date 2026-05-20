@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { OrderStore } from '../store/orderStore.js';
 import { MatchingService } from '../service/matchingService.js';
 import type { AlgorithmFn } from '../service/matchingService.js';
-import type { Edge, EdgeSnapshot } from '../algorithm/algorithm.js';
+import type { Edge, EdgeSnapshot } from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -198,11 +198,11 @@ describe('OrderStore.expireStale', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Test 4 — Scheduler calls runAlgorithm with the correct dataset
+// Test 4 — Scheduler calls the algorithm with the correct dataset
 // ---------------------------------------------------------------------------
 
 describe('MatchingService adapter', () => {
-  it('calls runAlgorithm with n=unique chains, edges mapped from orders', () => {
+  it('calls the algorithm with n=unique chains, edges mapped from orders', () => {
     // Capture what the adapter passes to the algorithm
     let capturedN: number | undefined;
     let capturedEdges: Edge[] | undefined;
@@ -266,7 +266,7 @@ describe('MatchingService adapter', () => {
 
 describe('MatchingService.runMatchingPass — real algorithm', () => {
   it('marks the smaller order MATCHED and the larger order PARTIAL', () => {
-    // Use the real runAlgorithm with threshold 0 so all cycles are captured.
+    // Use the real algorithm with threshold 0 so all cycles are captured.
     // Two orders: A (chain1→chain2, 100) and B (chain2→chain1, 90).
     // The algorithm finds cycle [A, B]:
     //   minW = 90 (edge B), maxW = 100 (edge A), ratio = 0.9 > 0

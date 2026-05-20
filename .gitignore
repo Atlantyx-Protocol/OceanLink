@@ -49,4 +49,7 @@ target/
 *.pdb
 rust-project.json
 
+# Internal codebase docs (not part of thesis)
+docs/CODEBASE_*.md
+
 

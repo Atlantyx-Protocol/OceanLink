@@ -32,33 +32,21 @@ const fastify = Fastify({
 
 async function start() {
   try {
-    // Hydrate in-memory stores from Postgres before the scheduler starts,
-    // so any orders/matches/executions persisted in a previous run are
-    // restored. Failure here is fatal — better to crash than silently lose
-    // pending bridge state.
     await orderStore.hydrate();
     await orchestrator.hydrate();
     fastify.log.info('Stores hydrated from Postgres');
 
-    // Register CORS
     await fastify.register(cors, {
       origin: process.env.FRONTEND_URL || 'http://localhost:3000',
       credentials: true,
     });
 
-    // Register routes
+    // register routes
     await fastify.register(approvalRoutes, { prefix: '/api' });
     await fastify.register(bridgeRoutes, { prefix: '/api' });
     await fastify.register(intentRoutes, { prefix: '/api' });
     await fastify.register(orchestratorRoutes, { prefix: '/api' });
 
-    // Start liquidity market service if LP keys are available.
-    // The liquidity service runs its own matching loop (with LP-aware filtering)
-    // so the default matchScheduler is only used as fallback.
-    //
-    // Approval-failures from liquidityService.start() are NOT caught here:
-    // they must crash the boot so the operator fixes pre-approvals rather
-    // than silently downgrading to the fallback scheduler.
     let lpConfigs: ReturnType<typeof loadLPConfigsFromEnv> | null = null;
     try {
       lpConfigs = loadLPConfigsFromEnv();
@@ -66,10 +54,11 @@ async function start() {
       console.warn('[LiquidityService] LP keys not found — falling back to default scheduler');
     }
 
+    // start liquidity market service if LP keys are available
     if (lpConfigs) {
       const liquidityService = new LiquidityService(matchingService, orderStore, lpConfigs);
       await liquidityService.start();
-
+      
       const shutdown = async () => {
         liquidityService.stop();
         await fastify.close();
@@ -89,7 +78,7 @@ async function start() {
       process.once('SIGTERM', () => void shutdown());
     }
 
-    // Start server
+    // start server
     await fastify.listen({ port: PORT, host: HOST });
 
     console.log(`Backend server running on http://${HOST}:${PORT}`);
