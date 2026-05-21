@@ -6,12 +6,27 @@
 
 \begin{small}
 
-Trong những năm gần đây, công nghệ blockchain đã phát triển nhanh chóng với sự xuất hiện của nhiều blockchain như Ethereum, BNB Chain, Solana cùng hàng loạt các Layer 2. Sự đa dạng này bên cạnh việc rộng hệ sinh thái phi tập trung, nhưng mặt khác lại dẫn tới tình trạng phân mảnh nghiêm trọng về tài sản và thanh khoản giữa các chuỗi. Để giải quyết vấn đề tương tác xuyên chuỗi (cross-chain), các giải pháp bridge truyền thống đã được phát triển và đưa vào sử dụng rộng rãi, nhưng vẫn tồn tại nhiều hạn chế cả về chi phí giao dịch, độ trễ và đặc biệt là bảo mật. Thực tế cho thấy, phần lớn những vụ tấn công gây thiệt hại lớn nhất trong lịch sử blockchain đều nhắm vào điểm yếu của các bridge.
+Trong những năm gần đây, công nghệ blockchain đã phát triển nhanh chóng với sự xuất hiện của nhiều blockchain như Ethereum, BNB Chain, Solana 
+cùng hàng loạt các Layer 2. Sự đa dạng này bên cạnh việc mở
+rộng hệ sinh thái phi tập trung, nhưng mặt khác lại dẫn tới 
+tình trạng phân mảnh nghiêm trọng về tài sản và thanh khoản 
+giữa các chuỗi. Để giải quyết vấn đề tương tác xuyên chuỗi 
+(cross-chain), nhiều giải pháp bridge đã được 
+phát triển và được đưa vào sử dụng rộng rãi, 
+nhưng vẫn tồn tại nhiều hạn chế cả về chi phí giao dịch, độ trễ và đặc biệt là bảo mật. Thực tế cho thấy, phần lớn những vụ tấn công gây thiệt hại lớn nhất trong lịch sử blockchain đều nhắm vào điểm yếu của các bridge.
 
-KLTN đề xuất và xây dựng \textit{OceanLink Protocol}, một hệ thống bridge cross-chain dựa trên mô hình \textit{intent-based} kết hợp mạng ngang hàng (P2P), lấy cảm hứng từ cơ chế netting nội bộ mà Wise (trước đây là TransferWise) đã áp dụng trong lĩnh vực chuyển tiền quốc tế. 
-Kết quả thực nghiệm trên môi trường testnet với ba blockchain Ethereum Sepolia, Arbitrum Sepolia và Base Sepolia, sử dụng USDC làm tài sản giao dịch, cho thấy hệ thống xử lý chính xác các intent. 
-Với cửa sổ ghép cặp 60 giây, hệ thống giúp giảm khoảng 27\% 
-chi phí giao dịch so với các bridge truyền thống. 
+Khóa luận đề xuất và xây dựng \textit{OceanLink Protocol}, 
+một hệ thống bridge cross-chain dựa trên mô hình 
+\textit{intent-based} kết hợp mạng ngang hàng (P2P), lấy 
+cảm hứng từ cơ chế netting nội bộ mà Wise 
+(trước đây là TransferWise) đã áp dụng trong 
+lĩnh vực chuyển tiền quốc tế. 
+Kết quả thực nghiệm trên môi trường testnet với 7 blockchain EVM
+tiêu biểu nhất hiện nay, sử dụng USDC làm tài sản giao dịch,
+cho thấy hệ thống xử lý chính xác các intent. 
+Với cửa sổ ghép cặp 60 giây, khoảng 27\% intent được xử lý
+qua lớp Netting nội bộ với chi phí gần bằng không, qua đó
+giảm đáng kể tổng chi phí giao dịch so với các bridge truyền thống. 
 Bên cạnh đó, OceanLink còn đem lại mức độ an toàn cao hơn đáng kể nhờ loại bỏ các điểm tin cậy tập trung vốn là mục tiêu chính của các vụ tấn công bridge.
 
 \vspace*{1cm}

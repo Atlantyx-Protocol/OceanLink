@@ -12,7 +12,16 @@ Người dùng thường phải thực hiện nhiều giao dịch trên các blo
 Bên cạnh đó, bridge đã trở thành mục tiêu của nhiều cuộc tấn công, gây thiệt hại lớn cho hệ sinh thái, điển hình là vụ Ronin Bridge~\cite{ronin_postmortem} và Wormhole~\cite{wormhole_chainalysis} với tổng thiệt hại lên tới hàng tỷ USD~\cite{chainalysis2022bridge}.
 Có thể thấy bridge là một trong những điểm yếu nghiêm trọng trong kiến trúc blockchain hiện tại.
 
-Song song với đó, khối lượng giao dịch cross-chain liên tục gia tăng, đạt tới mức hàng chục tỷ USD mỗi tháng~\cite{defillama_bridges}, phản ánh nhu cầu thực tế rất lớn từ phía người dùng.
+Song song với đó, khối lượng giao dịch cross-chain liên tục gia tăng, đạt tới mức hàng chục tỷ USD mỗi tháng và có thời điểm tổng volume giao dịch đạt đỉnh khoảng 93 tỷ USD~\cite{defillama_bridges}, phản ánh nhu cầu thực tế rất lớn từ phía người dùng (Hình~\ref{fig:bridge-volume}).
+
+\begin{figure}[H]
+  \begin{center}
+  \includegraphics[width=0.85\linewidth]{figures/c1/bridge-volume}
+  \end{center}
+  \caption{Khối lượng giao dịch cross-chain qua các bridge theo thời gian~\cite{defillama_bridges}}
+  \label{fig:bridge-volume}
+\end{figure}
+
 Điều này đặt ra yêu cầu cấp thiết về việc tìm kiếm một mô hình mới có khả năng thay thế hoặc cải thiện các cơ chế bridge hiện tại, nhằm giảm thiểu rủi ro, tối ưu chi phí và nâng cao hiệu năng.
 
 \section{Động lực}
