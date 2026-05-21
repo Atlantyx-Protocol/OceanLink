@@ -116,7 +116,7 @@ Hệ thống tương tác với năm tác nhân chính:
     \item Solver: tác nhân cung cấp thanh khoản và thực thi (fill) intent ở Intent Accelerator Layer, cạnh tranh với các solver khác thông qua cơ chế Dutch auction.
     \item Matching Engine: tác nhân nội bộ của hệ thống, có nhiệm vụ tìm các chu trình bù trừ giữa các intent ở Netting Layer.
     \item Smart Contract on-chain: gồm các HTLC Vault triển khai trên các blockchain EVM khác nhau, đóng vai trò khoá tài sản và xác minh các điều kiện thực thi.
-    \item Fallback Bridge Aggregator: hệ thống bên thứ ba (ví dụ Chainlink CCIP, Across Protocol) được sử dụng như dự phòng khi cả Netting và Accelerator đều không khả thi.
+    \item Fallback Bridge Aggregator: hệ thống bên thứ ba (ví dụ Chainlink CCIP\footnote{\url{https://chain.link/}}, Across Protocol\footnote{\url{https://across.to/}}) được sử dụng như dự phòng khi cả Netting và Accelerator đều không khả thi.
 \end{itemize}
 
 \subsection{Yêu cầu chức năng}
@@ -153,7 +153,8 @@ Sau khi đã nghiên cứu và đánh giá kỹ lưỡng, KLTN phân tách kiế
 thành hai phần lớn rõ ràng. Phần \textbf{onchain} chứa các smart contract 
 chịu trách nhiệm cho các thao tác cần đảm bảo tính trustless như khoá 
 tài sản, xác minh điều kiện thực thi và settle giao dịch. 
-Phần \textbf{offchain} chứa các thành phần xử lý intent, matching và 
+Phần 
+\textbf{offchain}\footnote{Off-chain: các thao tác và dữ liệu xử lý ngoài blockchain, ngược lại với on-chain.} chứa các thành phần xử lý intent, matching và
 điều phối thực thi. 
 Việc phân tách này cho phép tận dụng lợi thế của cả hai:
 onchain phụ trách lưu trữ và chuyển giao tài sản một cách an toàn, 

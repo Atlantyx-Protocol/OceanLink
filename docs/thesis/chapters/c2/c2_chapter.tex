@@ -255,66 +255,47 @@ vừa đủ ngưỡng $m$, sau đó ký phê duyệt (approve) các giao dịch 
 khoảng \textbf{625 triệu USD}~\cite{ronin_postmortem}. Đây là minh chứng điển hình cho điểm yếu của giả định
 $m$-of-$n$ khi $n$ nhỏ.
 
-\paragraph{Wormhole (Solana--Ethereum).}
-Wormhole~\cite{wormhole_docs} là một generic message-passing bridge giữa nhiều blockchain,
-sử dụng một tập hợp 19 \textit{guardian} ký xác nhận các thông điệp cross-chain
-dưới dạng VAA (Verified Action Approval).
-Smart contract trên chain đích sẽ kiểm tra chữ ký của các guardian trước khi mint
-tài sản tương ứng.
-Ưu điểm của Wormhole là khả năng tổng quát, hỗ trợ nhiều loại tương tác xuyên chuỗi chuyển tài sản, 
-đồng thời có hiệu năng cao nhờ mô hình attestation off-chain.
-Tuy nhiên nhược điểm là độ an toàn phụ thuộc vào tính đúng đắn 
-của smart contract xác minh chữ ký
-và tính trung thực của tập guardian.
-Tháng 02/2022, một lỗi trong khâu kiểm tra chữ ký của smart contract trên Solana
-(bỏ sót việc xác minh \texttt{sysvar} chuẩn) đã cho phép kẻ tấn công giả mạo VAA
-mà không cần được các guardian ký, gây thiệt hại khoảng \textbf{326 triệu USD}~\cite{wormhole_chainalysis}.
+\paragraph{Wormhole (Solana - Ethereum).}
+Wormhole~\cite{wormhole_docs} là bridge truyền message giữa nhiều blockchain,
+xác thực giao dịch bằng chữ ký của 19 \textit{guardian} (một dạng validator
+ngoài chuỗi). Smart contract trên chain đích kiểm tra chữ ký guardian trước khi
+mint tài sản, do đó độ an toàn phụ thuộc trực tiếp vào sự đúng đắn của smart
+contract này.
+Tháng 02/2022, một lỗi bỏ sót bước xác minh 
+\texttt{sysvar}\footnote{Sysvar: các biến hệ thống ví dụ thông tin block, rent, instructions.} trong contract trên
+Solana đã cho phép kẻ tấn công giả mạo VAA mà không cần guardian ký, gây thiệt
+hại khoảng \textbf{326 triệu USD}~\cite{wormhole_chainalysis}.
 
 \paragraph{Kelp DAO qua LayerZero.}
-LayerZero V2~\cite{layerzero_v2_docs} là một giao thức truyền tin omnichain, trong đó việc xác thực
-thông điệp cross-chain được uỷ quyền cho một tập hợp \textit{Decentralized
-Verifier Network} (DVN) do mỗi ứng dụng tự cấu hình. Mỗi thông điệp được coi
-là hợp lệ khi đủ ngưỡng $m$-of-$n$ DVN ký xác nhận, tuỳ thuộc vào cấu hình
-mà ứng dụng lựa chọn (ví dụ 1-of-1, 2-of-3 hay nhiều hơn).
-Ưu điểm của thiết kế này là tính linh hoạt cao, ứng dụng có thể chọn DVN phù hợp
-với mức độ rủi ro và chi phí, đồng thời giảm phụ thuộc vào một tập validator
-cố định như mô hình $m$-of-$n$ truyền thống.
-Nhược điểm là an toàn của bridge thực chất phụ thuộc vào cấu hình DVN do ứng dụng
-tự chọn, một cấu hình lỏng (đặc biệt là 1-of-1) sẽ thu hẹp giả định bảo mật xuống
-một thực thể duy nhất, đồng thời tính sẵn sàng (liveness) của DVN cũng trở thành
-yếu tố trọng yếu.
-Tháng 04/2026, Kelp DAO bị tấn công khi đang sử dụng cấu hình 1-of-1 DVN trên
-LayerZero V2. Theo phân tích sau sự cố, kẻ tấn công đã chiếm quyền các node Remote
-Procedure Call (RPC) mà DVN của Kelp dựa vào, đồng thời tiến hành tấn công DDoS các node khác để buộc
-DVN failover sang đúng các node đã bị thoả hiệp, từ đó ký xác nhận các thông điệp
-cross-chain giả mạo và rút tài sản trên nhiều chain. Tổng thiệt hại ước tính khoảng
+LayerZero V2~\cite{layerzero_v2_docs} cho phép mỗi ứng dụng tự chọn tập
+verifier (Decentralized Verifier Network -- DVN) và ngưỡng $m$-of-$n$ ký xác
+nhận cho message của mình. Thiết kế này linh hoạt nhưng đặt toàn bộ trách nhiệm
+bảo mật vào tay ứng dụng, một cấu hình lỏng có thể thu hẹp tập tin cậy xuống
+mức rất nhỏ.
+Tháng 04/2026, Kelp DAO bị tấn công khi đang dùng cấu hình 1-of-1 DVN. Kẻ tấn
+công chiếm quyền các node RPC mà DVN dựa vào, sau đó DDoS các node khác để
+buộc DVN failover sang node đã bị thoả hiệp, từ đó ký các message giả mạo và
+rút tài sản trên nhiều chain. Tổng thiệt hại ước tính
 \textbf{292 triệu USD}~\cite{kelp_chainalysis}.
-Vụ việc cho thấy mô hình DVN linh hoạt vẫn có thể bị suy giảm xuống mức rủi ro
-tương đương một validator duy nhất nếu ứng dụng cấu hình ngưỡng quá lỏng,
-và an toàn của bridge có thể bị phá vỡ ngay ở tầng hạ tầng.
 
 \subsubsection*{Nhóm optimistic ($1$-of-$n$)}
 
 \paragraph{Nomad Bridge.}
-Nomad Bridge~\cite{nomad_docs} là một generic message-passing bridge giữa nhiều blockchain,
-hoạt động theo mô hình optimistic. Mỗi thông điệp cross-chain được gắn với một
-\textit{Merkle root} mặc định được coi là hợp lệ sau một
-khoảng thời gian gọi là fraud window, trừ khi có ít nhất một watcher gửi fraud proof phản đối.
-Ưu điểm của thiết kế này là chi phí xác minh ban đầu thấp vì chỉ cần một watcher trung thực phát hiện
-gian lận trong fraud window là đủ để bảo vệ toàn hệ thống.
-Đó cũng chính là nhược điểm chính là độ trễ lớn do phải chờ hết fraud window thời gian chellenge
-và sự phụ thuộc vào tính
-liveness của watcher.
-Tháng 08/2022, một thay đổi cấu hình của Nomad đã khiến giá trị \texttt{0x00} bị coi
-là một root hợp lệ, kéo theo bất kỳ message nào cũng được chấp thuận mặc định mà
-không cần đi qua quy trình challenge. Vụ việc gây thiệt hại khoảng \textbf{190 triệu USD}~\cite{nomad_immunefi}
-và trở thành một trong những vụ hack mở lớn nhất khi hàng trăm địa chỉ độc lập đã
-sao chép giao dịch khai thác để tự rút tiền.
+Nomad Bridge~\cite{nomad_docs} là bridge truyền message theo mô hình optimistic:
+mỗi message gắn với một 
+\textit{Merkle root}\footnote{Merkle root: giá trị băm gốc của cây Merkle (Merkle tree), đại diện cho toàn bộ tập dữ liệu.} mặc định được coi là hợp lệ sau
+fraud window, trừ khi có watcher gửi fraud proof phản đối. Đánh đổi là độ trễ
+lớn do phải chờ hết fraud window và phụ thuộc vào liveness của watcher.
+Tháng 08/2022, một thay đổi cấu hình khiến giá trị \texttt{0x00} bị coi là
+root hợp lệ, mọi message đều được chấp thuận mặc định mà không cần qua
+challenge. Vụ việc gây thiệt hại khoảng \textbf{190 triệu USD}~\cite{nomad_immunefi}
+và trở thành một trong những vụ hack ``mở'' lớn nhất khi hàng trăm địa chỉ
+độc lập sao chép giao dịch khai thác để tự rút tiền.
 
 \subsubsection*{Nhóm consensus verifying}
 
 Các hệ thống thuộc nhóm này xác minh trạng thái hoặc giao dịch của chain nguồn
-trực tiếp trên chain đích bằng cách triển khai một \textit{light client} hoặc kiểm
+trực tiếp trên chain đích bằng cách triển khai một \textit{light client}\footnote{Light client: phiên bản rút gọn của node blockchain, chỉ lưu block header để xác minh giao dịch qua Merkle proof thay vì lưu toàn bộ trạng thái.} hoặc kiểm
 tra zero-knowledge proof, thay vì dựa vào một tập hợp validator được tin cậy.
 Trong mô hình light client, chain đích chạy một phiên bản rút gọn của giao thức đồng
 thuận chain nguồn để xác minh các block header và transaction proof, ví dụ tiêu biểu là

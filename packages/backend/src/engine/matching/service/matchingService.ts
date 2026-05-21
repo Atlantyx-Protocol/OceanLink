@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { runMaxFlow } from '../algorithm/maxFlow.js';
+import { runCycleReduction } from '../algorithm/cycleReduction.js';
 import type { Edge, EdgeSnapshot } from '../types.js';
 import { orderStore } from '../store/orderStore.js';
 import type { OrderStore } from '../store/orderStore.js';
@@ -30,8 +30,8 @@ export type AlgorithmFn = (n: number, edges: Edge[], x: number) => EdgeSnapshot[
 export class MatchingService {
   constructor(
     private readonly store: OrderStore,
-    // algorithm to use; defaults to runMaxFlow. mockable in tests.
-    private readonly algorithmFn: AlgorithmFn = runMaxFlow,
+    // algorithm to use; defaults to runCycleReduction. mockable in tests.
+    private readonly algorithmFn: AlgorithmFn = runCycleReduction,
     // ratio threshold: cycle matched only when min/max > threshold. env: MATCH_THRESHOLD.
     private readonly threshold: number = getMatchThreshold()
   ) {}

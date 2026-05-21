@@ -64,9 +64,9 @@ mô tả như trong Bảng~\ref{tab:c4-params}:
         \hline
         \texttt{TIME\_LOCK} & Thời gian khoá HTLC trên chain (đơn vị phút) & 10 \\
         \hline
-        \texttt{MATCH\_INTERVAL\_MS} & Chu kỳ scheduler chạy thuật toán cycle-reduction & 30000 (30\,s) \\
+        \texttt{MATCH\_INTERVAL\_MS} & Chu kỳ scheduler chạy thuật toán cycle-reduction & 60000 (60\,s) \\
         \hline
-        \texttt{MATCH\_THRESHOLD} & Ngưỡng tỉ lệ $\min_w / \max_w$ để chấp nhận một chu trình & 0.3 (30\%) \\
+        \texttt{MATCH\_THRESHOLD} & Ngưỡng tỉ lệ $\min_w / \max_w$ để chấp nhận một chu trình & 0.5 (50\%) \\
         \hline
     \end{tabular}
 \end{table}
@@ -212,22 +212,22 @@ chuyển sang Accelerator/Fallback trong production.
 
 \begin{table}[H]
     \centering
-    \caption{Tỷ lệ intent khớp qua Netting layer theo ngưỡng $x$, với \texttt{window}\,=\,30\,s và deadline = 15\,phút}
+    \caption{Tỷ lệ intent khớp qua Netting layer theo ngưỡng $x$, với \texttt{window}\,=\,60\,s và deadline = 15\,phút}
     \label{tab:c4-results}
     \begin{tabular}{|l|r|r|r|r|r|r|r|}
         \hline
         \textbf{Threshold} & $x=0$ & $x=0.3$ & $x=0.5$ & $x=0.7$ & $x=0.8$ & $x=0.9$ & $x=0.95$ \\
         \hline
-        \textbf{Tỷ lệ khớp} & 44.0\% & 40.1\% & 34.9\% & 29.1\% & 22.5\% & 15.2\% & 11.1\% \\
+        \textbf{Tỷ lệ khớp} & 43.1\% & 39.7\% & 35.3\% & 28.8\% & 22.7\% & 15.1\% & 11.0\% \\
         \hline
     \end{tabular}
 \end{table}
 
-Tỷ lệ khớp giảm dần khi $x$ tăng từ 0 lên 0.95 (44\% xuống 11\%) do các chu trình ratio
-thấp bị loại nhiều hơn. Ngưỡng cân bằng giữa chi phí và độ trễ là $x=0.3$: đạt $\sim$40.1\%
-intent khớp trên 1349. Bên cạnh đó, 657 intent (48.7\%) bị EXPIRED và 115 intent (8.5\%) 
-còn ở trạng thái QUEUED cuối cửa sổ quan sát
-sẽ được chuyển tiếp xuống Accelerator/Fallback layer. Kết quả trên khẳng định 
+Tỷ lệ khớp giảm dần khi $x$ tăng từ 0 lên 0.95 (43{,}1\% xuống 11{,}0\%) do các chu trình
+ratio thấp bị loại nhiều hơn. Ngưỡng cân bằng giữa chất lượng match (chu trình càng cân
+bằng càng tiết kiệm gas) và tỷ lệ khớp là $x=0{,}5$: đạt $\sim$35{,}3\% intent khớp trên
+1349. Bên cạnh đó, 720 intent (53{,}4\%) bị EXPIRED và 111 intent (8{,}2\%) còn ở trạng
+thái QUEUED cuối cửa sổ quan sát sẽ được chuyển tiếp xuống Accelerator/Fallback layer. Kết quả trên khẳng định 
 luận điểm của KLTN việc kết hợp matching P2P nội bộ cho phép phục
 vụ một phần đáng kể lưu lượng bridge thực tế trong khi vẫn giữ được tính trustless và
 chi phí thấp đã đặt ra ở Chương~\ref{chap:design}.

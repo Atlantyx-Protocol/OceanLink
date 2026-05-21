@@ -10,9 +10,10 @@ hướng ngược lại, giữ an toàn lên hàng đầu nhưng vẫn duy trì 
 
 KLTN đã thiết kế kiến trúc ba lớp Netting - Accelerator - Fallback. Toàn bộ thiết kế đã được hiện thực hoá thành
 sản phẩm chạy trên ba chain EVM testnet (Ethereum Sepolia, Arbitrum Sepolia,
-Base Sepolia) cùng giao diện người dùng. Khi đánh giá với 1000 intent thu thập
-từ Dune Analytics, hệ thống phục vụ được khoảng 96\% số intent, trong đó riêng
-lớp Netting đã chiếm gần 1/4 với chi phí gần bằng không.
+Base Sepolia) cùng giao diện người dùng. Khi đánh giá với 1349 intent thu thập
+từ Dune Analytics ở giờ cao điểm, lớp Netting xử lý được khoảng 35\% số intent
+với chi phí gần bằng không, phần còn lại sẽ được chuyển tiếp xuống Accelerator
+và Fallback layer.
 
 Tuy vậy, hệ thống vẫn còn nhiều hạn chế. Phạm vi triển khai hiện mới dừng ở
 testnet với ba chain EVM, tài sản hỗ trợ giới hạn ở USDC, phần kiểm thử on-chain

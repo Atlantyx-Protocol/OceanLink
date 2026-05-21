@@ -59,8 +59,16 @@ cấu hình chain và signer tương ứng mà không phải sửa logic của O
 
 Như đã đề cập ở phần dẫn đoạn của chương, intent không qua một con đường xử lý
 duy nhất mà tổ chức việc thanh toán thành
-ba lớp thực thi áp dụng tuần tự.
+ba lớp thực thi áp dụng tuần tự, được minh hoạ ở Hình~\ref{fig:intent-lifecycle}.
 Execution Engine thực hiện điều phối cả ba lớp này.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/c3/intent-layer}
+  \caption{Vòng đời của một intent qua ba lớp thực thi.}
+  \label{fig:intent-lifecycle}
+\end{figure}
+
 \subsubsection*{Netting Layer}
 
 Mục tiêu của lớp này là thanh toán bằng cách bù trừ trực tiếp các intent đối ứng, 
@@ -127,15 +135,10 @@ phát giao dịch qua adapter và theo dõi đến khi hoàn tất hoặc thất
 
 Trật tự leo dần này đảm bảo phần lớn intent hưởng chi phí thấp nhất có thể, một số ít chấp nhận trade-off cho tốc độ, và không có intent nào bị treo vô thời hạn.
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\linewidth]{figures/c3/intent-layer}
-  \caption{Vòng đời của một intent qua ba lớp thực thi.}
-  \label{fig:intent-lifecycle}
-\end{figure}
-
 Trong phạm vi triển khai của KLTN, Lớp 1 đã được cài đặt đầy đủ với matching engine, 
 HTLC multi-fill và orchestrator. Đây là phần tập trung của các mục quan trọng nhất
-Lớp 2 được trình bày ở mức thiết kế (interface, Dutch auction incentive, biểu đồ) và cài đặt cụ thể nằm ngoài scope. 
-Lớp 3 đã được tích hợp với Across Protocol làm bridge bên thứ ba mặc định. Việc mở rộng sang 
-các bridge khác để định tuyến tối ưu hơn được liệt kê trong định hướng phát triển tiếp theo.
+Lớp 2 được trình bày ở mức thiết kế (interface, Dutch auction incentive, biểu đồ); việc triển khai nằm ngoài scope của khoá luận do phụ thuộc vào yếu tố thị trường, cần có mạng lưới solver thực sự cạnh tranh fill các intent.
+Lớp 3 đã được cài đặt và tích hợp với Across Protocol làm bridge bên thứ ba mặc định,
+tuy nhiên khó đưa vào thực nghiệm trên môi trường testnet do Across không duy trì
+thanh khoản đáng kể trên các testnet. Việc mở rộng sang các bridge khác để định tuyến
+tối ưu hơn được liệt kê trong định hướng phát triển tiếp theo.

@@ -23,22 +23,8 @@ và một số giao thức thanh toán xuyên chuỗi điển hình như Lightni
 Network~\cite{poon2016lightning} hoặc các giao thức atomic swap giữa Bitcoin và Ethereum,
 song vẫn chưa phổ biến trong các sản phẩm bridge thương mại phổ biến
 hiện nay.
-Mô hình cơ bản giữa hai bên $A$ và $B$ trên hai chuỗi khác nhau được 
-mô tả như sau:
-
-\begin{enumerate}
-  \item Người gửi $A$ tạo một bí mật (secret) ngẫu nhiên $s$ và tính hash $h = \mathcal{H}(s)$, với $\mathcal{H}$ là hàm \texttt{sha256}.
-  \item Phase 1: khởi tạo HTLC trên chuỗi nguồn: $A$ gọi hợp đồng trên chuỗi 1, khoá tài sản với hashlock $h$ và timelock $T_A$; thông tin giao dịch được chuyển sang $B$ qua kênh off-chain.
-  \item Phase 2: khởi tạo HTLC đối ứng trên chuỗi đích: sau khi quan sát được HTLC bên chuỗi 1, $B$ tạo một HTLC tương ứng trên chuỗi 2 với cùng hashlock $h$ và timelock $T_B < T_A$ (để $B$ luôn còn đủ thời gian xử lý nếu $A$ rút trễ).
-  \item Phase 3: $A$ rút tài sản trên chuỗi đích. $A$ cung cấp preimage $s$ cho hợp đồng trên chuỗi 2 và nhận tài sản. Thao tác này sex tiết lộ $s$ on-chain để cho B có thể đọc được.
-  \item Phase 4:  $B$ rút tài sản trên chuỗi nguồn sau khi $s$ đã được công khai, $B$ đọc nó từ event của chuỗi 2 và dùng để rút tài sản đã bị $A$ khoá ở Phase 1. Nếu một trong hai bên không hoàn tất trước timelock tương ứng, hợp đồng cho phép refund tự động.
-\end{enumerate}
-
-Điểm cốt lõi của thuật toán là cùng một preimage $s$ mở khoá được nhiều HTLC khác chuỗi,
-nhờ đó mọi nhánh thanh toán hoặc cùng diễn ra hoặc cùng được hoàn lại.
-Tính nguyên tử được duy trì mà không cần tin cậy bên thứ ba.
-Hình \ref{fig:htlc-sequence} minh hoạ bốn pha trên dưới dạng sequence diagram giữa hai người dùng $A$, $B$ 
-và hai hợp đồng smart contract trên hai chuỗi.
+Mô hình cơ bản giữa hai bên $A$ và $B$ trên hai chuỗi khác nhau được
+minh hoạ ở Hình~\ref{fig:htlc-sequence}, gồm 4 pha như sau:
 
 \begin{figure}[H]
   \centering
@@ -46,6 +32,18 @@ và hai hợp đồng smart contract trên hai chuỗi.
   \caption{Biểu đồ tuần tự thuật toán HTLC giữa hai bên trên hai chuỗi.}
   \label{fig:htlc-sequence}
 \end{figure}
+
+\begin{enumerate}
+  \item Người gửi $A$ tạo một bí mật (secret) ngẫu nhiên $s$ và tính hash $h = \mathcal{H}(s)$, với $\mathcal{H}$ là hàm \texttt{sha256}.
+  \item Phase 1: khởi tạo HTLC trên chuỗi nguồn: $A$ gọi hợp đồng trên chuỗi 1, khoá tài sản với hashlock $h$ và timelock $T_A$; thông tin giao dịch được chuyển sang $B$ qua kênh off-chain.
+  \item Phase 2: khởi tạo HTLC đối ứng trên chuỗi đích: sau khi quan sát được HTLC bên chuỗi 1, $B$ tạo một HTLC tương ứng trên chuỗi 2 với cùng hashlock $h$ và timelock $T_B < T_A$ (để $B$ luôn còn đủ thời gian xử lý nếu $A$ rút trễ).
+  \item Phase 3: $A$ rút tài sản trên chuỗi đích. $A$ cung cấp preimage\footnote{Preimage: giá trị gốc $s$ thoả mãn $\mathcal{H}(s) = h$ với $h$ là hashlock; do hàm băm $\mathcal{H}$ là một chiều, chỉ người nắm giữ $s$ mới có thể mở khoá HTLC.} $s$ cho hợp đồng trên chuỗi 2 và nhận tài sản. Thao tác này sẽ tiết lộ $s$ on-chain để cho $B$ có thể đọc được.
+  \item Phase 4: $B$ rút tài sản trên chuỗi nguồn sau khi $s$ đã được công khai, $B$ đọc nó từ event của chuỗi 2 và dùng để rút tài sản đã bị $A$ khoá ở Phase 1. Nếu một trong hai bên không hoàn tất trước timelock tương ứng, hợp đồng cho phép refund tự động.
+\end{enumerate}
+
+Điểm cốt lõi của thuật toán là cùng một preimage $s$ mở khoá được nhiều HTLC khác chuỗi,
+nhờ đó mọi nhánh thanh toán hoặc cùng diễn ra hoặc cùng được hoàn lại.
+Tính nguyên tử được duy trì mà không cần tin cậy bên thứ ba.
 
 \subsubsection{Multi-fill HTLC}
 
@@ -148,26 +146,13 @@ do người gọi cung cấp khớp với hashlock đã đăng ký từ trước
 Điều kiện này đảm bảo rằng chỉ người thực sự nắm giữ secret tương ứng mới có thể rút
 được phần tài sản của fill. Bên cạnh đó, fill chỉ được phép rút trước \texttt{timelock}.
 Sau khi tất cả các điều kiện trên đều thoả mãn, contract gọi \texttt{safeTransfer}
-để chuyển token cho người nhận. Chức năng còn tích hợp modifier \texttt{nonReentrant} của OpenZeppelin nhằm loại bỏ rủi ro tấn công re-entrancy.
+để chuyển token cho người nhận. Chức năng còn tích hợp modifier \texttt{nonReentrant} của OpenZeppelin nhằm loại bỏ rủi ro tấn công re-entrancy\footnote{Re-entrancy: kiểu tấn công trong đó kẻ tấn công lợi dụng việc smart contract gọi sang một contract ngoài (external call) khi chưa cập nhật xong trạng thái, để gọi đệ quy lại chính hàm đó và rút tiền nhiều lần. Đây là lỗ hổng nổi tiếng từng gây vụ hack The DAO trên Ethereum năm 2016.}.
 
 \subsubsection*{refund}
 
 Thao tác này cho phép người gửi (hoặc admin) lấy lại toàn bộ phần tài sản chưa được claim
-sau khi \texttt{timelock} hết hạn. Tham số đầu vào được mô tả trong
-Bảng~\ref{tab:refund-params}.
-
-\begin{table}[H]
-    \centering
-    \caption{Các tham số của thao tác \texttt{refund}}
-    \label{tab:refund-params}
-    \begin{tabular}{|l|p{10cm}|}
-        \hline
-        \textbf{Tham số} & \textbf{Mô tả} \\
-        \hline
-        \texttt{orderId} & Định danh của order cần hoàn lại phần tài sản chưa được claim \\
-        \hline
-    \end{tabular}
-\end{table}
+sau khi \texttt{timelock} hết hạn. Tham số đầu vào duy nhất là \texttt{orderId} --- định danh
+của order cần hoàn lại phần tài sản chưa được claim.
 
 Để có thể được refund order phải ở trạng thái \texttt{OPEN} và
 \texttt{timelock} đã hết hạn. Sau đó contract cập nhật trạng
