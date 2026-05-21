@@ -157,7 +157,10 @@ thực hiện ba thao tác chính sau đây:
     \item Các cạnh còn lại trong chu trình $C$ bị giảm trọng số đi đúng $w_{\min}$. Các intent này chuyển sang trạng thái \texttt{PARTIAL} với phần còn lại được giữ trong queue chờ tick sau.
 \end{enumerate}
 
-Sau bước cập nhật, đồ thị mới loại bỏ đi ít nhất một cạnh. Thuật toán lặp lại các bước trên đồ thị mới cho đến khi không còn chu trình nào hoặc chu trình tìm được không thoả mãn ngưỡng.
+Để tránh việc một intent bị chia thành quá nhiều phần nhỏ dẫn đến chi phí thực thi
+on-chain phức tạp và phí gas tăng cao, hệ thống áp dụng giới hạn \emph{max-partial
+counter} là 3, nghĩa là mỗi intent chỉ được phép tham gia tối đa 3 lần khớp \texttt{PARTIAL}
+trước khi bị chuyển xuống Accelerator/Fallback layer xử lý phần dư còn lại. Sau bước cập nhật, đồ thị mới loại bỏ đi ít nhất một cạnh. Thuật toán lặp lại các bước trên đồ thị mới cho đến khi không còn chu trình nào hoặc chu trình tìm được không thoả mãn ngưỡng.
 Mã giả tổng quát của thuật toán như sau:
 
 \begin{verbatim}
