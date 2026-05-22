@@ -94,7 +94,7 @@ giao diện chính của hệ thống.
 Để bộ dữ liệu kiểm thử sát với dữ liệu bridge thực tế thay vì sinh ngẫu nhiên
 thuần tuý, dữ liệu đầu vào được trích xuất từ Dune Analytics, một nền tảng truy vấn
 dữ liệu on-chain.
-Dune cung cấp dataset \texttt{bridges\_evms.flows} tổng hợp các giao dịch bridge giữa
+Dune cung cấp dataset \texttt{bridges\_evms.flows}~\cite{dune_bridges_dataset} tổng hợp các giao dịch bridge giữa
 các chuỗi EVM, gồm thông tin đầy đủ về chuỗi nguồn, chuỗi đích, token, số lượng và
 thời điểm. Hình~\ref{fig:dune-data} thể hiện một phần dữ liệu bridge thu thập được từ Dune Analytics
 sau khi chạy truy vấn trên dataset \texttt{bridges\_evms.flows}.
@@ -188,7 +188,7 @@ Polygon, zkSync Era, Hyperliquid) với 21 cặp route đối xứng, phân bố
 Phân bố cho thấy việc \emph{lệch một chiều mạnh} ở dữ liệu Dune giờ
 cao điểm: cặp Arbitrum -- Hyperliquid chiếm tới 1/3 tổng
 intent với 447 trong số 456 intent đi theo chiều Arbitrum $\rightarrow$ Hyperliquid
-(do Hyperliquid chủ yếu nhận deposit từ các L2 trong giai đoạn này). Tính
+(dòng tiền vào Hyperliquid từ các L2 chiếm ưu thế trong giai đoạn quan sát, theo dữ liệu Dune~\cite{dune_bridges_dataset}). Tính
 chất bất đối xứng này sẽ ảnh hưởng trực tiếp đến tỷ lệ khớp được netting.
 
 \subsection{Kết quả và đánh giá}

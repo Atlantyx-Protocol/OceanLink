@@ -91,7 +91,7 @@ Nhờ đó, mức độ bảo mật cực kỳ cao, để tấn công mô hình 
 Trong mô hình consensus verifying, 
 chain đích xác minh rằng một giao dịch trên chain nguồn đã được hoàn tất 
 thông qua việc kiểm chứng cơ chế đồng thuận. 
-Cách làm này thường yêu cầu phải cung cấp các bằng chứng (proof) về block hoặc transaction, 
+Cách làm này thường yêu cầu phải cung cấp các bằng chứng (proof) về block hoặc transaction,
 nhằm đảm bảo tính đúng đắn mà không cần tin tưởng hoàn toàn vào bên trung gian.
 
 \subsubsection*{Third-party attestation protocols}
@@ -213,7 +213,7 @@ và mức độ rủi ro bảo mật.
 Từ Hình~\ref{fig:bridge-taxonomy}, có thể rút ra một số nhận xét như sau.
 Trước hết, phần lớn các bridge đang vận hành trong thực tế nằm ở nhóm 
 \textit{third-party attestation} và đây cũng chính là cột tập trung nhiều ô có viền đỏ nhất, 
-tương ứng với các vụ tấn công lớn như Ronin, Wormhole, Multichain hay Binance Bridge. 
+tương ứng với các vụ tấn công lớn như Ronin, Wormhole, Multichain~\cite{multichain_chainalysis} hay Binance Bridge~\cite{bnb_bridge_halborn}. 
 Tiếp theo, các nhóm \textit{optimistic} và \textit{consensus verifying} có một số đại 
 diện như Nomad, Polkadot, Cosmos IBC, zkBridge, nhưng số lượng và quy mô triển khai còn khá 
 khiêm tốn so với third-party attestation. 
@@ -299,7 +299,7 @@ trực tiếp trên chain đích bằng cách triển khai một \textit{light c
 tra zero-knowledge proof, thay vì dựa vào một tập hợp validator được tin cậy.
 Trong mô hình light client, chain đích chạy một phiên bản rút gọn của giao thức đồng
 thuận chain nguồn để xác minh các block header và transaction proof, ví dụ tiêu biểu là
-Cosmos Inter-Blockchain Communication (IBC).
+Cosmos Inter-Blockchain Communication (IBC)~\cite{cosmos_ibc}.
 Trong khi mô hình zkBridge thì sử dụng zk-SNARK (Zero-Knowledge Succinct Non-Interactive Argument of Knowledge) hoặc zk-STARK (Zero-Knowledge Scalable Transparent Argument of Knowledge) để chứng minh tính đúng đắn của
 một quá trình chuyển trạng thái, yêu cầu chain đích chỉ cần xác minh proof có kích thước nhỏ.
 Ưu điểm lớn nhất của nhóm này là nền tảng bảo mật mạnh hơn do giảm

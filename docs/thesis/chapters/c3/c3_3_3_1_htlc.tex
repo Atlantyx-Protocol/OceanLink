@@ -146,7 +146,7 @@ do người gọi cung cấp khớp với hashlock đã đăng ký từ trước
 Điều kiện này đảm bảo rằng chỉ người thực sự nắm giữ secret tương ứng mới có thể rút
 được phần tài sản của fill. Bên cạnh đó, fill chỉ được phép rút trước \texttt{timelock}.
 Sau khi tất cả các điều kiện trên đều thoả mãn, contract gọi \texttt{safeTransfer}
-để chuyển token cho người nhận. Chức năng còn tích hợp modifier \texttt{nonReentrant} của OpenZeppelin nhằm loại bỏ rủi ro tấn công re-entrancy\footnote{Re-entrancy: kiểu tấn công trong đó kẻ tấn công lợi dụng việc smart contract gọi sang một contract ngoài (external call) khi chưa cập nhật xong trạng thái, để gọi đệ quy lại chính hàm đó và rút tiền nhiều lần. Đây là lỗ hổng nổi tiếng từng gây vụ hack The DAO trên Ethereum năm 2016.}.
+để chuyển token cho người nhận. Chức năng còn tích hợp modifier \texttt{nonReentrant} của OpenZeppelin nhằm loại bỏ rủi ro tấn công re-entrancy\footnote{Re-entrancy: kiểu tấn công trong đó kẻ tấn công lợi dụng việc smart contract gọi sang một contract ngoài (external call) khi chưa cập nhật xong trạng thái, để gọi đệ quy lại chính hàm đó và rút tiền nhiều lần. Đây là lỗ hổng nổi tiếng từng gây vụ hack The DAO trên Ethereum năm 2016~\cite{dao_hack_chainlink}.}.
 
 \subsubsection*{refund}
 
