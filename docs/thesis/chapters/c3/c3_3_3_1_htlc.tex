@@ -51,8 +51,8 @@ Với thuật toán HTLC chuẩn giả định mỗi hợp đồng tương ứng
 Tuy nhiên khi matching theo vòng (cycle netting), 
 trên cùng một chuỗi nguồn có thể có nhiều người nhận khác nhau cần 
 được thanh toán cùng một lúc, mỗi người ứng với một hashlock riêng. 
-Để giảm tải số lượng thao tác onchain, chi phí gas và đơn giản hoá việc điều phối, 
-KTLN mở rộng HTLC theo hướng multi-fill: mỗi Order
+Để giảm tải số lượng thao tác on-chain, chi phí gas và đơn giản hoá việc điều phối, 
+KLTN mở rộng HTLC theo hướng multi-fill: mỗi Order
 chứa một hoặc nhiều fill (nhánh thanh toán).
 
 Cụ thể, một Order đại diện cho tài sản được một người gửi khoá vào 
@@ -182,7 +182,7 @@ order duy nhất trên mỗi chuỗi. Một trong các order được chọn là
 presiding order (trong Hình~\ref{fig:multi-fill} là order trên Ethereum, nét
 xanh lá), các order còn lại đóng vai trò responding order (Base và Arbitrum,
 nét đen).
-Vai trò chính của presiding order là tạo ra secret s.
+Vai trò chính của presiding order là tạo ra secret $s$.
 Cụ thể, presiding order
 sinh các $s_i$ đồng thời publish các hashlock $h_i = \mathcal{H}(s_i)$ qua event
 \texttt{FillCreated}. Các responding order tái sử dụng đúng các hashlock $h_i$ này khi
@@ -192,7 +192,7 @@ tạo HTLC trên hai chuỗi còn lại, nhờ đó mọi nhánh thuộc cùng m
 Khi cả ba HTLC đã được khoá trên ba chuỗi, Orchestrator lần lượt gọi \texttt{withdraw}
 với các preimage tương ứng. Mỗi lần \texttt{withdraw} thành công, 
 preimage được phát ra (emit)
-onchain qua event \texttt{FillWithdrawn}, và bất kỳ bên nhận nào ở các chuỗi khác
+on-chain qua event \texttt{FillWithdrawn}, và bất kỳ bên nhận nào ở các chuỗi khác
 cùng chia sẻ hashlock $h_i$ đều có thể đọc được preimage này để tự rút phần của mình.
 Nếu bước nào trong quy trình thất bại, chẳng hạn một HTLC không được khởi tạo kịp hoặc
 preimage không được công bố, các HTLC chưa được rút sẽ tự động được hoàn lại cho người

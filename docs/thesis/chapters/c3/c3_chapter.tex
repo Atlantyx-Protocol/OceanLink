@@ -62,7 +62,7 @@ dịch trở nên đắt đỏ và phạm vi áp dụng còn hạn chế.
 
 KLTN đi theo hướng ngược lại với phần lớn thị trường, ưu tiên đồng thời
 an toàn và chi phí thấp, chấp nhận đánh đổi một phần tốc độ.
-Cụ thể, khóa luận kết hợp ưu điểm của hai nhóm phân loại đã được phân 
+Cụ thể, khoá luận kết hợp ưu điểm của hai nhóm phân loại đã được phân 
 tích ở Chương \ref{chap:background} đó là nhóm State validating protocols
 và Liquidity network.
 Một mặt, hệ thống khai thác nguồn thanh khoản của chính người dùng qua việc
@@ -99,8 +99,8 @@ trình bày chi tiết trong mục Execution Engine
 (Mục~\ref{sec:execution-engine}).
 
 Phần còn lại của chương được tổ chức theo hai trục chính, 
-trục \textbf{kiến trúc} mô tả các thành phần cấu thành (onchain và 
-offchain), còn trục \textbf{thực thi} mô tả 
+trục \textbf{kiến trúc} mô tả các thành phần cấu thành (on-chain và 
+off-chain), còn trục \textbf{thực thi} mô tả 
 cách một intent được phục vụ qua ba lớp. 
 Mục 3.1 phân tích yêu cầu, mục 3.2 trình bày kiến trúc tổng quan kèm 
 thiết kế chi tiết từng thành phần và mục 3.3 trình bày mô hình dữ liệu.
@@ -140,7 +140,7 @@ Hệ thống cần thoả các yêu cầu phi chức năng sau:
 \begin{itemize}
     \item NFR-01 - Trustless: không đặt giả định tin cậy vào bất kỳ bên thứ ba nào, mọi thao tác giao dịch tài sản phải được kiểm chứng on-chain.
     \item NFR-02 - Tính nguyên tử: với mỗi intent, kết quả phải đảm bảo hoặc tất cả các bên hoàn tất nghĩa vụ, hoặc không bên nào bị thiệt hại.
-    \item NFR-03 - Bảo mật: smart contract phải chống các tấn công phổ biến như reentrancy, front-running, replay attack, hệ thống offchain phải xác thực chữ ký người dùng.
+    \item NFR-03 - Bảo mật: smart contract phải chống các tấn công phổ biến như reentrancy, front-running, replay attack, hệ thống off-chain phải xác thực chữ ký người dùng.
     \item NFR-04 - Khả năng phục hồi: tài sản không bị khoá vĩnh viễn; mọi HTLC đều có timelock đảm bảo refund tự động.
     \item NFR-05 - Non-custodial: hệ thống không nắm giữ tài sản của người dùng tại bất kỳ thời điểm nào. Tài sản chỉ được khoá trong các smart contract escrow (HTLC) với điều kiện giải phóng được kiểm chứng on-chain. Trong trường hợp giao dịch không thành công, tài sản sẽ được hoàn trả tự động cho người dùng thông qua cơ chế timelock mà không cần sự can thiệp của bất kỳ bên trung gian nào.
 \end{itemize}
@@ -150,15 +150,15 @@ Hệ thống cần thoả các yêu cầu phi chức năng sau:
 \subsection{Phân tách Onchain và Offchain}
 
 Sau khi đã nghiên cứu và đánh giá kỹ lưỡng, KLTN phân tách kiến trúc hệ thống
-thành hai phần lớn rõ ràng. Phần \textbf{onchain} chứa các smart contract 
+thành hai phần lớn rõ ràng. Phần \textbf{on-chain} chứa các smart contract 
 chịu trách nhiệm cho các thao tác cần đảm bảo tính trustless như khoá 
 tài sản, xác minh điều kiện thực thi và settle giao dịch. 
 Phần 
-\textbf{offchain}\footnote{Off-chain: các thao tác và dữ liệu xử lý ngoài blockchain, ngược lại với on-chain.} chứa các thành phần xử lý intent, matching và
+\textbf{off-chain}\footnote{Off-chain: các thao tác và dữ liệu xử lý ngoài blockchain, ngược lại với on-chain.} chứa các thành phần xử lý intent, matching và
 điều phối thực thi. 
 Việc phân tách này cho phép tận dụng lợi thế của cả hai:
-onchain phụ trách lưu trữ và chuyển giao tài sản một cách an toàn, 
-trong khi offchain phụ trách xử lý order và matching với hiệu năng cao, 
+on-chain phụ trách lưu trữ và chuyển giao tài sản một cách an toàn, 
+trong khi off-chain phụ trách xử lý order và matching với hiệu năng cao, 
 độ trễ thấp.
 
 \begin{figure}[H]

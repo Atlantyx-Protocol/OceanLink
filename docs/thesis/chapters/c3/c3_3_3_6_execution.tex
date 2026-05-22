@@ -72,7 +72,7 @@ Execution Engine thực hiện điều phối cả ba lớp này.
 \subsubsection*{Netting Layer}
 
 Mục tiêu của lớp này là thanh toán bằng cách bù trừ trực tiếp các intent đối ứng, 
-không cần thanh khoản ngoài. Ưu điểm là chi phí gần bằng không (chỉ phí gas), trustles 
+không cần thanh khoản ngoài. Ưu điểm là chi phí gần bằng không (chỉ phí gas), trustless 
 vì không cần solver, chất lượng thực thi tối ưu (không trượt giá). Nhược điểm là phụ thuộc 
 vào sự xuất hiện của intent đối ứng, có thể phải chờ nhiều tick trước khi tìm được match.
 
@@ -121,7 +121,7 @@ interface BridgeAdapter {
 \subsubsection*{Vòng đời của intent}
 
 Vòng đời một intent qua ba lớp diễn ra theo trình tự sau. 
-Đầu tiên, intent được gửi và xác thực qua API Gatewway sau đó được đưa vào OrderBook với trạng thái \texttt{QUEUED}. 
+Đầu tiên, intent được gửi và xác thực qua API Gateway sau đó được đưa vào OrderBook với trạng thái \texttt{QUEUED}. 
 Trong cửa sổ thời gian $T_{\text{net}}$, 
 Matching Engine cố tìm cycle ở mỗi tick, nếu tìm được cycle khớp toàn bộ, 
 trạng thái chuyển \texttt{MATCHED}. Nếu khớp một phần, phần khớp được sẽ settle qua matching engine, 
