@@ -119,7 +119,7 @@ function findBest3Cycle(edges: Edge[], n: number, threshold: number): [Edge, Edg
 }
 
 // returns one EdgeSnapshot[] per captured cycle with pre-mutation weights.
-export function runMaxFlow(
+export function runCycleReduction(
   n: number,
   edges: Edge[],
   threshold: number
