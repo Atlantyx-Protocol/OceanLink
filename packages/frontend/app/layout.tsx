@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import { Providers } from './providers';
 import { Toaster } from '@/components/ui/toaster';
+import { Header } from './components/bridge/header';
+import { Footer } from './components/bridge/footer';
 import './globals.css';
 
 const _geist = Geist({ subsets: ['latin'] });
@@ -26,7 +28,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          <div className="min-h-screen flex flex-col bg-background">
+            <Header />
+            {children}
+            <Footer />
+          </div>
+        </Providers>
         <Toaster />
         <Analytics />
       </body>

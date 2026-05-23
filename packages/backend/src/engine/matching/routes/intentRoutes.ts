@@ -46,6 +46,22 @@ const intentRoutes: FastifyPluginAsync = async (fastify) => {
     return reply.code(201).send({ order: result.order });
   });
 
+  // GET /orders?userAddress=0x...&page=1&pageSize=20
+  fastify.get<{
+    Querystring: { userAddress?: string; page?: string; pageSize?: string };
+  }>('/orders', async (request, reply) => {
+    const { userAddress } = request.query;
+    if (!userAddress || !/^0x[0-9a-fA-F]{40}$/.test(userAddress)) {
+      return reply.code(400).send({ error: 'userAddress query param required (0x-prefixed)' });
+    }
+
+    const page = Math.max(1, parseInt(request.query.page ?? '1', 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(request.query.pageSize ?? '20', 10) || 20));
+
+    const result = await orderStore.getOrdersByUser(userAddress, page, pageSize);
+    return reply.send(result);
+  });
+
   // GET /orders/:id
   fastify.get<{ Params: { id: string } }>('/orders/:id', async (request, reply) => {
     const order = orderStore.get(request.params.id);

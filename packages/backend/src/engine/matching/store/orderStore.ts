@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql, desc } from 'drizzle-orm';
 import type { IntentOrder, MatchResult } from '../types.js';
 import { db, schema, logDbError } from '../../../db/client.js';
 import { isTestingMode } from '../../../config/constants.js';
@@ -190,6 +190,49 @@ export class OrderStore {
 
   totalCount(): number {
     return this.orders.size;
+  }
+
+  // returns a user's orders newest-first, paginated. queries DB directly so the
+  // list survives in-memory cache eviction and includes historic completed orders.
+  async getOrdersByUser(
+    userAddress: string,
+    page: number,
+    pageSize: number
+  ): Promise<{ data: IntentOrder[]; total: number; page: number; pageSize: number }> {
+    const normalized = userAddress.toLowerCase();
+    const offset = (page - 1) * pageSize;
+
+    // case-insensitive match — frontend may send checksummed addresses while
+    // the DB stores whatever the client passed in.
+    const where = sql`lower(${schema.intentOrders.userAddress}) = ${normalized}`;
+
+    const [rows, totalRow] = await Promise.all([
+      db
+        .select()
+        .from(schema.intentOrders)
+        .where(where)
+        .orderBy(desc(schema.intentOrders.createdAt))
+        .limit(pageSize)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.intentOrders)
+        .where(where),
+    ]);
+
+    const data: IntentOrder[] = rows.map((row) => ({
+      orderId: row.orderId,
+      srcChain: row.srcChain,
+      desChain: row.desChain,
+      amount: row.amount,
+      incentiveFee: row.incentiveFee ?? undefined,
+      deadline: row.deadline,
+      createdAt: row.createdAt,
+      status: row.status,
+      userAddress: row.userAddress,
+    }));
+
+    return { data, total: totalRow[0]?.count ?? 0, page, pageSize };
   }
 
   // wipes in-memory state — tests only, does not touch the DB.
