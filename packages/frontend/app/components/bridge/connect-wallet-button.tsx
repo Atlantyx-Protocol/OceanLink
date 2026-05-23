@@ -118,11 +118,7 @@ export function ConnectWalletButton() {
             className="flex items-center gap-2"
           >
             {CHAIN_ICONS[c.id] && (
-              <img
-                src={CHAIN_ICONS[c.id]}
-                alt=""
-                className="h-4 w-4 rounded-full object-contain"
-              />
+              <img src={CHAIN_ICONS[c.id]} alt="" className="h-4 w-4 rounded-full object-contain" />
             )}
             <span>{c.name}</span>
             {c.id === chainId && <span className="ml-auto">✓</span>}

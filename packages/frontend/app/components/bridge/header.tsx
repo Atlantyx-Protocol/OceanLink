@@ -47,9 +47,7 @@ export function Header() {
               >
                 <Link
                   href={item.href}
-                  {...(item.external
-                    ? { target: '_blank', rel: 'noopener noreferrer' }
-                    : {})}
+                  {...(item.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
                 >
                   {item.label}
                   {isActive && (

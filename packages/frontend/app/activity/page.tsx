@@ -72,10 +72,7 @@ export default function ActivityPage() {
               className="text-muted-foreground hover:text-foreground"
             >
               <RefreshCw
-                className={cn(
-                  'h-4 w-4 mr-1.5',
-                  (isLoading || isRefreshing) && 'animate-spin'
-                )}
+                className={cn('h-4 w-4 mr-1.5', (isLoading || isRefreshing) && 'animate-spin')}
               />
               Refresh
             </Button>
@@ -148,11 +145,7 @@ function OrderRow({
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
             {src ? (
-              <img
-                src={src.icon}
-                alt={src.short}
-                className="h-7 w-7 rounded-full object-contain"
-              />
+              <img src={src.icon} alt={src.short} className="h-7 w-7 rounded-full object-contain" />
             ) : (
               <ChainFallback />
             )}
@@ -224,9 +217,7 @@ function OrderDetail({ order }: { order: BridgeOrder }) {
           <span className="text-foreground">{des?.name ?? `Chain ${order.desChain}`}</span>
         </Field>
         <Field label="Amount">
-          <span className="text-foreground tabular-nums">
-            {formatAmount(order.amount)} USDC
-          </span>
+          <span className="text-foreground tabular-nums">{formatAmount(order.amount)} USDC</span>
         </Field>
         {incentive && (
           <Field label="Incentive fee">

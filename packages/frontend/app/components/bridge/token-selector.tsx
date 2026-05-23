@@ -77,11 +77,7 @@ export function TokenSelector({
               onClick={() => onNetworkChange(net)}
               className="flex items-center gap-2 cursor-pointer"
             >
-              <img
-                src={net.icon}
-                alt={net.name}
-                className="h-5 w-5 rounded-full object-contain"
-              />
+              <img src={net.icon} alt={net.name} className="h-5 w-5 rounded-full object-contain" />
               <span>{net.name}</span>
               {net.id === network.id && <span className="ml-auto text-accent">●</span>}
             </DropdownMenuItem>

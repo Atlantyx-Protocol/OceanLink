@@ -7,13 +7,7 @@
 //   COMPLETED — orchestrator finished HTLC + withdrawals on all chains
 //   FAILED    — orchestrator execution errored
 //   EXPIRED   — deadline passed before match
-export type OrderStatus =
-  | 'QUEUED'
-  | 'PARTIAL'
-  | 'MATCHED'
-  | 'COMPLETED'
-  | 'FAILED'
-  | 'EXPIRED';
+export type OrderStatus = 'QUEUED' | 'PARTIAL' | 'MATCHED' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
 
 // an intent order submitted via POST /intent. lives in the queue until matched
 // or expired.

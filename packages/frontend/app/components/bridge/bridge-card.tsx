@@ -41,7 +41,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   const [fromNetwork, setFromNetwork] = useState(NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(NETWORKS[1]);
 
-  const { step, orderId, approvalTxHash, error, isLoading, bridge, reset } = useOceanBridge();
+  const { step, orderStatus, error, isLoading, bridge, reset } = useOceanBridge();
 
   // derived state
   const srcChain = fromNetwork.id as SupportedChain;
@@ -174,11 +174,18 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
     if (!isConnected) return null; // handled by connect wallet button
 
     if (isLoading) {
+      // during 'tracking' the label mirrors the order status from /activity so
+      // user sees the same wording across surfaces.
+      const trackingLabel: Record<string, string> = {
+        QUEUED: 'Pending match...',
+        PARTIAL: 'Partial match...',
+        MATCHED: 'Settling...',
+      };
       const labels: Record<string, string> = {
         checking: 'Checking allowance...',
         approving: 'Waiting for approval...',
         submitting: 'Submitting order...',
-        tracking: 'Settling on-chain...',
+        tracking: (orderStatus && trackingLabel[orderStatus]) ?? 'Pending match...',
       };
       return (
         <span className="flex items-center justify-center gap-2">
@@ -197,10 +204,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   };
 
   const isButtonDisabled =
-    isLoading ||
-    !hasValidAmount ||
-    fromNetwork.id === toNetwork.id ||
-    insufficientBalance;
+    isLoading || !hasValidAmount || fromNetwork.id === toNetwork.id || insufficientBalance;
 
   return (
     <div className="w-full max-w-md mx-auto">

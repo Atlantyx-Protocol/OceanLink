@@ -119,11 +119,7 @@ function findBest3Cycle(edges: Edge[], n: number, threshold: number): [Edge, Edg
 }
 
 // returns one EdgeSnapshot[] per captured cycle with pre-mutation weights.
-export function runCycleReduction(
-  n: number,
-  edges: Edge[],
-  threshold: number
-): EdgeSnapshot[][] {
+export function runCycleReduction(n: number, edges: Edge[], threshold: number): EdgeSnapshot[][] {
   const captured: EdgeSnapshot[][] = [];
 
   // phase 1 — saturate 2-cycles.

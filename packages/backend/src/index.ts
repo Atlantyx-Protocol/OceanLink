@@ -58,7 +58,7 @@ async function start() {
     if (lpConfigs) {
       const liquidityService = new LiquidityService(matchingService, orderStore, lpConfigs);
       await liquidityService.start();
-      
+
       const shutdown = async () => {
         liquidityService.stop();
         await fastify.close();

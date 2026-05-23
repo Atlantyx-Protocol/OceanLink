@@ -24,10 +24,14 @@ export type OceanBridgeStep =
   | 'done'
   | 'error';
 
+// mirrors backend OrderStatus, used to label the tracking step accurately.
+export type OrderStatus = 'QUEUED' | 'PARTIAL' | 'MATCHED' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
+
 export interface OceanBridgeState {
   step: OceanBridgeStep;
   approvalTxHash: `0x${string}` | null;
   orderId: string | null;
+  orderStatus: OrderStatus | null;
   error: string | null;
   isLoading: boolean;
 }
@@ -44,8 +48,21 @@ const INITIAL_STATE: OceanBridgeState = {
   step: 'idle',
   approvalTxHash: null,
   orderId: null,
+  orderStatus: null,
   error: null,
   isLoading: false,
+};
+
+// SSE event type → backend OrderStatus, used so the bridge button label
+// stays in sync with what /activity shows.
+const EVENT_TO_STATUS: Record<ServerOrderEvent['type'], OrderStatus | null> = {
+  queued: 'QUEUED',
+  matched: 'MATCHED',
+  plan: 'MATCHED', // orchestrator started; still settling
+  htlc_created: 'MATCHED',
+  withdrawn: 'MATCHED',
+  done: 'COMPLETED',
+  error: 'FAILED',
 };
 
 // intent orders are valid for 30 minutes
@@ -107,12 +124,7 @@ function buildEventDescription(event: ServerOrderEvent): React.ReactNode {
     const chain = typeof data.chain === 'string' ? data.chain : '';
     const txHash = typeof data.txHash === 'string' ? data.txHash : '';
     if (chain && txHash) {
-      return createElement(
-        'span',
-        null,
-        `on ${chain} — `,
-        txLink(chain, txHash)
-      );
+      return createElement('span', null, `on ${chain} — `, txLink(chain, txHash));
     }
   }
 
@@ -123,12 +135,7 @@ function buildEventDescription(event: ServerOrderEvent): React.ReactNode {
         'div',
         { className: 'flex flex-col gap-0.5' },
         ...withdrawals.map((w, i) =>
-          createElement(
-            'span',
-            { key: i },
-            `${w.chain} — `,
-            txLink(w.chain, w.txHash)
-          )
+          createElement('span', { key: i }, `${w.chain} — `, txLink(w.chain, w.txHash))
         )
       );
     }
@@ -139,41 +146,31 @@ function buildEventDescription(event: ServerOrderEvent): React.ReactNode {
 }
 
 // open SSE stream for orderId, toast each event, auto-close on done/error.
-// onTerminal is invoked when the stream resolves so the hook can flip step
-// state to 'done' or 'error' — letting the bridge button stay in a loading
-// state from intent submission until on-chain settlement completes.
-function subscribeToOrderEvents(
-  orderId: string,
-  onTerminal: (status: 'done' | 'error', message?: string) => void
-): void {
+// onEvent is invoked for every event so the caller can drive the button label
+// from the live order status, then a terminal event closes the stream.
+function subscribeToOrderEvents(orderId: string, onEvent: (event: ServerOrderEvent) => void): void {
   const url = `${BACKEND_URL}/api/orders/${orderId}/events`;
   const es = new EventSource(url);
-
-  console.log('[OceanBridge:server] 🔌 subscribing', { url, orderId });
 
   es.onmessage = (e) => {
     let event: ServerOrderEvent;
     try {
       event = JSON.parse(e.data);
     } catch {
-      console.warn('[OceanBridge:server] non-JSON message', e.data);
       return;
     }
-    console.log(`[OceanBridge:server] ⟵ ${event.type}`, event);
     toast({
       title: EVENT_TITLES[event.type] ?? event.type,
       description: buildEventDescription(event),
       variant: event.type === 'error' ? 'destructive' : undefined,
     });
+    onEvent(event);
     if (event.type === 'done' || event.type === 'error') {
       es.close();
-      console.log('[OceanBridge:server] 🔌 stream closed');
-      onTerminal(event.type, event.message);
     }
   };
 
-  es.onerror = (err) => {
-    console.error('[OceanBridge:server] SSE error', err);
+  es.onerror = () => {
     es.close();
   };
 }
@@ -197,20 +194,13 @@ export function useOceanBridge() {
 
     const { amount, srcChain, desChain, userAddress } = params;
 
-    console.log('[OceanBridge] ▶ bridge() start', {
-      amount,
-      srcChain,
-      desChain,
-      userAddress,
-      incentiveFee: params.incentiveFee,
-    });
-
     try {
       // step 1: check current USDC allowance
       setState({
         step: 'checking',
         approvalTxHash: null,
         orderId: null,
+        orderStatus: null,
         error: null,
         isLoading: true,
       });
@@ -265,12 +255,7 @@ export function useOceanBridge() {
         setState((s) => ({ ...s, approvalTxHash: hash }));
         toast({
           title: 'Approval sent',
-          description: createElement(
-            'span',
-            null,
-            'TX: ',
-            txLink(srcChain, hash)
-          ),
+          description: createElement('span', null, 'TX: ', txLink(srcChain, hash)),
         });
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -297,8 +282,6 @@ export function useOceanBridge() {
         body.incentiveFee = params.incentiveFee;
       }
 
-      console.log('[OceanBridge] step=submitting — POST /api/intent', body);
-
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), INTENT_SUBMIT_TIMEOUT_MS);
 
@@ -320,7 +303,6 @@ export function useOceanBridge() {
       }
 
       const data = await res.json().catch(() => ({ error: 'Invalid response' }));
-      console.log('[OceanBridge] /api/intent response', { status: res.status, ok: res.ok, data });
 
       if (!res.ok) {
         throw new Error(data.error || `Intent submission failed (${res.status})`);
@@ -333,14 +315,9 @@ export function useOceanBridge() {
         step: 'tracking',
         approvalTxHash,
         orderId: submittedOrderId,
+        orderStatus: 'QUEUED',
         error: null,
         isLoading: true,
-      });
-
-      console.log('[OceanBridge] ⏳ step=tracking — order submitted', {
-        orderId: submittedOrderId,
-        approvalTxHash,
-        order: data.order,
       });
 
       toast({
@@ -349,17 +326,30 @@ export function useOceanBridge() {
       });
 
       if (submittedOrderId) {
-        subscribeToOrderEvents(submittedOrderId, (status, message) => {
-          inflightRef.current = false;
-          if (status === 'done') {
-            setState((s) => ({ ...s, step: 'done', isLoading: false, error: null }));
-          } else {
+        subscribeToOrderEvents(submittedOrderId, (event) => {
+          const nextStatus = EVENT_TO_STATUS[event.type];
+
+          if (event.type === 'done') {
+            inflightRef.current = false;
+            setState((s) => ({
+              ...s,
+              step: 'done',
+              orderStatus: nextStatus ?? s.orderStatus,
+              isLoading: false,
+              error: null,
+            }));
+          } else if (event.type === 'error') {
+            inflightRef.current = false;
             setState((s) => ({
               ...s,
               step: 'error',
+              orderStatus: nextStatus ?? s.orderStatus,
               isLoading: false,
-              error: message ?? 'Bridge settlement failed',
+              error: event.message ?? 'Bridge settlement failed',
             }));
+          } else if (nextStatus) {
+            // mid-flight progress update — keep step='tracking', update label
+            setState((s) => ({ ...s, orderStatus: nextStatus }));
           }
         });
       } else {
@@ -368,7 +358,6 @@ export function useOceanBridge() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Bridge transaction failed';
-      console.error('[OceanBridge] ❌ step=error', { message, error: err });
       setState((s) => ({
         ...s,
         step: 'error',
