@@ -13,10 +13,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { AlertTriangle, LogOut, Wallet } from 'lucide-react';
 import { SUPPORTED_CHAINS } from '@/lib/wagmi';
+import { sepolia, arbitrumSepolia, baseSepolia } from 'wagmi/chains';
 
 function truncate(addr: string): string {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
+
+const CHAIN_ICONS: Record<number, string> = {
+  [sepolia.id]: '/ethereum.png',
+  [arbitrumSepolia.id]: '/arbitrum.png',
+  [baseSepolia.id]: '/base.png',
+};
 
 export function ConnectWalletButton() {
   const { address, chainId, isConnected, isConnecting, isReconnecting } = useAccount();
@@ -76,12 +83,27 @@ export function ConnectWalletButton() {
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
       <DropdownMenuTrigger asChild>
         <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-          <Wallet className="h-4 w-4 mr-2" />
+          {chainId !== undefined && CHAIN_ICONS[chainId] ? (
+            <img
+              src={CHAIN_ICONS[chainId]}
+              alt={activeChain?.name ?? ''}
+              className="h-4 w-4 mr-2 rounded-full object-contain"
+            />
+          ) : (
+            <Wallet className="h-4 w-4 mr-2" />
+          )}
           {address ? truncate(address) : ''}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">
+        <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
+          {chainId !== undefined && CHAIN_ICONS[chainId] && (
+            <img
+              src={CHAIN_ICONS[chainId]}
+              alt=""
+              className="h-4 w-4 rounded-full object-contain"
+            />
+          )}
           {activeChain?.name ?? `Chain ${chainId}`}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -93,9 +115,17 @@ export function ConnectWalletButton() {
             key={c.id}
             disabled={c.id === chainId || isSwitchPending}
             onClick={() => switchChain({ chainId: c.id })}
+            className="flex items-center gap-2"
           >
-            {c.name}
-            {c.id === chainId ? ' ✓' : ''}
+            {CHAIN_ICONS[c.id] && (
+              <img
+                src={CHAIN_ICONS[c.id]}
+                alt=""
+                className="h-4 w-4 rounded-full object-contain"
+              />
+            )}
+            <span>{c.name}</span>
+            {c.id === chainId && <span className="ml-auto">✓</span>}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />

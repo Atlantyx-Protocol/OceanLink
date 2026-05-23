@@ -35,16 +35,16 @@ export function InputCard({
   disabled = false,
 }: InputCardProps) {
   return (
-    <div className="rounded-2xl bg-card border border-border/50 p-4 md:p-5 transition-colors duration-200 focus-within:border-accent/40">
+    <div className="group rounded-2xl bg-background/60 border border-border/70 p-5 md:p-6 transition-all duration-200 hover:border-border focus-within:border-accent/40 focus-within:bg-background/80 focus-within:shadow-[inset_0_0_0_1px_rgba(39,117,202,0.08)]">
       {/* Header row */}
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center justify-between mb-5">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
           {label}
         </span>
         {showAddress && address && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2.5 py-0.5 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary/80 px-2.5 py-1 text-[11px] text-muted-foreground">
             <span className="hidden sm:inline">{addressLabel}</span>
-            <span className="font-mono text-foreground">
+            <span className="font-mono text-foreground/90">
               {address.slice(0, 6)}...{address.slice(-4)}
             </span>
           </span>
@@ -52,8 +52,8 @@ export function InputCard({
       </div>
 
       {/* Input + Token selector */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-2 flex-1 min-w-0">
           <Input
             type="text"
             inputMode="decimal"
@@ -66,9 +66,9 @@ export function InputCard({
                 onAmountChange(value);
               }
             }}
-            className="border-0 bg-transparent text-3xl md:text-4xl font-bold text-foreground placeholder:text-muted-foreground/30 p-0 h-auto focus-visible:ring-0 transition-colors"
+            className="border-0 bg-transparent text-4xl md:text-[42px] font-semibold tracking-tight text-foreground placeholder:text-muted-foreground/25 p-0 h-auto leading-none rounded-none shadow-none focus-visible:ring-0 focus-visible:outline-none transition-colors"
           />
-          <span className="text-xs text-muted-foreground/70">{equivalentValue}</span>
+          <span className="text-xs font-medium text-muted-foreground/80">{equivalentValue}</span>
         </div>
         <TokenSelector
           token={token}

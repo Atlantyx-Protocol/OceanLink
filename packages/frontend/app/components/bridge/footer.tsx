@@ -1,12 +1,17 @@
 import Link from 'next/link';
-import { Twitter, Github, MessageCircle } from 'lucide-react';
+import { Twitter, Github } from 'lucide-react';
 
 export function Footer() {
   return (
     <footer className="px-4 py-6 md:px-6">
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
         <div className="flex items-center gap-6">
-          <Link href="#" className="hover:text-foreground transition-colors">
+          <Link
+            href="https://anhs-organization-30.gitbook.io/oceanlink"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-foreground transition-colors"
+          >
             Docs
           </Link>
           <div className="flex items-center gap-4">
@@ -25,9 +30,6 @@ export function Footer() {
               className="hover:text-foreground transition-colors"
             >
               <Github className="h-4 w-4" />
-            </Link>
-            <Link href="#" className="hover:text-foreground transition-colors">
-              <MessageCircle className="h-4 w-4" />
             </Link>
           </div>
         </div>

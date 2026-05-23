@@ -16,15 +16,15 @@ type ConfiguredChainId = (typeof wagmiConfig)['chains'][number]['id'];
 import { USDC_DECIMALS } from '@/hooks/funds/constants';
 
 const NETWORKS: Network[] = [
-  { id: 'ethereum-sepolia', name: 'Ethereum Sepolia', icon: '\u27E0' },
-  { id: 'arbitrum-sepolia', name: 'Arbitrum Sepolia', icon: '\uD83D\uDD35' },
-  { id: 'base-sepolia', name: 'Base Sepolia', icon: '\uD83D\uDD37' },
+  { id: 'ethereum-sepolia', name: 'Ethereum Sepolia', icon: '/ethereum.png' },
+  { id: 'arbitrum-sepolia', name: 'Arbitrum Sepolia', icon: '/arbitrum.png' },
+  { id: 'base-sepolia', name: 'Base Sepolia', icon: '/base.png' },
 ];
 
 const USDC_TOKEN: Token = {
   symbol: 'USDC',
   name: 'USD Coin',
-  icon: '\uD83D\uDCB2',
+  icon: '/usdc.png',
 };
 
 interface BridgeCardProps {
@@ -188,7 +188,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
 
   return (
     <div className="w-full max-w-md mx-auto">
-      <div className="rounded-3xl bg-secondary/50 p-3 md:p-4">
+      <div className="rounded-[24px] bg-card border border-border/60 p-4 md:p-5 shadow-[0_8px_30px_-12px_rgba(17,17,17,0.08),0_2px_8px_-3px_rgba(17,17,17,0.04)] dark:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)]">
         <InputCard
           label="From"
           amount={fromAmount}
@@ -208,13 +208,13 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
         />
 
         <div className="relative py-2">
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
             <Button
               variant="secondary"
               size="icon"
               onClick={handleSwapDirection}
               disabled={isLoading}
-              className="h-10 w-10 rounded-xl bg-secondary hover:bg-secondary/80 border border-border shadow-lg transition-transform hover:scale-105"
+              className="h-11 w-11 rounded-2xl bg-card/80 hover:bg-card backdrop-blur-md border border-border ring-4 ring-card shadow-[0_4px_16px_-2px_rgba(17,17,17,0.08),0_2px_4px_-1px_rgba(17,17,17,0.06)] transition-all hover:scale-105 hover:shadow-[0_6px_20px_-2px_rgba(39,117,202,0.18),0_2px_6px_-1px_rgba(17,17,17,0.06)] hover:border-accent/40"
             >
               <ArrowDownUp className="h-4 w-4 text-foreground" />
             </Button>

@@ -44,18 +44,27 @@ export function TokenSelector({
         <DropdownMenuTrigger asChild>
           <Button
             variant="secondary"
-            className="flex items-center gap-2 h-auto py-2 px-3 hover:bg-secondary/80 rounded-xl border border-border transition-colors"
+            className="group/pill relative flex items-center gap-2.5 h-auto py-2 pl-2 pr-3 rounded-2xl border border-border bg-gradient-to-b from-card to-secondary/40 hover:from-card hover:to-card hover:border-accent/30 hover:shadow-[0_0_0_4px_rgba(39,117,202,0.06),0_4px_12px_-4px_rgba(39,117,202,0.12)] transition-all duration-200"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-background text-base">
-              {token.icon}
+            <div className="relative flex h-8 w-8 items-center justify-center">
+              <img
+                src={token.icon}
+                alt={token.symbol}
+                className="h-8 w-8 rounded-full object-contain drop-shadow-[0_2px_4px_rgba(39,117,202,0.18)]"
+              />
+              <img
+                src={network.icon}
+                alt={network.name}
+                className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full object-contain ring-2 ring-card"
+              />
             </div>
-            <div className="flex flex-col items-start">
+            <div className="flex flex-col items-start leading-tight">
               <span className="text-sm font-semibold text-foreground">{token.symbol}</span>
-              <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+              <span className="text-[10px] font-medium text-muted-foreground truncate max-w-[100px]">
                 {network.name}
               </span>
             </div>
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover/pill:translate-y-0.5" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
@@ -68,7 +77,11 @@ export function TokenSelector({
               onClick={() => onNetworkChange(net)}
               className="flex items-center gap-2 cursor-pointer"
             >
-              <span className="text-lg">{net.icon}</span>
+              <img
+                src={net.icon}
+                alt={net.name}
+                className="h-5 w-5 rounded-full object-contain"
+              />
               <span>{net.name}</span>
               {net.id === network.id && <span className="ml-auto text-accent">●</span>}
             </DropdownMenuItem>

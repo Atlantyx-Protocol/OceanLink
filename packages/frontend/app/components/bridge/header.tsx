@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Menu, Waves } from 'lucide-react';
 import { ConnectWalletButton } from './connect-wallet-button';
@@ -19,6 +20,19 @@ export function Header() {
           <Button variant="ghost" className="relative text-foreground hover:bg-secondary">
             Bridge
             <span className="absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 bg-accent rounded-full" />
+          </Button>
+          <Button
+            asChild
+            variant="ghost"
+            className="text-muted-foreground hover:text-foreground hover:bg-secondary"
+          >
+            <Link
+              href="https://anhs-organization-30.gitbook.io/oceanlink"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Docs
+            </Link>
           </Button>
         </nav>
       </div>
