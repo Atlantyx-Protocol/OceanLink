@@ -20,7 +20,15 @@ export default function BridgePage() {
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
 
-      <main className="flex-1 flex items-center justify-center px-4 py-8">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground">
+            Bridge USDC across chains
+          </h1>
+          <p className="mt-2 text-sm md:text-base text-muted-foreground">
+            Trustless. Non-custodial. Cheap.
+          </p>
+        </div>
         <BridgeCard isConnected={isAuthenticated} onConnectWallet={handleConnectWallet} />
       </main>
 
