@@ -7,30 +7,29 @@ export function Footer() {
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
         <div className="flex items-center gap-6">
           <Link href="#" className="hover:text-foreground transition-colors">
-            FAQ
-          </Link>
-          <Link href="#" className="hover:text-foreground transition-colors">
             Docs
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="#" className="hover:text-foreground transition-colors">
+            <Link
+              href="https://x.com/_atlantyx"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+            >
               <Twitter className="h-4 w-4" />
             </Link>
-            <Link href="#" className="hover:text-foreground transition-colors">
+            <Link
+              href="https://github.com/Atlantyx-Protocol"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-foreground transition-colors"
+            >
               <Github className="h-4 w-4" />
             </Link>
             <Link href="#" className="hover:text-foreground transition-colors">
               <MessageCircle className="h-4 w-4" />
             </Link>
           </div>
-        </div>
-        <div className="flex items-center gap-6">
-          <Link href="#" className="hover:text-foreground transition-colors">
-            Terms
-          </Link>
-          <Link href="#" className="hover:text-foreground transition-colors">
-            Privacy
-          </Link>
         </div>
       </div>
       <div className="mt-4 text-center text-xs text-muted-foreground/60">
