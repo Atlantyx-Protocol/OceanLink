@@ -44,16 +44,22 @@ export function getChainId(id: SupportedChain): number {
   return getChain(id).id;
 }
 
-// OceanLink HTLC contract addresses
-const HTLC_ADDRESSES: Record<SupportedChain, `0x${string}`> = {
-  [SUPPORTED_CHAINS.ETHEREUM]: '0xedc85Fe98519109be0137Ca17bAA32F323c42796',
-  [SUPPORTED_CHAINS.ARBITRUM]: '0xbd9CCa55C35EEBa20984745dC3e9bAc60453BcfD',
-  [SUPPORTED_CHAINS.BASE]: '0x9db8d7C640251C51a145f6c51de64B884f3276Ee',
+// OceanLink HTLC contract addresses (from env — must match backend config)
+const HTLC_ADDRESSES: Record<SupportedChain, `0x${string}` | undefined> = {
+  [SUPPORTED_CHAINS.ETHEREUM]: process.env.NEXT_PUBLIC_HTLC_ADDRESS_SEPOLIA as
+    | `0x${string}`
+    | undefined,
+  [SUPPORTED_CHAINS.ARBITRUM]: process.env.NEXT_PUBLIC_HTLC_ADDRESS_ARBITRUM_SEPOLIA as
+    | `0x${string}`
+    | undefined,
+  [SUPPORTED_CHAINS.BASE]: process.env.NEXT_PUBLIC_HTLC_ADDRESS_BASE_SEPOLIA as
+    | `0x${string}`
+    | undefined,
 };
 
 export function getHtlcAddress(id: SupportedChain): `0x${string}` {
   const addr = HTLC_ADDRESSES[id];
-  if (!addr) throw new Error(`No HTLC address for chain: ${id}`);
+  if (!addr) throw new Error(`Missing NEXT_PUBLIC_HTLC_ADDRESS_* env for chain: ${id}`);
   return addr;
 }
 

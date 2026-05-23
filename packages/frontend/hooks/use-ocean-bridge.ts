@@ -225,12 +225,6 @@ export function useOceanBridge() {
       const htlcAddress = getHtlcAddress(srcChain);
       const amountWei = parseUnits(amount, USDC_DECIMALS);
 
-      console.log('[OceanBridge] step=checking — reading USDC allowance', {
-        usdcAddress,
-        htlcAddress,
-        amountWei: amountWei.toString(),
-      });
-
       const currentAllowance = await publicClient.readContract({
         address: usdcAddress,
         abi: erc20Abi,
@@ -238,20 +232,23 @@ export function useOceanBridge() {
         args: [userAddress, htlcAddress],
       });
 
-      console.log('[OceanBridge] allowance result', {
-        currentAllowance: currentAllowance.toString(),
-        needsApproval: currentAllowance < amountWei,
-      });
-
       // step 2: approve HTLC if allowance is insufficient
       let approvalTxHash: `0x${string}` | null = null;
 
       if (currentAllowance < amountWei) {
         setState((s) => ({ ...s, step: 'approving' }));
-        console.log('[OceanBridge] step=approving — requesting approve()');
 
         const wc = walletClientRef.current;
         if (!wc) throw new Error('Wallet not connected');
+
+        const fees = await publicClient.estimateFeesPerGas();
+        const GAS_BUFFER_MULTIPLIER = BigInt(2);
+        const maxFeePerGas = fees.maxFeePerGas
+          ? fees.maxFeePerGas * GAS_BUFFER_MULTIPLIER
+          : undefined;
+        const maxPriorityFeePerGas = fees.maxPriorityFeePerGas
+          ? fees.maxPriorityFeePerGas * GAS_BUFFER_MULTIPLIER
+          : undefined;
 
         const hash = await wc.writeContract({
           address: usdcAddress,
@@ -260,11 +257,11 @@ export function useOceanBridge() {
           args: [htlcAddress, amountWei],
           chain,
           account: userAddress,
+          maxFeePerGas,
+          maxPriorityFeePerGas,
         });
 
         approvalTxHash = hash;
-        console.log('[OceanBridge] approval tx sent', { hash });
-
         setState((s) => ({ ...s, approvalTxHash: hash }));
         toast({
           title: 'Approval sent',
@@ -277,12 +274,6 @@ export function useOceanBridge() {
         });
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        console.log('[OceanBridge] approval receipt', {
-          status: receipt.status,
-          blockNumber: receipt.blockNumber.toString(),
-          gasUsed: receipt.gasUsed.toString(),
-        });
-
         if (receipt.status === 'reverted') {
           throw new Error('USDC approval transaction reverted');
         }

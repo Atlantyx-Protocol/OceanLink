@@ -66,13 +66,20 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
     },
   });
 
+  const balanceNum =
+    rawBalance !== undefined ? parseFloat(formatUnits(rawBalance, USDC_DECIMALS)) : undefined;
+
   const formattedBalance =
-    rawBalance !== undefined
-      ? parseFloat(formatUnits(rawBalance, USDC_DECIMALS)).toLocaleString('en-US', {
+    balanceNum !== undefined
+      ? balanceNum.toLocaleString('en-US', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })
       : undefined;
+
+  // true once balance has loaded and the typed amount exceeds it
+  const insufficientBalance =
+    isConnected && hasValidAmount && balanceNum !== undefined && parsedAmount > balanceNum;
 
   // read balance on destination chain
   const desChainId = getChainId(desChain) as ConfiguredChainId;
@@ -183,12 +190,17 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
 
     if (!hasValidAmount) return 'Enter an amount';
     if (fromNetwork.id === toNetwork.id) return 'Select different networks';
+    if (insufficientBalance) return 'Insufficient USDC balance';
     if (!isOnCorrectChain) return `Switch to ${fromNetwork.name}`;
 
     return 'Bridge';
   };
 
-  const isButtonDisabled = isLoading || !hasValidAmount || fromNetwork.id === toNetwork.id;
+  const isButtonDisabled =
+    isLoading ||
+    !hasValidAmount ||
+    fromNetwork.id === toNetwork.id ||
+    insufficientBalance;
 
   return (
     <div className="w-full max-w-md mx-auto">
