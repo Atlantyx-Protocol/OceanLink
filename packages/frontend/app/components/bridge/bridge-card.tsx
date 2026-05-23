@@ -54,7 +54,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   // read USDC balance on source chain
   const usdcAddress = getUsdcAddress(srcChain);
 
-  const { data: rawBalance } = useReadContract({
+  const { data: rawBalance, refetch: refetchSrcBalance } = useReadContract({
     address: usdcAddress,
     abi: erc20Abi,
     functionName: 'balanceOf',
@@ -62,7 +62,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
     chainId: srcChainId,
     query: {
       enabled: isConnected && !!walletAddress,
-      refetchInterval: 15_000,
+      refetchInterval: 5_000,
     },
   });
 
@@ -78,7 +78,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   const desChainId = getChainId(desChain) as ConfiguredChainId;
   const desUsdcAddress = getUsdcAddress(desChain);
 
-  const { data: rawDesBalance } = useReadContract({
+  const { data: rawDesBalance, refetch: refetchDesBalance } = useReadContract({
     address: desUsdcAddress,
     abi: erc20Abi,
     functionName: 'balanceOf',
@@ -86,7 +86,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
     chainId: desChainId,
     query: {
       enabled: isConnected && !!walletAddress,
-      refetchInterval: 15_000,
+      refetchInterval: 5_000,
     },
   });
 
@@ -105,13 +105,16 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
     }
   }, [fromAmount, fromNetwork, toNetwork]);
 
-  // reset form after a successful bridge
+  // reset form after a successful bridge and refetch balances immediately so
+  // the UI reflects on-chain settlement without waiting for the next poll tick.
   useEffect(() => {
     if (step === 'done') {
       setFromAmount('');
       setToAmount('');
+      void refetchSrcBalance();
+      void refetchDesBalance();
     }
-  }, [step]);
+  }, [step, refetchSrcBalance, refetchDesBalance]);
 
   // handlers
   const handleSwapDirection = () => {
@@ -168,6 +171,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
         checking: 'Checking allowance...',
         approving: 'Waiting for approval...',
         submitting: 'Submitting order...',
+        tracking: 'Settling on-chain...',
       };
       return (
         <span className="flex items-center justify-center gap-2">
@@ -261,13 +265,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
         </div>
 
         {/* status feedback */}
-        <BridgeStatus
-          step={step}
-          orderId={orderId}
-          approvalTxHash={approvalTxHash}
-          error={error}
-          onDismiss={reset}
-        />
+        <BridgeStatus step={step} error={error} onDismiss={reset} />
       </div>
     </div>
   );

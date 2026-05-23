@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { createElement, useCallback, useRef, useState } from 'react';
 import { createPublicClient, http, parseUnits, erc20Abi } from 'viem';
 import type { PublicClient } from 'viem';
 import { useWalletClient } from 'wagmi';
@@ -13,8 +13,16 @@ import {
 } from '@/lib/web3/web3';
 import { USDC_DECIMALS } from '@/hooks/funds/constants';
 import { toast } from '@/hooks/use-toast';
+import { getExplorerTxUrl, shortHash } from '@/lib/explorers';
 
-export type OceanBridgeStep = 'idle' | 'checking' | 'approving' | 'submitting' | 'done' | 'error';
+export type OceanBridgeStep =
+  | 'idle'
+  | 'checking'
+  | 'approving'
+  | 'submitting'
+  | 'tracking' // intent accepted; waiting for orchestrator settlement via SSE
+  | 'done'
+  | 'error';
 
 export interface OceanBridgeState {
   step: OceanBridgeStep;
@@ -51,14 +59,93 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:300
 
 interface ServerOrderEvent {
   orderId: string;
-  type: 'queued' | 'matched' | 'htlc_created' | 'withdrawn' | 'done' | 'error';
+  type: 'queued' | 'matched' | 'plan' | 'htlc_created' | 'withdrawn' | 'done' | 'error';
   message: string;
   data?: Record<string, unknown>;
   timestamp: number;
 }
 
-// open SSE stream for orderId, toast each event, auto-close on done/error
-function subscribeToOrderEvents(orderId: string): void {
+// renders a truncated tx hash as a clickable link to the chain explorer.
+// falls back to plain truncated text when the chain is unknown.
+function txLink(chain: string, txHash: string) {
+  const url = getExplorerTxUrl(chain, txHash);
+  const label = shortHash(txHash);
+  if (!url) {
+    return createElement('span', { className: 'font-mono text-xs' }, label);
+  }
+  return createElement(
+    'a',
+    {
+      href: url,
+      target: '_blank',
+      rel: 'noopener noreferrer',
+      className: 'font-mono text-xs underline underline-offset-2 hover:text-foreground',
+    },
+    label
+  );
+}
+
+interface Withdrawal {
+  chain: string;
+  txHash: string;
+}
+
+const EVENT_TITLES: Record<ServerOrderEvent['type'], string> = {
+  queued: 'Order queued',
+  matched: 'Order matched',
+  plan: 'Execution planned',
+  htlc_created: 'HTLC created',
+  withdrawn: 'Withdrawal completed',
+  done: 'Bridge completed',
+  error: 'Bridge failed',
+};
+
+function buildEventDescription(event: ServerOrderEvent): React.ReactNode {
+  const data = event.data ?? {};
+
+  if (event.type === 'htlc_created') {
+    const chain = typeof data.chain === 'string' ? data.chain : '';
+    const txHash = typeof data.txHash === 'string' ? data.txHash : '';
+    if (chain && txHash) {
+      return createElement(
+        'span',
+        null,
+        `on ${chain} — `,
+        txLink(chain, txHash)
+      );
+    }
+  }
+
+  if (event.type === 'withdrawn') {
+    const withdrawals = Array.isArray(data.withdrawals) ? (data.withdrawals as Withdrawal[]) : [];
+    if (withdrawals.length > 0) {
+      return createElement(
+        'div',
+        { className: 'flex flex-col gap-0.5' },
+        ...withdrawals.map((w, i) =>
+          createElement(
+            'span',
+            { key: i },
+            `${w.chain} — `,
+            txLink(w.chain, w.txHash)
+          )
+        )
+      );
+    }
+  }
+
+  // default: plain message text
+  return event.message;
+}
+
+// open SSE stream for orderId, toast each event, auto-close on done/error.
+// onTerminal is invoked when the stream resolves so the hook can flip step
+// state to 'done' or 'error' — letting the bridge button stay in a loading
+// state from intent submission until on-chain settlement completes.
+function subscribeToOrderEvents(
+  orderId: string,
+  onTerminal: (status: 'done' | 'error', message?: string) => void
+): void {
   const url = `${BACKEND_URL}/api/orders/${orderId}/events`;
   const es = new EventSource(url);
 
@@ -74,13 +161,14 @@ function subscribeToOrderEvents(orderId: string): void {
     }
     console.log(`[OceanBridge:server] ⟵ ${event.type}`, event);
     toast({
-      title: `Bridge: ${event.type}`,
-      description: event.message,
+      title: EVENT_TITLES[event.type] ?? event.type,
+      description: buildEventDescription(event),
       variant: event.type === 'error' ? 'destructive' : undefined,
     });
     if (event.type === 'done' || event.type === 'error') {
       es.close();
       console.log('[OceanBridge:server] 🔌 stream closed');
+      onTerminal(event.type, event.message);
     }
   };
 
@@ -180,7 +268,12 @@ export function useOceanBridge() {
         setState((s) => ({ ...s, approvalTxHash: hash }));
         toast({
           title: 'Approval sent',
-          description: `TX: ${hash.slice(0, 10)}...${hash.slice(-8)}`,
+          description: createElement(
+            'span',
+            null,
+            'TX: ',
+            txLink(srcChain, hash)
+          ),
         });
 
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -242,17 +335,18 @@ export function useOceanBridge() {
         throw new Error(data.error || `Intent submission failed (${res.status})`);
       }
 
-      // done
+      // intent accepted — keep the button in a loading state ('tracking') until
+      // the SSE stream resolves with 'done' (settled on-chain) or 'error'.
       const submittedOrderId = data.order?.orderId ?? null;
       setState({
-        step: 'done',
+        step: 'tracking',
         approvalTxHash,
         orderId: submittedOrderId,
         error: null,
-        isLoading: false,
+        isLoading: true,
       });
 
-      console.log('[OceanBridge] ✅ step=done — order submitted', {
+      console.log('[OceanBridge] ⏳ step=tracking — order submitted', {
         orderId: submittedOrderId,
         approvalTxHash,
         order: data.order,
@@ -260,11 +354,26 @@ export function useOceanBridge() {
 
       toast({
         title: 'Bridge order submitted',
-        description: `Order ID: ${submittedOrderId ?? 'N/A'}`,
+        description: 'Tracking settlement on-chain…',
       });
 
       if (submittedOrderId) {
-        subscribeToOrderEvents(submittedOrderId);
+        subscribeToOrderEvents(submittedOrderId, (status, message) => {
+          inflightRef.current = false;
+          if (status === 'done') {
+            setState((s) => ({ ...s, step: 'done', isLoading: false, error: null }));
+          } else {
+            setState((s) => ({
+              ...s,
+              step: 'error',
+              isLoading: false,
+              error: message ?? 'Bridge settlement failed',
+            }));
+          }
+        });
+      } else {
+        // no orderId means nothing to track — treat as done immediately.
+        setState((s) => ({ ...s, step: 'done', isLoading: false }));
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Bridge transaction failed';

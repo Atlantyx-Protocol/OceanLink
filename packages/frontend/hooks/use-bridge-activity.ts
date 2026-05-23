@@ -8,7 +8,13 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:300
 // and status transitions appear "live" without hammering the backend.
 const POLL_INTERVAL_MS = 4_000;
 
-export type BridgeOrderStatus = 'QUEUED' | 'PARTIAL' | 'MATCHED' | 'EXPIRED';
+export type BridgeOrderStatus =
+  | 'QUEUED'
+  | 'PARTIAL'
+  | 'MATCHED'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'EXPIRED';
 
 export interface BridgeOrder {
   orderId: string;

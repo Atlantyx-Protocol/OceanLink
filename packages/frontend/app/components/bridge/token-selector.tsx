@@ -91,7 +91,7 @@ export function TokenSelector({
       {balance && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span>
-            Bal: <span className="text-foreground font-medium">{balance}</span>
+            Balance: <span className="text-foreground font-medium">{balance}</span>
           </span>
           {onMaxClick && (
             <button
