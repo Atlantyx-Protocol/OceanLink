@@ -5,10 +5,11 @@ import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { wagmiConfig } from '@/lib/wagmi';
 import { AuthProvider } from '@/lib/auth-context';
-import { ThemeProvider } from '@/app/components/ui/theme-provider';
+import { ThemeProvider } from '@/components/ui/theme-provider';
 
 export function Providers({ children }: { children: ReactNode }) {
-  // QueryClient must live inside a client component so each session has its own cache (SSR-safe)
+  // QueryClient lives inside a client component so each session gets its own
+  // cache instance (SSR-safe)
   const [queryClient] = useState(
     () =>
       new QueryClient({

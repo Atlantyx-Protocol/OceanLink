@@ -1,5 +1,7 @@
 'use client';
 
+import { ChevronDown } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -7,7 +9,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown } from 'lucide-react';
 
 export interface Network {
   id: string;
@@ -38,6 +39,8 @@ export function TokenSelector({
   balance,
   onMaxClick,
 }: TokenSelectorProps) {
+  const t = useTranslations('bridge');
+
   return (
     <div className="flex flex-col items-end gap-2">
       <DropdownMenu>
@@ -69,7 +72,7 @@ export function TokenSelector({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-            Select Network
+            {t('selectNetwork')}
           </div>
           {networks.map((net) => (
             <DropdownMenuItem
@@ -84,10 +87,11 @@ export function TokenSelector({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
+
       {balance && (
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span>
-            Balance: <span className="text-foreground font-medium">{balance}</span>
+            {t('balance')}: <span className="text-foreground font-medium">{balance}</span>
           </span>
           {onMaxClick && (
             <button
@@ -95,7 +99,7 @@ export function TokenSelector({
               onClick={onMaxClick}
               className="font-semibold text-accent hover:text-accent/80 transition-colors cursor-pointer"
             >
-              MAX
+              {t('max')}
             </button>
           )}
         </div>

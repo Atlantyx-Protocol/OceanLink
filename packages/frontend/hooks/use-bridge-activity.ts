@@ -1,11 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { env } from '@/config/env';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL ?? 'http://localhost:3001';
-
-// auto-refresh interval while page is visible — short enough that new orders
-// and status transitions appear "live" without hammering the backend.
+// short enough that new orders and status transitions feel "live", but won't
+// hammer the backend when the user idles on the page.
 const POLL_INTERVAL_MS = 4_000;
 
 export type BridgeOrderStatus =
@@ -35,7 +34,7 @@ interface OrdersResponse {
   pageSize: number;
 }
 
-interface UseBridgeActivityResult {
+export interface UseBridgeActivityResult {
   orders: BridgeOrder[];
   total: number;
   isLoading: boolean;
@@ -54,8 +53,7 @@ export function useBridgeActivity(
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // tracks whether this is the first load (full spinner) vs a background
-  // refresh (small indicator)
+  // distinguishes the first load (full spinner) from background refreshes
   const hasLoadedRef = useRef(false);
 
   const fetchOrders = useCallback(async () => {
@@ -66,17 +64,14 @@ export function useBridgeActivity(
       return;
     }
 
-    if (hasLoadedRef.current) {
-      setIsRefreshing(true);
-    } else {
-      setIsLoading(true);
-    }
+    if (hasLoadedRef.current) setIsRefreshing(true);
+    else setIsLoading(true);
+
     try {
-      const url = `${BACKEND_URL}/api/orders?userAddress=${address}&pageSize=${pageSize}`;
+      const url = `${env.backendUrl}/api/orders?userAddress=${address}&pageSize=${pageSize}`;
       const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
       const json = (await res.json()) as OrdersResponse;
       setOrders(json.data);
       setTotal(json.total);
@@ -94,51 +89,51 @@ export function useBridgeActivity(
     }
   }, [address, pageSize]);
 
-  // initial fetch + refetch when address changes
   useEffect(() => {
     void fetchOrders();
   }, [fetchOrders]);
 
-  // poll while document is visible. pauses on hidden tabs to save resources
-  // and immediately refetches when the tab regains focus.
   useEffect(() => {
     if (!address) return;
-
-    let timer: ReturnType<typeof setInterval> | null = null;
-
-    const start = () => {
-      if (timer !== null) return;
-      timer = setInterval(() => {
-        if (document.visibilityState === 'visible') {
-          void fetchOrders();
-        }
-      }, POLL_INTERVAL_MS);
-    };
-
-    const stop = () => {
-      if (timer !== null) {
-        clearInterval(timer);
-        timer = null;
-      }
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        void fetchOrders();
-        start();
-      } else {
-        stop();
-      }
-    };
-
-    document.addEventListener('visibilitychange', onVisibility);
-    if (document.visibilityState === 'visible') start();
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibility);
-      stop();
-    };
+    return startVisibilityAwarePoll(fetchOrders);
   }, [address, fetchOrders]);
 
   return { orders, total, isLoading, isRefreshing, error, refetch: fetchOrders };
+}
+
+// polls while the document is visible. pauses on hidden tabs and refetches
+// immediately when the tab regains focus.
+function startVisibilityAwarePoll(fetcher: () => Promise<void>): () => void {
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  const start = () => {
+    if (timer !== null) return;
+    timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void fetcher();
+    }, POLL_INTERVAL_MS);
+  };
+
+  const stop = () => {
+    if (timer !== null) {
+      clearInterval(timer);
+      timer = null;
+    }
+  };
+
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      void fetcher();
+      start();
+    } else {
+      stop();
+    }
+  };
+
+  document.addEventListener('visibilitychange', onVisibility);
+  if (document.visibilityState === 'visible') start();
+
+  return () => {
+    document.removeEventListener('visibilitychange', onVisibility);
+    stop();
+  };
 }

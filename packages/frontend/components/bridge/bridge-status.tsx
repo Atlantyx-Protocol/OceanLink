@@ -1,16 +1,19 @@
 'use client';
 
 import { AlertCircle, Loader2, X } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import type { OceanBridgeStep } from '@/hooks/use-ocean-bridge';
+import type { BridgeStep } from '@/hooks/use-bridge';
 
 interface BridgeStatusProps {
-  step: OceanBridgeStep;
+  step: BridgeStep;
   error: string | null;
   onDismiss: () => void;
 }
 
 export function BridgeStatus({ step, error, onDismiss }: BridgeStatusProps) {
+  const t = useTranslations('bridge.status');
+
   if (step === 'idle' || step === 'done' || step === 'tracking') return null;
 
   return (
@@ -19,12 +22,11 @@ export function BridgeStatus({ step, error, onDismiss }: BridgeStatusProps) {
       aria-live="polite"
       className="mt-3 rounded-xl border border-border bg-card p-4 text-sm"
     >
-      {/* Error */}
       {step === 'error' && (
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-destructive">Transaction failed</p>
+            <p className="font-medium text-destructive">{t('title')}</p>
             <p className="text-muted-foreground mt-1 text-xs break-all">{error}</p>
           </div>
           <Button
@@ -39,10 +41,9 @@ export function BridgeStatus({ step, error, onDismiss }: BridgeStatusProps) {
         </div>
       )}
 
-      {/* In-progress steps */}
-      {step === 'checking' && <StepRow text="Checking USDC allowance..." />}
-      {step === 'approving' && <StepRow text="Approve USDC in your wallet..." />}
-      {step === 'submitting' && <StepRow text="Submitting bridge order..." />}
+      {step === 'checking' && <StepRow text={t('checking')} />}
+      {step === 'approving' && <StepRow text={t('approving')} />}
+      {step === 'submitting' && <StepRow text={t('submitting')} />}
     </div>
   );
 }
