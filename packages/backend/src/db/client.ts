@@ -1,40 +1,32 @@
 import postgres from 'postgres';
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js';
 import * as schema from './schema.js';
-
-// lazy db handle: DATABASE_URL is read on first use so dotenv.config() in
-// index.ts has a chance to run first.
+import { loadEnv } from '../config/env.js';
 
 type Db = PostgresJsDatabase<typeof schema>;
 
-let _db: Db | null = null;
+let cached: Db | null = null;
 
 function getDb(): Db {
-  if (_db) return _db;
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error('DATABASE_URL is not set — see .env.example');
-  }
-  const client = postgres(url, { max: 5 });
-  _db = drizzle(client, { schema });
-  return _db;
+  if (cached) return cached;
+  const { url } = loadEnv().database;
+  if (!url) throw new Error('DATABASE_URL is not set — see .env.example');
+  cached = drizzle(postgres(url, { max: 5 }), { schema });
+  return cached;
 }
 
-// proxy forwards property access to the lazy Drizzle instance, so call sites
-// can use `db.select()...` without awaiting init.
+// proxy so call sites can `import { db }` and use it synchronously —
+// the real handle is built on first access, after dotenv has run.
 export const db = new Proxy({} as Db, {
-  get(_target, prop, receiver) {
-    const real = getDb() as unknown as Record<string | symbol, unknown>;
-    const value = real[prop as string];
-    return typeof value === 'function' ? (value as Function).bind(real) : value;
-    void receiver;
+  get(_target, prop) {
+    const real = getDb();
+    const value = Reflect.get(real, prop);
+    return typeof value === 'function' ? value.bind(real) : value;
   },
 });
 
 export { schema };
 
-// log a DB write failure without crashing the engine.
 export function logDbError(scope: string, err: unknown): void {
-  // eslint-disable-next-line no-console
   console.error(`[db:${scope}]`, err instanceof Error ? err.message : err);
 }

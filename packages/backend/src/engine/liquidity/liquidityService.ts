@@ -10,6 +10,7 @@ import {
   getMatchIntervalMs,
   getLpRefillIntervalMs,
 } from '../../config/constants.js';
+import { loadEnv } from '../../config/env.js';
 import { selectLpOrdersForUsers } from './lpSelector.js';
 
 // liquidity market service — seeds power-of-2 LP orders per route and
@@ -39,14 +40,14 @@ export interface LPConfig {
 
 // build LP configs from env private keys; throws if any key is missing
 export function loadLPConfigsFromEnv(): LPConfig[] {
+  const keys = loadEnv().privateKeys;
   const defs = [
-    { name: 'B', envKey: 'PRIVATE_KEY_B', src: SEPOLIA, des: [BASE_SEPOLIA, ARBITRUM_SEPOLIA] },
-    { name: 'C', envKey: 'PRIVATE_KEY_C', src: BASE_SEPOLIA, des: [SEPOLIA, ARBITRUM_SEPOLIA] },
-    { name: 'D', envKey: 'PRIVATE_KEY_D', src: ARBITRUM_SEPOLIA, des: [SEPOLIA, BASE_SEPOLIA] },
+    { name: 'B', pk: keys.lpB, envKey: 'PRIVATE_KEY_B', src: SEPOLIA, des: [BASE_SEPOLIA, ARBITRUM_SEPOLIA] },
+    { name: 'C', pk: keys.lpC, envKey: 'PRIVATE_KEY_C', src: BASE_SEPOLIA, des: [SEPOLIA, ARBITRUM_SEPOLIA] },
+    { name: 'D', pk: keys.lpD, envKey: 'PRIVATE_KEY_D', src: ARBITRUM_SEPOLIA, des: [SEPOLIA, BASE_SEPOLIA] },
   ];
 
-  return defs.map(({ name, envKey, src, des }) => {
-    const pk = process.env[envKey];
+  return defs.map(({ name, pk, envKey, src, des }) => {
     if (!pk) throw new Error(`Missing env variable: ${envKey}`);
     return { name, address: new Wallet(pk).address, srcChainId: src, desChainIds: des };
   });

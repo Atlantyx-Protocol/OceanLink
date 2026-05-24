@@ -10,16 +10,17 @@ import { LiquidityService, loadLPConfigsFromEnv } from './engine/liquidity/liqui
 import { matchingService } from './engine/matching/service/matchingService.js';
 import { orderStore } from './engine/matching/store/orderStore.js';
 import { orchestrator } from './engine/orchestrator/orchestrator.js';
+import { loadEnv } from './config/env.js';
 
 dotenv.config({ path: '../../.env' });
 
-const PORT = parseInt(process.env.PORT || '3001', 10);
-const HOST = process.env.HOST || '0.0.0.0';
+// loadEnv() reads process.env at call time, so dotenv.config() above runs first.
+const appEnv = loadEnv().app;
 
 const fastify = Fastify({
   disableRequestLogging: true, // suppress automatic "incoming request" / "request completed" logs
   logger: {
-    level: process.env.LOG_LEVEL || 'info',
+    level: appEnv.logLevel,
     transport: {
       target: 'pino-pretty',
       options: {
@@ -37,7 +38,7 @@ async function start() {
     fastify.log.info('Stores hydrated from Postgres');
 
     await fastify.register(cors, {
-      origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+      origin: appEnv.frontendUrl,
       credentials: true,
     });
 
@@ -79,9 +80,9 @@ async function start() {
     }
 
     // start server
-    await fastify.listen({ port: PORT, host: HOST });
+    await fastify.listen({ port: appEnv.port, host: appEnv.host });
 
-    console.log(`Backend server running on http://${HOST}:${PORT}`);
+    console.log(`Backend server running on http://${appEnv.host}:${appEnv.port}`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);

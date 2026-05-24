@@ -3,13 +3,14 @@
 
 import { JsonRpcProvider, NonceManager, Wallet, Contract } from 'ethers';
 import { getChainConfig } from '../../config/chains.js';
+import { loadEnv } from '../../config/env.js';
 import { ERC20_ABI, HTLC_ABI } from './abi.js';
 
 const providers = new Map<string, JsonRpcProvider>();
 const signers = new Map<string, NonceManager>();
 
 export function getAdminKey(): string {
-  const key = process.env.PRIVATE_KEY_ADMIN;
+  const key = loadEnv().privateKeys.admin;
   if (!key) throw new Error('PRIVATE_KEY_ADMIN is not configured in environment');
   return key;
 }

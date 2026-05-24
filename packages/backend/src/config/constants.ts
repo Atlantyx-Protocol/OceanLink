@@ -1,4 +1,9 @@
 // centralized config constants: magic numbers and env-driven defaults.
+// env-backed getters delegate to env.ts so process.env is read in one place.
+// (env.ts imports the DEFAULT_* values below — the cycle is safe because
+// loadEnv() is only invoked inside function bodies, never at module init.)
+
+import { loadEnv } from './env.js';
 
 export const DEFAULT_TIMELOCK_MINUTES = 10;
 export const LP_DEADLINE_SECONDS = 24 * 60 * 60;
@@ -8,23 +13,23 @@ export const DEFAULT_MATCH_THRESHOLD = 0;
 export const USDC_DECIMALS = 6;
 
 export function getTimelockMinutes(): number {
-  return parseInt(process.env.TIME_LOCK ?? String(DEFAULT_TIMELOCK_MINUTES), 10);
+  return loadEnv().engine.timelockMinutes;
 }
 
 export function getMatchIntervalMs(): number {
-  return parseInt(process.env.MATCH_INTERVAL_MS ?? String(DEFAULT_MATCH_INTERVAL_MS), 10);
+  return loadEnv().engine.matchIntervalMs;
 }
 
 export function getMatchThreshold(): number {
-  return parseFloat(process.env.MATCH_THRESHOLD ?? String(DEFAULT_MATCH_THRESHOLD));
+  return loadEnv().engine.matchThreshold;
 }
 
 export function getLpRefillIntervalMs(): number {
-  return parseInt(process.env.LP_REFILL_INTERVAL_MS ?? String(DEFAULT_LP_REFILL_INTERVAL_MS), 10);
+  return loadEnv().engine.lpRefillIntervalMs;
 }
 
 // true during offline benches/simulations; skips DB writes, on-chain calls,
 // and other external side effects. never set in production.
 export function isTestingMode(): boolean {
-  return process.env.OCEAN_LINK_TESTING === '1' || process.env.OCEAN_LINK_TESTING === 'true';
+  return loadEnv().engine.testingMode;
 }
