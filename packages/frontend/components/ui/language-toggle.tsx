@@ -28,12 +28,7 @@ export function LanguageToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled={isPending}
-          aria-label={t('toggle')}
-        >
+        <Button variant="ghost" size="icon" disabled={isPending} aria-label={t('toggle')}>
           <Languages className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>

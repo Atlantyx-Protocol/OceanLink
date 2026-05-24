@@ -15,17 +15,29 @@ const CHAIN_MAP: Record<SupportedChain, Chain> = {
 };
 
 const USDC_ADDRESSES: Record<SupportedChain, `0x${string}` | undefined> = {
-  [SUPPORTED_CHAINS.ETHEREUM]: process.env.NEXT_PUBLIC_USDC_ADDRESS_SEPOLIA as `0x${string}` | undefined,
-  [SUPPORTED_CHAINS.ARBITRUM]: process.env.NEXT_PUBLIC_USDC_ADDRESS_ARBITRUM_SEPOLIA as `0x${string}` | undefined,
-  [SUPPORTED_CHAINS.BASE]: process.env.NEXT_PUBLIC_USDC_ADDRESS_BASE_SEPOLIA as `0x${string}` | undefined,
+  [SUPPORTED_CHAINS.ETHEREUM]: process.env.NEXT_PUBLIC_USDC_ADDRESS_SEPOLIA as
+    | `0x${string}`
+    | undefined,
+  [SUPPORTED_CHAINS.ARBITRUM]: process.env.NEXT_PUBLIC_USDC_ADDRESS_ARBITRUM_SEPOLIA as
+    | `0x${string}`
+    | undefined,
+  [SUPPORTED_CHAINS.BASE]: process.env.NEXT_PUBLIC_USDC_ADDRESS_BASE_SEPOLIA as
+    | `0x${string}`
+    | undefined,
 };
 
 // addresses must match backend chain config — verify via GET /api/usdc/chains
 // if values diverge.
 const HTLC_ADDRESSES: Record<SupportedChain, `0x${string}` | undefined> = {
-  [SUPPORTED_CHAINS.ETHEREUM]: process.env.NEXT_PUBLIC_HTLC_ADDRESS_SEPOLIA as `0x${string}` | undefined,
-  [SUPPORTED_CHAINS.ARBITRUM]: process.env.NEXT_PUBLIC_HTLC_ADDRESS_ARBITRUM_SEPOLIA as `0x${string}` | undefined,
-  [SUPPORTED_CHAINS.BASE]: process.env.NEXT_PUBLIC_HTLC_ADDRESS_BASE_SEPOLIA as `0x${string}` | undefined,
+  [SUPPORTED_CHAINS.ETHEREUM]: process.env.NEXT_PUBLIC_HTLC_ADDRESS_SEPOLIA as
+    | `0x${string}`
+    | undefined,
+  [SUPPORTED_CHAINS.ARBITRUM]: process.env.NEXT_PUBLIC_HTLC_ADDRESS_ARBITRUM_SEPOLIA as
+    | `0x${string}`
+    | undefined,
+  [SUPPORTED_CHAINS.BASE]: process.env.NEXT_PUBLIC_HTLC_ADDRESS_BASE_SEPOLIA as
+    | `0x${string}`
+    | undefined,
 };
 
 const CHAIN_ID_TO_SUPPORTED: Record<number, SupportedChain> = {

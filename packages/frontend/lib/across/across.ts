@@ -70,9 +70,7 @@ async function fetchQuote(params: URLSearchParams, label: string): Promise<Label
 export function createOriginPublicClient(originChain: SupportedChain): PublicClient {
   const originChainConfig = getChain(originChain);
   const httpEndpoint =
-    originChain === SUPPORTED_CHAINS.ETHEREUM
-      ? env.rpc.ethereum
-      : env.rpc.arbitrum;
+    originChain === SUPPORTED_CHAINS.ETHEREUM ? env.rpc.ethereum : env.rpc.arbitrum;
   return createPublicClient({
     chain: originChainConfig,
     transport: http(httpEndpoint || undefined),

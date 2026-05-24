@@ -43,9 +43,7 @@ export function InputCard({
   };
 
   // strip thousand separators before propagating MAX so parsing stays clean
-  const handleMaxClick = balance
-    ? () => onAmountChange(balance.replace(/,/g, ''))
-    : undefined;
+  const handleMaxClick = balance ? () => onAmountChange(balance.replace(/,/g, '')) : undefined;
 
   return (
     <div className="group rounded-2xl bg-background/60 border border-border/70 p-5 md:p-6 transition-all duration-200 hover:border-border focus-within:border-accent/40 focus-within:bg-background/80 focus-within:shadow-[inset_0_0_0_1px_rgba(39,117,202,0.08)]">

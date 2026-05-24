@@ -4,12 +4,7 @@ import { createElement, useCallback, useRef, useState } from 'react';
 import { createPublicClient, http, parseUnits, erc20Abi, type PublicClient } from 'viem';
 import { useWalletClient } from 'wagmi';
 import { useTranslations } from 'next-intl';
-import {
-  getChain,
-  getChainId,
-  getUsdcAddress,
-  getHtlcAddress,
-} from '@/config/chains';
+import { getChain, getChainId, getUsdcAddress, getHtlcAddress } from '@/config/chains';
 import { USDC_DECIMALS } from '@/config/constants';
 import { toast } from '@/hooks/use-toast';
 import { EVENT_TO_STATUS } from './bridge/events';

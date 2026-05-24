@@ -64,14 +64,16 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
 
   // refetch balances immediately when settlement completes so the UI updates
   // without waiting for the next poll tick
+  const { refetch: refetchSrc } = srcBalance;
+  const { refetch: refetchDes } = desBalance;
   useEffect(() => {
     if (step === 'done') {
       setFromAmount('');
       setToAmount('');
-      void srcBalance.refetch();
-      void desBalance.refetch();
+      void refetchSrc();
+      void refetchDes();
     }
-  }, [step, srcBalance.refetch, desBalance.refetch]);
+  }, [step, refetchSrc, refetchDes]);
 
   const handleSwapDirection = () => {
     if (isLoading) return;
@@ -130,10 +132,7 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="rounded-[24px] bg-card border border-border/60 p-4 md:p-5 shadow-[0_8px_30px_-12px_rgba(17,17,17,0.08),0_2px_8px_-3px_rgba(17,17,17,0.04)] dark:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)]">
-        <BridgeSettings
-          deadlineMinutes={deadlineMinutes}
-          onDeadlineChange={setDeadlineMinutes}
-        />
+        <BridgeSettings deadlineMinutes={deadlineMinutes} onDeadlineChange={setDeadlineMinutes} />
 
         <InputCard
           label={t('from')}

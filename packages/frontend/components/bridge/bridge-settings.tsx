@@ -116,7 +116,11 @@ function Field({
       </label>
       <div className="flex items-center gap-2">
         {children}
-        <span className={suffixMuted ? 'text-xs text-muted-foreground/60' : 'text-xs text-muted-foreground'}>
+        <span
+          className={
+            suffixMuted ? 'text-xs text-muted-foreground/60' : 'text-xs text-muted-foreground'
+          }
+        >
           {suffix}
         </span>
       </div>
