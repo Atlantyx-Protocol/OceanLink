@@ -42,6 +42,8 @@ export interface OceanBridgeParams {
   desChain: SupportedChain;
   userAddress: `0x${string}`;
   incentiveFee?: string;
+  // override the default 30-minute deadline (in seconds)
+  deadlineSeconds?: number;
 }
 
 const INITIAL_STATE: OceanBridgeState = {
@@ -269,7 +271,8 @@ export function useOceanBridge() {
       // step 3: submit intent order to backend
       setState((s) => ({ ...s, step: 'submitting' }));
 
-      const deadline = Math.floor(Date.now() / 1000) + INTENT_DEADLINE_SECONDS;
+      const deadlineSecs = params.deadlineSeconds ?? INTENT_DEADLINE_SECONDS;
+      const deadline = Math.floor(Date.now() / 1000) + deadlineSecs;
 
       const body: Record<string, unknown> = {
         srcChain: getChainId(srcChain),

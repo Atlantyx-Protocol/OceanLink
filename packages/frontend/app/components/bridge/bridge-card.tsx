@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAccount, useReadContract, useSwitchChain } from 'wagmi';
 import { erc20Abi, formatUnits } from 'viem';
 import { Button } from '@/components/ui/button';
 import { InputCard } from './input-card';
 import { BridgeStatus } from './bridge-status';
-import { ArrowDownUp, Loader2 } from 'lucide-react';
+import { ArrowDownUp, Loader2, Settings, X } from 'lucide-react';
 import type { Network, Token } from './token-selector';
 import { useOceanBridge } from '@/hooks/use-ocean-bridge';
 import { getChainId, getUsdcAddress, type SupportedChain } from '@/lib/web3/web3';
@@ -40,6 +40,24 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   const [toAmount, setToAmount] = useState('');
   const [fromNetwork, setFromNetwork] = useState(NETWORKS[0]);
   const [toNetwork, setToNetwork] = useState(NETWORKS[1]);
+
+  // bridge settings — defaults match backend INTENT_DEADLINE_SECONDS (30 min)
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [deadlineMinutes, setDeadlineMinutes] = useState('30');
+  const [incentiveFee, setIncentiveFee] = useState('');
+  const settingsRef = useRef<HTMLDivElement>(null);
+
+  // close popup when clicking outside
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [settingsOpen]);
 
   const { step, orderStatus, error, isLoading, bridge, reset } = useOceanBridge();
 
@@ -153,11 +171,16 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
       return;
     }
 
+    const parsedDeadlineMin = Math.max(1, parseInt(deadlineMinutes, 10) || 30);
+    const trimmedFee = incentiveFee.trim();
+
     await bridge({
       amount: fromAmount,
       srcChain,
       desChain,
       userAddress: walletAddress,
+      deadlineSeconds: parsedDeadlineMin * 60,
+      ...(trimmedFee && parseFloat(trimmedFee) > 0 ? { incentiveFee: trimmedFee } : {}),
     });
   };
 
@@ -209,6 +232,86 @@ export function BridgeCard({ isConnected, onConnectWallet }: BridgeCardProps) {
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="rounded-[24px] bg-card border border-border/60 p-4 md:p-5 shadow-[0_8px_30px_-12px_rgba(17,17,17,0.08),0_2px_8px_-3px_rgba(17,17,17,0.04)] dark:shadow-[0_8px_30px_-12px_rgba(0,0,0,0.5)]">
+        {/* card header with settings toggle */}
+        <div className="relative flex items-center justify-end mb-2" ref={settingsRef}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setSettingsOpen((v) => !v)}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            aria-label="Bridge settings"
+            aria-expanded={settingsOpen}
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
+
+          {settingsOpen && (
+            <div className="absolute right-0 top-full mt-2 z-20 w-72 rounded-2xl border border-border bg-card p-4 shadow-[0_8px_24px_-8px_rgba(17,17,17,0.16)]">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-semibold text-foreground">Settings</span>
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(false)}
+                  className="text-muted-foreground hover:text-foreground"
+                  aria-label="Close settings"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label
+                    htmlFor="bridge-deadline"
+                    className="block text-xs font-medium text-muted-foreground mb-1"
+                  >
+                    Swap expiration
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="bridge-deadline"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      value={deadlineMinutes}
+                      onChange={(e) => setDeadlineMinutes(e.target.value)}
+                      className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    />
+                    <span className="text-xs text-muted-foreground">minutes</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground/80">
+                    Order expires if not matched within this window. Min 1.
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="bridge-incentive"
+                    className="block text-xs font-medium text-muted-foreground mb-1"
+                  >
+                    Incentive fee
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id="bridge-incentive"
+                      type="text"
+                      placeholder="Coming soon"
+                      value=""
+                      disabled
+                      readOnly
+                      className="flex-1 rounded-lg border border-border bg-secondary/40 px-3 py-1.5 text-sm text-muted-foreground placeholder:text-muted-foreground cursor-not-allowed focus:outline-none"
+                    />
+                    <span className="text-xs text-muted-foreground/60">USDC</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted-foreground/80">
+                    Extra USDC paid to LPs to prioritise your order.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         <InputCard
           label="From"
           amount={fromAmount}
