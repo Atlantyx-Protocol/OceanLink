@@ -1,7 +1,7 @@
 import { Wallet } from 'ethers';
 import type { MatchingService } from '../matching/service/matchingService.js';
 import type { OrderStore } from '../matching/store/orderStore.js';
-import type { IntentOrder, MatchResult, TickStats } from '../matching/types.js';
+import type { MatchResult, TickStats } from '../matching/types.js';
 import { orchestrator } from '../orchestrator/orchestrator.js';
 import { approvalService } from '../execution/approval.js';
 import { getAllChainConfigs, getChainConfig } from '../../config/chains.js';
@@ -22,14 +22,17 @@ import { selectLpOrdersForUsers } from './lpSelector.js';
 //   C → Base Sepolia       (orders TO Ethereum & Arbitrum Sepolia)
 //   D → Arbitrum Sepolia   (orders TO Ethereum & Base Sepolia)
 
-// chain IDs derived from chain config
 const SEPOLIA = getChainConfig('sepolia')!.chainId;
 const BASE_SEPOLIA = getChainConfig('baseSepolia')!.chainId;
 const ARBITRUM_SEPOLIA = getChainConfig('arbitrumSepolia')!.chainId;
 
-// powers of 2 from 2^0 to 2^13 (all <= 10 000)
-// sum = 16 383, so any integer amount in [1, 10 000] can be covered
+// powers of 2 from 2^0 to 2^13 (all <= 10 000).
+// sum = 16 383, so any integer amount in [1, 10 000] can be covered.
 export const POWER_OF_TWO_AMOUNTS = Array.from({ length: 14 }, (_, i) => 2 ** i);
+
+// 2^200 sits well below MaxUint256 but above any plausible total pull,
+// so anything >= MIN_ALLOWANCE counts as "approved max".
+const MIN_ALLOWANCE = 2n ** 200n;
 
 export interface LPConfig {
   name: string;
@@ -38,17 +41,31 @@ export interface LPConfig {
   desChainIds: number[];
 }
 
+interface LPDef {
+  name: string;
+  envKey: 'lpB' | 'lpC' | 'lpD';
+  src: number;
+  des: number[];
+}
+
+const LP_DEFS: LPDef[] = [
+  { name: 'B', envKey: 'lpB', src: SEPOLIA, des: [BASE_SEPOLIA, ARBITRUM_SEPOLIA] },
+  { name: 'C', envKey: 'lpC', src: BASE_SEPOLIA, des: [SEPOLIA, ARBITRUM_SEPOLIA] },
+  { name: 'D', envKey: 'lpD', src: ARBITRUM_SEPOLIA, des: [SEPOLIA, BASE_SEPOLIA] },
+];
+
+const ENV_KEY_LABEL: Record<LPDef['envKey'], string> = {
+  lpB: 'PRIVATE_KEY_B',
+  lpC: 'PRIVATE_KEY_C',
+  lpD: 'PRIVATE_KEY_D',
+};
+
 // build LP configs from env private keys; throws if any key is missing
 export function loadLPConfigsFromEnv(): LPConfig[] {
   const keys = loadEnv().privateKeys;
-  const defs = [
-    { name: 'B', pk: keys.lpB, envKey: 'PRIVATE_KEY_B', src: SEPOLIA, des: [BASE_SEPOLIA, ARBITRUM_SEPOLIA] },
-    { name: 'C', pk: keys.lpC, envKey: 'PRIVATE_KEY_C', src: BASE_SEPOLIA, des: [SEPOLIA, ARBITRUM_SEPOLIA] },
-    { name: 'D', pk: keys.lpD, envKey: 'PRIVATE_KEY_D', src: ARBITRUM_SEPOLIA, des: [SEPOLIA, BASE_SEPOLIA] },
-  ];
-
-  return defs.map(({ name, pk, envKey, src, des }) => {
-    if (!pk) throw new Error(`Missing env variable: ${envKey}`);
+  return LP_DEFS.map(({ name, envKey, src, des }) => {
+    const pk = keys[envKey];
+    if (!pk) throw new Error(`Missing env variable: ${ENV_KEY_LABEL[envKey]}`);
     return { name, address: new Wallet(pk).address, srcChainId: src, desChainIds: des };
   });
 }
@@ -68,45 +85,31 @@ export class LiquidityService {
     this.lpAddresses = new Set(lpConfigs.map((lp) => lp.address));
   }
 
-  private orderKey(address: string, src: number, des: number, amount: number): string {
-    return `${address}-${src}-${des}-${amount}`;
+  isLPAddress(address: string): boolean {
+    return this.lpAddresses.has(address);
   }
 
-  private futureDeadline(): number {
-    return Math.floor(Date.now() / 1000) + LP_DEADLINE_SECONDS;
+  get trackedCount(): number {
+    return this.activeOrders.size;
   }
 
   // seed the full set of liquidity orders for every LP + route + amount
   seed(): { created: number; skipped: number } {
     let created = 0;
     let skipped = 0;
-
-    for (const lp of this.lpConfigs) {
-      for (const des of lp.desChainIds) {
-        for (const amount of POWER_OF_TWO_AMOUNTS) {
-          if (this.createIfMissing(lp.address, lp.srcChainId, des, amount)) {
-            created++;
-          } else {
-            skipped++;
-          }
-        }
-      }
-    }
+    this.forEachSlot((address, src, des, amount) => {
+      if (this.createIfMissing(address, src, des, amount)) created++;
+      else skipped++;
+    });
     return { created, skipped };
   }
 
   // recreate any consumed or expired slots
   refill(): number {
     let refilled = 0;
-    for (const lp of this.lpConfigs) {
-      for (const des of lp.desChainIds) {
-        for (const amount of POWER_OF_TWO_AMOUNTS) {
-          if (this.createIfMissing(lp.address, lp.srcChainId, des, amount)) {
-            refilled++;
-          }
-        }
-      }
-    }
+    this.forEachSlot((address, src, des, amount) => {
+      if (this.createIfMissing(address, src, des, amount)) refilled++;
+    });
     if (refilled > 0) {
       console.log(`[LiquidityService] Refilled ${refilled} LP orders`);
     }
@@ -122,11 +125,9 @@ export class LiquidityService {
     const allActive = this.store.getActiveOrders();
     const queuedBefore = allActive.length;
 
-    // separate user orders from LP orders
     const userOrders = allActive.filter((o) => !this.lpAddresses.has(o.userAddress));
 
     let matchResults: MatchResult[] = [];
-
     if (userOrders.length > 0) {
       const selectedLpOrders = selectLpOrdersForUsers(userOrders, allActive, this.lpAddresses);
       matchResults = this.service.runMatchingPass([...userOrders, ...selectedLpOrders]);
@@ -136,12 +137,8 @@ export class LiquidityService {
     this.refill();
 
     const queuedAfter = this.store.getActiveOrders().length;
-    const matchedOrders = matchResults.flatMap((r) =>
-      r.orders.filter((o) => o.status === 'MATCHED')
-    ).length;
-    const partialOrders = matchResults.flatMap((r) =>
-      r.orders.filter((o) => o.status === 'PARTIAL')
-    ).length;
+    const matchedOrders = countByStatus(matchResults, 'MATCHED');
+    const partialOrders = countByStatus(matchResults, 'PARTIAL');
 
     return { queuedBefore, expired, matchResults, matchedOrders, partialOrders, queuedAfter };
   }
@@ -150,14 +147,7 @@ export class LiquidityService {
   // its source chain. throws listing all missing pairs — approvals must be
   // pre-arranged since admin cannot approve on the LP's behalf.
   async verifyApprovals(): Promise<void> {
-    const chainIdToKey = new Map<number, string>();
-    for (const [key, cfg] of Object.entries(getAllChainConfigs())) {
-      chainIdToKey.set(cfg.chainId, key);
-    }
-
-    // 2^200 sits well below MaxUint256 but above any plausible total pull,
-    // so anything >= MIN_ALLOWANCE counts as "approved max"
-    const MIN_ALLOWANCE = 2n ** 200n;
+    const chainIdToKey = buildChainIdToKey();
     const missing: string[] = [];
 
     for (const lp of this.lpConfigs) {
@@ -166,15 +156,8 @@ export class LiquidityService {
         missing.push(`${lp.name}: unknown chainId=${lp.srcChainId}`);
         continue;
       }
-      try {
-        const { allowance } = await approvalService.getAllowance(chainKey, lp.address);
-        if (BigInt(allowance) < MIN_ALLOWANCE) {
-          missing.push(`${lp.name}@${chainKey} (allowance=${allowance})`);
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        missing.push(`${lp.name}@${chainKey} (allowance check failed: ${msg})`);
-      }
+      const reason = await checkApproval(chainKey, lp);
+      if (reason) missing.push(reason);
     }
 
     if (missing.length > 0) {
@@ -197,26 +180,8 @@ export class LiquidityService {
     const matchIntervalMs = getMatchIntervalMs();
 
     if (this.matchTimer === null) {
-      this.matchTimer = setInterval(() => {
-        const stats = this.tick();
-        if (stats.matchResults.length > 0) {
-          const summary = stats.matchResults
-            .flatMap((r) => r.orders)
-            .map(
-              (o) =>
-                `  ${o.orderId.slice(0, 8)}… [${o.status}] matched=${o.matchedAmount} remaining=${o.remainingAmount}`
-            )
-            .join('\n');
-          console.log(
-            `[LiquidityService] Tick — matched: ${stats.matchedOrders}, partial: ${stats.partialOrders}\n${summary}`
-          );
-
-          void orchestrator.handleMatchResults(stats.matchResults);
-        }
-      }, matchIntervalMs);
+      this.matchTimer = setInterval(() => this.matchTick(), matchIntervalMs);
     }
-
-    // separate refill loop for expired orders, runs independently of matching
     if (this.refillTimer === null) {
       this.refillTimer = setInterval(() => this.refill(), this.refillIntervalMs);
     }
@@ -238,29 +203,45 @@ export class LiquidityService {
     console.log('[LiquidityService] Stopped');
   }
 
-  isLPAddress(address: string): boolean {
-    return this.lpAddresses.has(address);
+  private matchTick(): void {
+    const stats = this.tick();
+    if (stats.matchResults.length === 0) return;
+
+    console.log(
+      `[LiquidityService] Tick — matched: ${stats.matchedOrders}, partial: ${stats.partialOrders}\n${formatMatchSummary(stats.matchResults)}`
+    );
+    void orchestrator.handleMatchResults(stats.matchResults);
+  }
+
+  private forEachSlot(
+    fn: (address: string, src: number, des: number, amount: number) => void
+  ): void {
+    for (const lp of this.lpConfigs) {
+      for (const des of lp.desChainIds) {
+        for (const amount of POWER_OF_TWO_AMOUNTS) {
+          fn(lp.address, lp.srcChainId, des, amount);
+        }
+      }
+    }
   }
 
   // creates an LP order if the slot isn't currently covered; returns true on create
   private createIfMissing(address: string, src: number, des: number, amount: number): boolean {
-    const key = this.orderKey(address, src, des, amount);
+    const key = orderKey(address, src, des, amount);
     const existingId = this.activeOrders.get(key);
 
     if (existingId) {
       const existing = this.store.get(existingId);
       // only skip if the order is still QUEUED at its original amount.
       // PARTIAL orders no longer cover the slot, so recreate at full amount.
-      if (existing && existing.status === 'QUEUED') {
-        return false;
-      }
+      if (existing && existing.status === 'QUEUED') return false;
     }
 
     const result = this.service.createOrder({
       srcChain: src,
       desChain: des,
       amount: String(amount),
-      deadline: this.futureDeadline(),
+      deadline: futureDeadline(),
       userAddress: address,
     });
 
@@ -269,13 +250,55 @@ export class LiquidityService {
       return true;
     }
 
-    console.error(
-      `[LiquidityService] Order creation failed: ${(result as { error: string }).error}`
-    );
+    console.error(`[LiquidityService] Order creation failed: ${result.error}`);
     return false;
   }
+}
 
-  get trackedCount(): number {
-    return this.activeOrders.size;
+function orderKey(address: string, src: number, des: number, amount: number): string {
+  return `${address}-${src}-${des}-${amount}`;
+}
+
+function futureDeadline(): number {
+  return Math.floor(Date.now() / 1000) + LP_DEADLINE_SECONDS;
+}
+
+function buildChainIdToKey(): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const [key, cfg] of Object.entries(getAllChainConfigs())) {
+    map.set(cfg.chainId, key);
   }
+  return map;
+}
+
+// returns a reason string when allowance is missing/unverifiable; undefined when OK.
+async function checkApproval(chainKey: string, lp: LPConfig): Promise<string | undefined> {
+  try {
+    const { allowance } = await approvalService.getAllowance(chainKey, lp.address);
+    if (BigInt(allowance) < MIN_ALLOWANCE) {
+      return `${lp.name}@${chainKey} (allowance=${allowance})`;
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return `${lp.name}@${chainKey} (allowance check failed: ${msg})`;
+  }
+  return undefined;
+}
+
+function countByStatus(matchResults: MatchResult[], status: 'MATCHED' | 'PARTIAL'): number {
+  let count = 0;
+  for (const r of matchResults) {
+    for (const o of r.orders) if (o.status === status) count++;
+  }
+  return count;
+}
+
+function formatMatchSummary(matchResults: MatchResult[]): string {
+  return matchResults
+    .flatMap((r) => r.orders)
+    .map(
+      (o) =>
+        `  ${o.orderId.slice(0, 8)}… [${o.status}] matched=${o.matchedAmount} remaining=${o.remainingAmount}`
+    )
+    .join('\n');
 }

@@ -1,8 +1,3 @@
-// centralized config constants: magic numbers and env-driven defaults.
-// env-backed getters delegate to env.ts so process.env is read in one place.
-// (env.ts imports the DEFAULT_* values below — the cycle is safe because
-// loadEnv() is only invoked inside function bodies, never at module init.)
-
 import { loadEnv } from './env.js';
 
 export const DEFAULT_TIMELOCK_MINUTES = 10;
@@ -28,8 +23,6 @@ export function getLpRefillIntervalMs(): number {
   return loadEnv().engine.lpRefillIntervalMs;
 }
 
-// true during offline benches/simulations; skips DB writes, on-chain calls,
-// and other external side effects. never set in production.
 export function isTestingMode(): boolean {
   return loadEnv().engine.testingMode;
 }
