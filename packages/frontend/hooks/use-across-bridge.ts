@@ -10,7 +10,7 @@ import {
   getQuote,
   type AcrossQuote,
 } from '@/lib/across/across';
-import type { SupportedChain } from '@/lib/web3/web3';
+import type { SupportedChain } from '@/config/chains';
 
 export type BridgeStep = 'idle' | 'quoting' | 'approving' | 'bridging' | 'done' | 'error';
 

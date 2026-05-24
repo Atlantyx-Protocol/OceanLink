@@ -64,29 +64,64 @@ check_inputs() {
     fi
 }
 
-main() {
-    check_deps
-    check_inputs
+approve_chain() {
+    local chain="$1"
+    log_info "→ $chain"
 
-    log_info "Approving $AMOUNT USDC for all configured chains..."
-
-    response=$(curl -s -X POST "$API_BASE/usdc/approve/all" \
+    local response
+    response=$(curl -s -X POST "$API_BASE/usdc/approve/$chain" \
         -H "Content-Type: application/json" \
         -d "{
             \"privateKey\": \"$PRIVATE_KEY\",
             \"amount\": \"$AMOUNT\"
         }")
 
+    local success
     success=$(echo "$response" | jq -r '.success')
 
     if [ "$success" != "true" ]; then
-        log_error "Approval request failed"
+        log_error "Approval failed on $chain"
         echo "$response" | jq . >&2
+        return 1
+    fi
+
+    local address txHash
+    address=$(echo "$response" | jq -r '.address')
+    txHash=$(echo "$response" | jq -r '.txHash')
+    log_success "$chain — address=$address txHash=$txHash"
+}
+
+main() {
+    check_deps
+    check_inputs
+
+    log_info "Fetching configured chains from $API_BASE/usdc/chains..."
+    local chains_response
+    chains_response=$(curl -s "$API_BASE/usdc/chains")
+    local chain_keys
+    chain_keys=$(echo "$chains_response" | jq -r '.chains[].key')
+
+    if [ -z "$chain_keys" ]; then
+        log_error "No chains configured. Response:"
+        echo "$chains_response" | jq . >&2
         exit 1
     fi
 
-    log_success "Approval request completed"
-    echo "$response" | jq .
+    log_info "Approving $AMOUNT USDC on: $(echo "$chain_keys" | tr '\n' ' ')"
+
+    local had_error=0
+    while IFS= read -r chain; do
+        if ! approve_chain "$chain"; then
+            had_error=1
+        fi
+    done <<< "$chain_keys"
+
+    if [ "$had_error" -eq 1 ]; then
+        log_error "One or more approvals failed"
+        exit 1
+    fi
+
+    log_success "All approvals completed"
 }
 
 main "$@"

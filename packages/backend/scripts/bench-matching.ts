@@ -109,7 +109,9 @@ function reportRouteDistribution(rows: Row[]): void {
   const sorted = [...counts.entries()].sort((x, y) => y[1] - x[1]);
   console.log('\n=== Route distribution (symmetric pairs) ===');
   for (const [route, n] of sorted) {
-    console.log(`  ${route.padEnd(24)}  ${String(n).padStart(5)}   ${((100 * n) / total).toFixed(1)}%`);
+    console.log(
+      `  ${route.padEnd(24)}  ${String(n).padStart(5)}   ${((100 * n) / total).toFixed(1)}%`
+    );
   }
   console.log(`  ${'TOTAL'.padEnd(24)}  ${String(total).padStart(5)}   100.0%`);
 }
@@ -245,7 +247,9 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
   }
   latencies.sort((a, b) => a - b);
   const pick = (q: number): number =>
-    latencies.length ? latencies[Math.min(latencies.length - 1, Math.floor(q * latencies.length))]! : 0;
+    latencies.length
+      ? latencies[Math.min(latencies.length - 1, Math.floor(q * latencies.length))]!
+      : 0;
 
   return {
     total: rows.length,
@@ -257,9 +261,7 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
     totalVolumeUsd: baselineVolume,
     expiredVolumeUsd: expiredVolume,
     ticks,
-    avgLatencySec: latencies.length
-      ? latencies.reduce((s, x) => s + x, 0) / latencies.length
-      : 0,
+    avgLatencySec: latencies.length ? latencies.reduce((s, x) => s + x, 0) / latencies.length : 0,
     p50LatencySec: pick(0.5),
     p95LatencySec: pick(0.95),
     cyclesByLength,
@@ -272,11 +274,7 @@ function bench(rows: Row[], windowSec: number, threshold: number): BenchResult {
 function main(): void {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, '../../../');
-  const defaultCsv = path.join(
-    repoRoot,
-    'data',
-    'bridge_data.mapped.clean.peak_hour.csv'
-  );
+  const defaultCsv = path.join(repoRoot, 'data', 'bridge_data.mapped.clean.peak_hour.csv');
   const csvPath = process.argv[2] ?? defaultCsv;
 
   if (!fs.existsSync(csvPath)) {
@@ -312,7 +310,9 @@ function main(): void {
         match: `${((100 * r.matched) / r.total).toFixed(1)}%`.padEnd(7),
         volume: `${((100 * r.matchedVolumeUsd) / r.totalVolumeUsd).toFixed(1)}%`.padEnd(7),
       });
-      process.stdout.write(`  w=${w}s x=${t}: ${r.matched}/${r.total} (${((100 * r.matched) / r.total).toFixed(1)}%) in ${r.elapsedMs}ms\n`);
+      process.stdout.write(
+        `  w=${w}s x=${t}: ${r.matched}/${r.total} (${((100 * r.matched) / r.total).toFixed(1)}%) in ${r.elapsedMs}ms\n`
+      );
     }
   }
 

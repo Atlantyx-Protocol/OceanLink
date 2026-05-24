@@ -1,0 +1,126 @@
+{
+  "meta": {
+    "title": "OceanLink Bridge",
+    "description": "Cross-chain token bridge for seamless transfers"
+  },
+  "nav": {
+    "bridge": "Bridge",
+    "docs": "Docs",
+    "activity": "Activity"
+  },
+  "hero": {
+    "title": "Bridge USDC across chains",
+    "subtitle": "Trustless. Non-custodial. Cheap."
+  },
+  "bridge": {
+    "from": "From",
+    "to": "To",
+    "bridgeButton": "Bridge",
+    "connectWallet": "Connect Wallet",
+    "enterAmount": "Enter an amount",
+    "differentNetworks": "Select different networks",
+    "insufficientBalance": "Insufficient USDC balance",
+    "switchTo": "Switch to {chain}",
+    "balance": "Balance",
+    "max": "MAX",
+    "selectNetwork": "Select Network",
+    "step": {
+      "checking": "Checking allowance...",
+      "approving": "Waiting for approval...",
+      "submitting": "Submitting order...",
+      "pending": "Pending match...",
+      "partial": "Partial match...",
+      "settling": "Settling...",
+      "processing": "Processing..."
+    },
+    "settings": {
+      "title": "Settings",
+      "swapExpiration": "Swap expiration",
+      "swapExpirationHint": "Order expires if not matched within this window. Min 1.",
+      "minutes": "minutes",
+      "incentiveFee": "Incentive fee",
+      "incentiveFeeHint": "Extra USDC paid to LPs to prioritise your order.",
+      "comingSoon": "Coming soon"
+    },
+    "status": {
+      "title": "Transaction failed",
+      "checking": "Checking USDC allowance...",
+      "approving": "Approve USDC in your wallet...",
+      "submitting": "Submitting bridge order..."
+    },
+    "toast": {
+      "approvalSent": "Approval sent",
+      "approvalConfirmed": "Approval confirmed",
+      "orderSubmitted": "Bridge order submitted",
+      "tracking": "Tracking settlement on-chain…",
+      "bridgeFailed": "Bridge failed",
+      "txPrefix": "TX:"
+    },
+    "event": {
+      "queued": "Order queued",
+      "matched": "Order matched",
+      "plan": "Execution planned",
+      "htlc_created": "HTLC created",
+      "withdrawn": "Withdrawal completed",
+      "done": "Bridge completed",
+      "error": "Bridge failed",
+      "onChain": "on {chain} —"
+    }
+  },
+  "activity": {
+    "title": "Activity",
+    "subtitle": "Track your bridge orders in real time.",
+    "refresh": "Refresh",
+    "loading": "Loading activity...",
+    "failedToLoad": "Failed to load activity",
+    "emptyConnected": "No bridge orders for {address} yet. Submit one to see it appear here.",
+    "emptyFallback": "Submit a bridge order to see it appear here.",
+    "connectWallet": "Connect your wallet",
+    "connectWalletHint": "Connect a wallet to view your bridge activity.",
+    "status": {
+      "QUEUED": "Pending match",
+      "PARTIAL": "Partial match",
+      "MATCHED": "Settling",
+      "COMPLETED": "Completed",
+      "FAILED": "Failed",
+      "EXPIRED": "Expired"
+    },
+    "detail": {
+      "orderId": "Order ID",
+      "status": "Status",
+      "from": "From",
+      "to": "To",
+      "amount": "Amount",
+      "incentiveFee": "Incentive fee",
+      "submitted": "Submitted",
+      "deadline": "Deadline"
+    },
+    "time": {
+      "justNow": "just now",
+      "minutesAgo": "{n}m ago",
+      "hoursAgo": "{n}h ago",
+      "daysAgo": "{n}d ago"
+    }
+  },
+  "wallet": {
+    "connect": "Connect Wallet",
+    "connecting": "Connecting...",
+    "wrongNetwork": "Wrong Network",
+    "switching": "Switching...",
+    "chooseWallet": "Choose a wallet",
+    "switchNetwork": "Switch network",
+    "disconnect": "Disconnect"
+  },
+  "theme": {
+    "toggle": "Toggle theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "language": {
+    "toggle": "Change language"
+  },
+  "footer": {
+    "tagline": "Powered by OceanLink Protocol"
+  }
+}

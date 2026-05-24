@@ -6,9 +6,9 @@ import {
   getUsdcAddress,
   SUPPORTED_CHAINS,
   type SupportedChain,
-} from '@/lib/web3/web3';
-import { USDC_DECIMALS } from '@/hooks/funds/constants';
-import { config } from '@/lib/config/config';
+} from '@/config/chains';
+import { USDC_DECIMALS } from '@/config/constants';
+import { env } from '@/config/env';
 
 // raw quote response from the Across swap/approval endpoint
 export interface AcrossQuote {
@@ -70,9 +70,7 @@ async function fetchQuote(params: URLSearchParams, label: string): Promise<Label
 export function createOriginPublicClient(originChain: SupportedChain): PublicClient {
   const originChainConfig = getChain(originChain);
   const httpEndpoint =
-    originChain === SUPPORTED_CHAINS.ETHEREUM
-      ? config.ethereum.httpEndpoint
-      : config.arbitrum.httpEndpoint;
+    originChain === SUPPORTED_CHAINS.ETHEREUM ? env.rpc.ethereum : env.rpc.arbitrum;
   return createPublicClient({
     chain: originChainConfig,
     transport: http(httpEndpoint || undefined),
@@ -107,7 +105,7 @@ export async function getQuote(
     amount: amountValue,
     depositor,
     recipient,
-    integratorId: config.across.integratorId,
+    integratorId: env.across.integratorId,
   };
 
   const usdcSpotParams = new URLSearchParams({

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { config } from '@/lib/config/config';
+import { env } from '@/config/env';
 
 const TESTNET_BASE_URL = 'https://testnet.across.to/api';
 const MAINNET_BASE_URL = 'https://app.across.to/api';
@@ -35,9 +35,9 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const isTestnet = config.network === 'testnet';
+  const isTestnet = env.network === 'testnet';
   const baseUrl = isTestnet ? TESTNET_BASE_URL : MAINNET_BASE_URL;
-  const apiKey = config.across.apiKey;
+  const apiKey = env.across.apiKey;
 
   const headers: HeadersInit = {};
   if (apiKey) {

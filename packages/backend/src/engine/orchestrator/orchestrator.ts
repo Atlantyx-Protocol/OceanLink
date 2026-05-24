@@ -53,6 +53,13 @@ export class Orchestrator {
       try {
         await this.executeConsolidated(result.cycles, result.matchId, orderIds);
 
+        // flip each order's status to COMPLETED so the activity feed reflects
+        // on-chain settlement (matchingService only sets MATCHED, which means
+        // "engine matched", not "settled").
+        for (const orderId of orderIds) {
+          this.store.update(orderId, { status: 'COMPLETED' });
+        }
+
         orderEvents.publishMany(orderIds, {
           type: 'done',
           message: 'Bridge execution completed',
@@ -61,6 +68,11 @@ export class Orchestrator {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         this.executionStore.set(result.matchId, { status: 'error', error: msg });
+
+        for (const orderId of orderIds) {
+          this.store.update(orderId, { status: 'FAILED' });
+        }
+
         console.error(
           `[Orchestrator] Consolidated execution failed (matchId=${result.matchId}):`,
           err

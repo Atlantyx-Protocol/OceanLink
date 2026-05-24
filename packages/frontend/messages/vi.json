@@ -1,0 +1,126 @@
+{
+  "meta": {
+    "title": "OceanLink Bridge",
+    "description": "Bridge token cross-chain mượt mà"
+  },
+  "nav": {
+    "bridge": "Bridge",
+    "docs": "Tài liệu",
+    "activity": "Hoạt động"
+  },
+  "hero": {
+    "title": "Bridge USDC giữa các chain",
+    "subtitle": "Trustless. Non-custodial. Phí thấp."
+  },
+  "bridge": {
+    "from": "Từ",
+    "to": "Đến",
+    "bridgeButton": "Bridge",
+    "connectWallet": "Kết nối ví",
+    "enterAmount": "Nhập số lượng",
+    "differentNetworks": "Chọn 2 mạng khác nhau",
+    "insufficientBalance": "Không đủ USDC",
+    "switchTo": "Chuyển sang {chain}",
+    "balance": "Số dư",
+    "max": "MAX",
+    "selectNetwork": "Chọn mạng",
+    "step": {
+      "checking": "Đang kiểm tra allowance...",
+      "approving": "Chờ approve...",
+      "submitting": "Đang gửi đơn...",
+      "pending": "Đang chờ match...",
+      "partial": "Match một phần...",
+      "settling": "Đang settle...",
+      "processing": "Đang xử lý..."
+    },
+    "settings": {
+      "title": "Cài đặt",
+      "swapExpiration": "Thời gian hết hạn",
+      "swapExpirationHint": "Đơn hết hạn nếu chưa match trong khoảng này. Tối thiểu 1.",
+      "minutes": "phút",
+      "incentiveFee": "Phí ưu tiên",
+      "incentiveFeeHint": "USDC thưởng thêm cho LP để ưu tiên đơn của bạn.",
+      "comingSoon": "Sắp ra mắt"
+    },
+    "status": {
+      "title": "Giao dịch thất bại",
+      "checking": "Đang kiểm tra USDC allowance...",
+      "approving": "Approve USDC trong ví của bạn...",
+      "submitting": "Đang gửi đơn bridge..."
+    },
+    "toast": {
+      "approvalSent": "Đã gửi approve",
+      "approvalConfirmed": "Approve thành công",
+      "orderSubmitted": "Đã gửi đơn bridge",
+      "tracking": "Đang theo dõi settle on-chain…",
+      "bridgeFailed": "Bridge thất bại",
+      "txPrefix": "TX:"
+    },
+    "event": {
+      "queued": "Đơn vào hàng đợi",
+      "matched": "Đơn đã match",
+      "plan": "Đã lên kế hoạch thực thi",
+      "htlc_created": "Đã tạo HTLC",
+      "withdrawn": "Đã rút",
+      "done": "Bridge hoàn tất",
+      "error": "Bridge thất bại",
+      "onChain": "trên {chain} —"
+    }
+  },
+  "activity": {
+    "title": "Hoạt động",
+    "subtitle": "Theo dõi đơn bridge của bạn theo thời gian thực.",
+    "refresh": "Làm mới",
+    "loading": "Đang tải...",
+    "failedToLoad": "Không thể tải hoạt động",
+    "emptyConnected": "Chưa có đơn bridge nào cho {address}. Tạo một đơn để hiện ở đây.",
+    "emptyFallback": "Tạo một đơn bridge để hiện ở đây.",
+    "connectWallet": "Kết nối ví của bạn",
+    "connectWalletHint": "Kết nối ví để xem lịch sử bridge.",
+    "status": {
+      "QUEUED": "Chờ match",
+      "PARTIAL": "Match một phần",
+      "MATCHED": "Đang settle",
+      "COMPLETED": "Hoàn tất",
+      "FAILED": "Thất bại",
+      "EXPIRED": "Hết hạn"
+    },
+    "detail": {
+      "orderId": "Mã đơn",
+      "status": "Trạng thái",
+      "from": "Từ",
+      "to": "Đến",
+      "amount": "Số lượng",
+      "incentiveFee": "Phí ưu tiên",
+      "submitted": "Đã gửi lúc",
+      "deadline": "Hết hạn"
+    },
+    "time": {
+      "justNow": "vừa xong",
+      "minutesAgo": "{n} phút trước",
+      "hoursAgo": "{n} giờ trước",
+      "daysAgo": "{n} ngày trước"
+    }
+  },
+  "wallet": {
+    "connect": "Kết nối ví",
+    "connecting": "Đang kết nối...",
+    "wrongNetwork": "Sai mạng",
+    "switching": "Đang chuyển...",
+    "chooseWallet": "Chọn ví",
+    "switchNetwork": "Chuyển mạng",
+    "disconnect": "Ngắt kết nối"
+  },
+  "theme": {
+    "toggle": "Đổi theme",
+    "light": "Sáng",
+    "dark": "Tối",
+    "system": "Hệ thống"
+  },
+  "language": {
+    "toggle": "Đổi ngôn ngữ"
+  },
+  "footer": {
+    "tagline": "Powered by OceanLink Protocol"
+  }
+}
