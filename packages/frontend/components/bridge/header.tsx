@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Menu, Waves } from 'lucide-react';
 import { ConnectWalletButton } from './connect-wallet-button';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { LanguageToggle } from '@/components/ui/language-toggle';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -60,6 +61,7 @@ export function Header() {
         </nav>
       </div>
       <div className="flex items-center gap-3">
+        <LanguageToggle />
         <ThemeToggle />
         <ConnectWalletButton />
         <Button variant="ghost" size="icon" className="md:hidden">

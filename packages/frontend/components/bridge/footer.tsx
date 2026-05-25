@@ -34,9 +34,6 @@ export function Footer() {
           </div>
         </div>
       </div>
-      <div className="mt-4 text-center text-xs text-muted-foreground/60">
-        Powered by OceanLink Protocol
-      </div>
     </footer>
   );
 }
