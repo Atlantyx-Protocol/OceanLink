@@ -64,17 +64,12 @@ export function loadEnv(): BackendEnv {
       url: process.env.DATABASE_URL,
     },
     engine: {
-      timelockMinutes: parseInt(
-        process.env.TIME_LOCK ?? String(DEFAULT_TIMELOCK_MINUTES),
-        10
-      ),
+      timelockMinutes: parseInt(process.env.TIME_LOCK ?? String(DEFAULT_TIMELOCK_MINUTES), 10),
       matchIntervalMs: parseInt(
         process.env.MATCH_INTERVAL_MS ?? String(DEFAULT_MATCH_INTERVAL_MS),
         10
       ),
-      matchThreshold: parseFloat(
-        process.env.MATCH_THRESHOLD ?? String(DEFAULT_MATCH_THRESHOLD)
-      ),
+      matchThreshold: parseFloat(process.env.MATCH_THRESHOLD ?? String(DEFAULT_MATCH_THRESHOLD)),
       lpRefillIntervalMs: parseInt(
         process.env.LP_REFILL_INTERVAL_MS ?? String(DEFAULT_LP_REFILL_INTERVAL_MS),
         10

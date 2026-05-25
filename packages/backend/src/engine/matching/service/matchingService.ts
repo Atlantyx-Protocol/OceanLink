@@ -15,7 +15,6 @@ import type {
   TickStats,
 } from '../types.js';
 
-
 export type AlgorithmFn = (n: number, edges: Edge[], x: number) => EdgeSnapshot[][];
 
 export class MatchingService {

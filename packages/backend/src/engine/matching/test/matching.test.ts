@@ -9,6 +9,10 @@ import { MatchingService } from '../service/matchingService.js';
 import type { AlgorithmFn } from '../service/matchingService.js';
 import type { Edge, EdgeSnapshot } from '../types.js';
 
+// the store persists to Postgres unless testing mode is on. these are pure
+// in-memory tests, so turn it on before any order is created.
+process.env.OCEAN_LINK_TESTING = '1';
+
 function nowSec(): number {
   return Math.floor(Date.now() / 1000);
 }

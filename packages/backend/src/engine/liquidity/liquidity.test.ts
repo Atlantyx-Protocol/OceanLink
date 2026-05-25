@@ -9,6 +9,10 @@ import { MatchingService } from '../matching/service/matchingService.js';
 import { LiquidityService, POWER_OF_TWO_AMOUNTS } from './liquidityService.js';
 import type { LPConfig } from './liquidityService.js';
 
+// the store persists to Postgres unless testing mode is on. these are pure
+// in-memory tests, so turn it on before any order is created.
+process.env.OCEAN_LINK_TESTING = '1';
+
 // same chain IDs used by the service
 const SEPOLIA = 11155111;
 const BASE_SEPOLIA = 84532;

@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { truncateAddress } from '@/lib/format';
 import { TokenSelector, type Network, type Token } from './token-selector';
 
-const DECIMAL_PATTERN = /^\d*\.?\d*$/;
+// whole USDC amounts only — no decimal point allowed
+const INTEGER_PATTERN = /^\d*$/;
 
 interface InputCardProps {
   label: string;
@@ -39,11 +40,14 @@ export function InputCard({
 }: InputCardProps) {
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (DECIMAL_PATTERN.test(value)) onAmountChange(value);
+    if (INTEGER_PATTERN.test(value)) onAmountChange(value);
   };
 
-  // strip thousand separators before propagating MAX so parsing stays clean
-  const handleMaxClick = balance ? () => onAmountChange(balance.replace(/,/g, '')) : undefined;
+  // strip thousand separators and drop any fractional part — amounts are whole
+  // USDC, so MAX rounds the balance down to its integer part
+  const handleMaxClick = balance
+    ? () => onAmountChange(balance.replace(/,/g, '').split('.')[0])
+    : undefined;
 
   return (
     <div className="group rounded-2xl bg-background/60 border border-border/70 p-5 md:p-6 transition-all duration-200 hover:border-border focus-within:border-accent/40 focus-within:bg-background/80 focus-within:shadow-[inset_0_0_0_1px_rgba(39,117,202,0.08)]">
@@ -63,8 +67,8 @@ export function InputCard({
         <div className="flex flex-col gap-2 flex-1 min-w-0">
           <Input
             type="text"
-            inputMode="decimal"
-            placeholder="0.00"
+            inputMode="numeric"
+            placeholder="0"
             value={amount}
             disabled={disabled}
             onChange={handleAmountChange}

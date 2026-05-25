@@ -68,10 +68,7 @@ export class Orchestrator {
       const msg = err instanceof Error ? err.message : String(err);
       this.executionStore.set(matchId, { status: 'error', error: msg });
       this.markOrdersFailed(orderIds);
-      console.error(
-        `[Orchestrator] Consolidated execution failed (matchId=${matchId}):`,
-        err
-      );
+      console.error(`[Orchestrator] Consolidated execution failed (matchId=${matchId}):`, err);
       this.publish(orderIds, 'error', `Bridge execution failed: ${msg}`, { matchId });
     }
   }
@@ -126,11 +123,16 @@ export class Orchestrator {
     );
 
     for (const r of nonPresidingResults) {
-      this.publish(orderIds, 'htlc_created', `HTLC created on ${r.chainKey} (txHash=${r.htlcTxHash})`, {
-        chain: r.chainKey,
-        orderId: r.orderId,
-        txHash: r.htlcTxHash,
-      });
+      this.publish(
+        orderIds,
+        'htlc_created',
+        `HTLC created on ${r.chainKey} (txHash=${r.htlcTxHash})`,
+        {
+          chain: r.chainKey,
+          orderId: r.orderId,
+          txHash: r.htlcTxHash,
+        }
+      );
     }
 
     const withdrawTxs = await this.verifyAndWithdrawAll(
@@ -140,7 +142,9 @@ export class Orchestrator {
       cycleSecretMap
     );
 
-    this.publish(orderIds, 'withdrawn',
+    this.publish(
+      orderIds,
+      'withdrawn',
       `${withdrawTxs.length} withdrawal(s) completed — ` +
         withdrawTxs.map((w) => `${w.chain}:${w.txHash}`).join(', '),
       { withdrawals: withdrawTxs }
@@ -165,7 +169,9 @@ export class Orchestrator {
     cycleCount: number,
     groupEntries: [string, SendAction[]][]
   ): void {
-    this.publish(orderIds, 'plan',
+    this.publish(
+      orderIds,
+      'plan',
       `Execution plan: ${cycleCount} cycle(s), ${groupEntries.length} HTLC group(s) — expect ${groupEntries.length} htlc_created and ${groupEntries.length} withdrawal(s)`,
       {
         matchId,

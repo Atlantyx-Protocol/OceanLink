@@ -1,26 +1,26 @@
 'use client';
 
 import { createElement, useCallback, useRef, useState } from 'react';
-import { createPublicClient, http, parseUnits, erc20Abi, type PublicClient } from 'viem';
 import { useWalletClient } from 'wagmi';
 import { useTranslations } from 'next-intl';
-import { getChain, getChainId, getUsdcAddress, getHtlcAddress } from '@/config/chains';
-import { USDC_DECIMALS } from '@/config/constants';
+import { getChainId } from '@/config/chains';
 import { toast } from '@/hooks/use-toast';
 import { EVENT_TO_STATUS } from './bridge/events';
 import { subscribeToOrderEvents } from './bridge/sse';
 import { toastEvent } from './bridge/event-toaster';
 import { txLink } from './bridge/tx-link';
+import {
+  createSrcContext,
+  checkAllowance,
+  sendApproval,
+  waitForApproval,
+  submitIntent,
+} from './bridge/steps';
 import type { BridgeParams, BridgeState } from './bridge/types';
 
 export type { BridgeStep, BridgeParams, BridgeState, OrderStatus } from './bridge/types';
 
 const DEFAULT_DEADLINE_SECONDS = 30 * 60;
-const INTENT_SUBMIT_TIMEOUT_MS = 30_000;
-
-// L2 testnet base fees can move between the wallet's gas estimate and the
-// actual submit; pad the cap so the tx isn't rejected for being just below.
-const GAS_BUFFER_MULTIPLIER = BigInt(2);
 
 const INITIAL_STATE: BridgeState = {
   step: 'idle',
@@ -61,46 +61,18 @@ export function useBridge() {
       try {
         setState({ ...INITIAL_STATE, step: 'checking', isLoading: true });
 
-        const chain = getChain(srcChain);
-        const publicClient = createPublicClient({ chain, transport: http() }) as PublicClient;
-        const usdcAddress = getUsdcAddress(srcChain);
-        const htlcAddress = getHtlcAddress(srcChain);
-        const amountWei = parseUnits(amount, USDC_DECIMALS);
-
-        const currentAllowance = await publicClient.readContract({
-          address: usdcAddress,
-          abi: erc20Abi,
-          functionName: 'allowance',
-          args: [userAddress, htlcAddress],
-        });
+        const ctx = createSrcContext(srcChain, amount);
+        const currentAllowance = await checkAllowance(ctx, userAddress);
 
         let approvalTxHash: `0x${string}` | null = null;
 
-        if (currentAllowance < amountWei) {
+        if (currentAllowance < ctx.amountWei) {
           setState((s) => ({ ...s, step: 'approving' }));
 
           const wc = walletClientRef.current;
           if (!wc) throw new Error('Wallet not connected');
 
-          const fees = await publicClient.estimateFeesPerGas();
-          const maxFeePerGas = fees.maxFeePerGas
-            ? fees.maxFeePerGas * GAS_BUFFER_MULTIPLIER
-            : undefined;
-          const maxPriorityFeePerGas = fees.maxPriorityFeePerGas
-            ? fees.maxPriorityFeePerGas * GAS_BUFFER_MULTIPLIER
-            : undefined;
-
-          approvalTxHash = await wc.writeContract({
-            address: usdcAddress,
-            abi: erc20Abi,
-            functionName: 'approve',
-            args: [htlcAddress, amountWei],
-            chain,
-            account: userAddress,
-            maxFeePerGas,
-            maxPriorityFeePerGas,
-          });
-
+          approvalTxHash = await sendApproval(ctx, wc, userAddress);
           setState((s) => ({ ...s, approvalTxHash }));
           toast({
             title: tToast('approvalSent'),
@@ -112,10 +84,7 @@ export function useBridge() {
             ),
           });
 
-          const receipt = await publicClient.waitForTransactionReceipt({ hash: approvalTxHash });
-          if (receipt.status === 'reverted') {
-            throw new Error('USDC approval transaction reverted');
-          }
+          await waitForApproval(ctx.publicClient, approvalTxHash);
           toast({ title: tToast('approvalConfirmed') });
         }
 
@@ -185,42 +154,4 @@ export function useBridge() {
   );
 
   return { ...state, bridge, reset };
-}
-
-interface IntentBody {
-  srcChain: number;
-  desChain: number;
-  amount: string;
-  deadline: number;
-  userAddress: string;
-  incentiveFee?: string;
-}
-
-async function submitIntent(body: IntentBody): Promise<string | null> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), INTENT_SUBMIT_TIMEOUT_MS);
-
-  let res: Response;
-  try {
-    res = await fetch('/api/intent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('Intent submission timed out — please try again');
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-
-  const data = await res.json().catch(() => ({ error: 'Invalid response' }));
-  if (!res.ok) {
-    throw new Error(data.error || `Intent submission failed (${res.status})`);
-  }
-
-  return data.order?.orderId ?? null;
 }
