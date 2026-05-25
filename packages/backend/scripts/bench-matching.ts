@@ -1,14 +1,3 @@
-// offline matching-engine benchmark: replays a CSV of bridge deposits through
-// MatchingService and reports matching rate over a (window, threshold) grid.
-// time is virtual (CSV timestamps bucket into runMatchingPass calls), so a
-// 1-hour CSV runs in well under a second. no DB/wallet/on-chain side effects —
-// OCEAN_LINK_TESTING is set before importing OrderStore.
-//
-// usage: pnpm --filter @ocean-link/backend run bench:matching [csv_path]
-// default csv: data/bridge_data.mapped.clean.peak_hour.csv (from monorepo root).
-
-process.env.OCEAN_LINK_TESTING = '1';
-
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 import { OrderStore } from '../src/engine/matching/store/orderStore.js';
 import { MatchingService } from '../src/engine/matching/service/matchingService.js';
 import type { IntentOrder } from '../src/engine/matching/types.js';
+
+process.env.OCEAN_LINK_TESTING = '1';
 
 // CSV row to IntentOrder mapping
 
