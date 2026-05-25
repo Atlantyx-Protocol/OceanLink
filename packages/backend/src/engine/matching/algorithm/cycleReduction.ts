@@ -1,8 +1,3 @@
-// cycle-cancellation max-circulation matching.
-// enumerates 2-cycles then 3-cycles, greedily picking the largest bottleneck
-// per pattern (ratio ≥ x). one order per leg, no aggregation, so cycles stay
-// clean N-tuples for HTLC settlement. 4+ chain cycles are skipped (rare).
-
 import type { Edge, EdgeSnapshot } from '../types.js';
 
 export type { Edge, EdgeSnapshot } from '../types.js';

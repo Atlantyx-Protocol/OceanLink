@@ -11,32 +11,21 @@ import type {
   IntentOrder,
   MatchResult,
   MatchedOrderEntry,
-  CycleMatch,
-  CycleMatchEntry,
   CreateIntentInput,
   TickStats,
 } from '../types.js';
 
-// matching algorithm adapter contract:
-//   algorithmFn(n, edges, x): EdgeSnapshot[][]
-//   - edges are mutated in place; surviving edges with reduced w are PARTIAL,
-//     splice-d edges are MATCHED.
-//   - precision: Number() is safe for USDC up to ~9e15 micro-units. For larger
-//     values switch to a BigInt-aware graph.
 
-// alias so tests can inject a mock.
 export type AlgorithmFn = (n: number, edges: Edge[], x: number) => EdgeSnapshot[][];
 
 export class MatchingService {
   constructor(
     private readonly store: OrderStore,
-    // algorithm to use; defaults to runCycleReduction. mockable in tests.
     private readonly algorithmFn: AlgorithmFn = runCycleReduction,
-    // ratio threshold: cycle matched only when min/max > threshold. env: MATCH_THRESHOLD.
-    private readonly threshold: number = getMatchThreshold()
+    private readonly threshold: number = getMatchThreshold() // cycle matched only when min/max > threshold
   ) {}
 
-  // validates input, creates an IntentOrder, stores it. returns { error } on failure.
+  // validates input, creates an IntentOrder, stores it
   createOrder(input: CreateIntentInput): { order: IntentOrder } | { error: string } {
     const result = validateAndCreateOrder(input);
     if ('error' in result) return result;

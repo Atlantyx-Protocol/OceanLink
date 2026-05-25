@@ -1,8 +1,8 @@
-import { ethers, Contract } from 'ethers';
-import { getChainConfig } from '../../config/chains.js';
+import { ethers, Contract, NonceManager, type TransactionReceipt } from 'ethers';
+import { getChainConfig, type ChainConfig } from '../../config/chains.js';
 import { getTimelockMinutes, USDC_DECIMALS } from '../../config/constants.js';
-import { ERC20_ABI, HTLC_ABI } from './abi.js';
-import { getProvider, getAdminSigner, getHTLCContract } from './provider.js';
+import { ERC20_ABI } from './abi.js';
+import { getAdminSigner, getHTLCContract } from './provider.js';
 
 export interface FillInfo {
   fillId: string;
@@ -32,104 +32,179 @@ export interface RefundResult {
   blockNumber: number;
 }
 
-class BridgeService {
-  // generate 256-bit secret and SHA256 hashlock
-  generateSecret(): { secret: string; hashlock: string } {
-    const secret = ethers.hexlify(ethers.randomBytes(32));
-    const hashlock = ethers.sha256(secret);
-    return { secret, hashlock };
+interface CreateOrderParams {
+  receivers: string[];
+  amounts: string[];
+  chain?: string;
+  isPresiding?: boolean; // true => generate new secrets; false => use provided hashlocks
+  hashlocks?: string[];
+  onBehalfOf?: string;
+}
+
+const DEFAULT_CHAIN = 'sepolia';
+
+function chainKeyOf(chain?: string): string {
+  return chain || DEFAULT_CHAIN;
+}
+
+function requireChainConfig(chainKey: string): ChainConfig {
+  const config = getChainConfig(chainKey);
+  if (!config) throw new Error(`Unknown chain: ${chainKey}`);
+  return config;
+}
+
+// generate 256-bit secret and SHA256 hashlock
+function generateSecret(): { secret: string; hashlock: string } {
+  const secret = ethers.hexlify(ethers.randomBytes(32));
+  return { secret, hashlock: ethers.sha256(secret) };
+}
+
+function validateCreateOrderParams(params: CreateOrderParams): void {
+  if (params.receivers.length !== params.amounts.length) {
+    throw new Error('receivers and amounts arrays must have the same length');
+  }
+  if (params.receivers.length === 0) {
+    throw new Error('At least one receiver is required');
+  }
+}
+
+// makes sure `sender` has enough USDC allowance for the HTLC contract. if the
+// sender is the admin signer, top up automatically; otherwise throw — admin
+// can't approve on someone else's behalf.
+async function ensureAllowance(
+  chainKey: string,
+  config: ChainConfig,
+  signer: NonceManager,
+  senderAddress: string,
+  totalAmount: bigint
+): Promise<void> {
+  const usdc = new Contract(config.usdcAddress, ERC20_ABI, signer);
+  const currentAllowance: bigint = await usdc.allowance(senderAddress, config.htlcAddress);
+
+  if (currentAllowance >= totalAmount) {
+    console.log(`[${chainKey}] Allowance check passed: ${currentAllowance}`);
+    return;
   }
 
+  const signerAddress = await signer.getAddress();
+  if (senderAddress.toLowerCase() !== signerAddress.toLowerCase()) {
+    throw new Error(
+      `[${chainKey}] ${senderAddress} has insufficient allowance ` +
+        `(have=${currentAllowance}, need=${totalAmount}) — pre-approval required`
+    );
+  }
+
+  console.log(
+    `[${chainKey}] Insufficient allowance (have ${currentAllowance}, need ${totalAmount}), approving...`
+  );
+  const approveTx = await usdc.approve(config.htlcAddress, totalAmount);
+  await approveTx.wait();
+  console.log(`[${chainKey}] USDC approved: ${totalAmount}`);
+
+  const newAllowance = await usdc.allowance(senderAddress, config.htlcAddress);
+  console.log(`[${chainKey}] New allowance: ${newAllowance}`);
+}
+
+// returns matched (secrets, hashlocks) arrays. when isPresiding, fresh secrets
+// are generated and hashlocks derived from them. otherwise, the caller-supplied
+// hashlocks are used and secrets stays empty.
+function resolveHashlocks(
+  chainKey: string,
+  params: CreateOrderParams
+): { secrets: string[]; hashlocks: string[] } {
+  if (params.isPresiding) {
+    const secrets: string[] = [];
+    const hashlocks: string[] = [];
+    for (let i = 0; i < params.receivers.length; i++) {
+      const pair = generateSecret();
+      secrets.push(pair.secret);
+      hashlocks.push(pair.hashlock);
+      console.log(`[${chainKey}] Generated secret for fill ${i}: ${pair.secret}`);
+    }
+    return { secrets, hashlocks };
+  }
+
+  if (!params.hashlocks || params.hashlocks.length !== params.receivers.length) {
+    throw new Error(
+      'hashlocks array is required and must match receivers length when isPresiding is false'
+    );
+  }
+  console.log(`[${chainKey}] Using provided hashlocks`);
+  return { secrets: [], hashlocks: [...params.hashlocks] };
+}
+
+// parses `OrderCreated` + `FillCreated` events out of the receipt logs.
+function parseCreateOrderReceipt(
+  chainKey: string,
+  receipt: TransactionReceipt,
+  htlc: Contract,
+  secrets: string[],
+  isPresiding: boolean | undefined
+): { orderId: string; fills: FillInfo[] } {
+  let orderId = '';
+  const fills: FillInfo[] = [];
+
+  for (const log of receipt.logs) {
+    let parsed;
+    try {
+      parsed = htlc.interface.parseLog(log);
+    } catch {
+      continue;
+    }
+    if (!parsed) continue;
+
+    if (parsed.name === 'OrderCreated') {
+      orderId = parsed.args[0].toString();
+      console.log(`[${chainKey}] Order ID: ${orderId}`);
+    } else if (parsed.name === 'FillCreated') {
+      const fillId = parsed.args[1].toString();
+      const fillIndex = parseInt(fillId);
+      fills.push({
+        fillId,
+        receiver: parsed.args[2],
+        amount: parsed.args[3].toString(),
+        hashlock: parsed.args[4],
+        secret: isPresiding ? secrets[fillIndex] : undefined,
+      });
+      console.log(`[${chainKey}] Fill ${fillId} created for ${parsed.args[2]}`);
+    }
+  }
+
+  return { orderId, fills };
+}
+
+class BridgeService {
+  generateSecret = generateSecret;
+
   // create order with multiple fills (signed by admin)
-  async createOrder(params: {
-    receivers: string[];
-    amounts: string[];
-    chain?: string;
-    isPresiding?: boolean; // true => generate new secrets; false => use provided hashlocks
-    hashlocks?: string[]; // required when isPresiding = false
-    onBehalfOf?: string; // pull tokens from this address instead of msg.sender
-  }): Promise<CreateOrderResult> {
-    const chainKey = params.chain || 'sepolia';
-    const config = getChainConfig(chainKey)!;
+  async createOrder(params: CreateOrderParams): Promise<CreateOrderResult> {
+    validateCreateOrderParams(params);
+
+    const chainKey = chainKeyOf(params.chain);
+    const config = requireChainConfig(chainKey);
     const signer = getAdminSigner(chainKey);
     const senderAddress = params.onBehalfOf || (await signer.getAddress());
 
-    // validate inputs
-    if (params.receivers.length !== params.amounts.length) {
-      throw new Error('receivers and amounts arrays must have the same length');
-    }
-    if (params.receivers.length === 0) {
-      throw new Error('At least one receiver is required');
-    }
-
     console.log(`[${chainKey}] Creating order from ${senderAddress}`);
 
-    // convert human-readable USDC amounts to micro-USDC
     const microAmounts = params.amounts.map((a) => ethers.parseUnits(a, USDC_DECIMALS));
     const totalAmount = microAmounts.reduce((sum, amt) => sum + amt, 0n);
 
-    // check USDC allowance
-    const usdc = new Contract(config.usdcAddress, ERC20_ABI, signer);
-    const currentAllowance = await usdc.allowance(senderAddress, config.htlcAddress);
-    const signerAddress = await signer.getAddress();
+    await ensureAllowance(chainKey, config, signer, senderAddress, totalAmount);
 
-    if (currentAllowance < totalAmount) {
-      if (senderAddress.toLowerCase() !== signerAddress.toLowerCase()) {
-        throw new Error(
-          `[${chainKey}] ${senderAddress} has insufficient allowance ` +
-            `(have=${currentAllowance}, need=${totalAmount}) — pre-approval required`
-        );
-      }
+    const { secrets, hashlocks } = resolveHashlocks(chainKey, params);
 
-      console.log(
-        `[${chainKey}] Insufficient allowance (have ${currentAllowance}, need ${totalAmount}), approving...`
-      );
-      const approveTx = await usdc.approve(config.htlcAddress, totalAmount);
-      await approveTx.wait();
-      console.log(`[${chainKey}] USDC approved: ${totalAmount}`);
-
-      const newAllowance = await usdc.allowance(senderAddress, config.htlcAddress);
-      console.log(`[${chainKey}] New allowance: ${newAllowance}`);
-    } else {
-      console.log(`[${chainKey}] Allowance check passed: ${currentAllowance}`);
-    }
-
-    // generate secrets and hashlocks (only when isPresiding = true)
-    const secrets: string[] = [];
-    const hashlocks: string[] = [];
-
-    if (params.isPresiding) {
-      for (let i = 0; i < params.receivers.length; i++) {
-        const { secret, hashlock } = this.generateSecret();
-        secrets.push(secret);
-        hashlocks.push(hashlock);
-        console.log(`[${chainKey}] Generated secret for fill ${i}: ${secret}`);
-      }
-    } else {
-      if (!params.hashlocks || params.hashlocks.length !== params.receivers.length) {
-        throw new Error(
-          'hashlocks array is required and must match receivers length when isPresiding is false'
-        );
-      }
-      hashlocks.push(...params.hashlocks);
-      console.log(`[${chainKey}] Using provided hashlocks`);
-    }
-
-    // calculate timelock
     const timelockMinutes = getTimelockMinutes();
     const timelock = Math.floor(Date.now() / 1000) + timelockMinutes * 60;
     console.log(
       `[${chainKey}] Timelock: ${new Date(timelock * 1000).toISOString()} (${timelockMinutes} minutes)`
     );
 
-    // create order
     const htlc = getHTLCContract(chainKey, signer);
 
     console.log(`[${chainKey}] Creating order...`);
     console.log(`  Receivers: ${params.receivers.length}`);
     console.log(`  Total Amount: ${totalAmount}`);
-
-    const onBehalfOf = params.onBehalfOf || ethers.ZeroAddress;
 
     const tx = await htlc.newOrder({
       token: config.usdcAddress,
@@ -138,43 +213,24 @@ class BridgeService {
       receivers: params.receivers,
       amounts: microAmounts,
       hashlocks,
-      onBehalfOf,
+      onBehalfOf: params.onBehalfOf || ethers.ZeroAddress,
     });
 
     console.log(`[${chainKey}] TX sent: ${tx.hash}`);
     const receipt = await tx.wait();
 
-    // parse events to get order ID and fill IDs
-    let orderId = '';
-    const fillInfos: FillInfo[] = [];
-
-    for (const log of receipt.logs) {
-      try {
-        const parsed = htlc.interface.parseLog(log);
-        if (parsed?.name === 'OrderCreated') {
-          orderId = parsed.args[0].toString();
-          console.log(`[${chainKey}] Order ID: ${orderId}`);
-        } else if (parsed?.name === 'FillCreated') {
-          const fillId = parsed.args[1].toString();
-          const fillIndex = parseInt(fillId);
-          fillInfos.push({
-            fillId,
-            receiver: parsed.args[2],
-            amount: parsed.args[3].toString(),
-            hashlock: parsed.args[4],
-            secret: params.isPresiding ? secrets[fillIndex] : undefined,
-          });
-          console.log(`[${chainKey}] Fill ${fillId} created for ${parsed.args[2]}`);
-        }
-      } catch {
-        continue;
-      }
-    }
+    const { orderId, fills } = parseCreateOrderReceipt(
+      chainKey,
+      receipt,
+      htlc,
+      secrets,
+      params.isPresiding
+    );
 
     return {
       htlcTxHash: tx.hash,
       orderId,
-      fills: fillInfos,
+      fills,
       sender: senderAddress,
       totalAmount: totalAmount.toString(),
       timelock,
@@ -188,7 +244,7 @@ class BridgeService {
     preimage: string;
     chain?: string;
   }): Promise<WithdrawResult> {
-    const chainKey = params.chain || 'sepolia';
+    const chainKey = chainKeyOf(params.chain);
     const signer = getAdminSigner(chainKey);
 
     console.log(`[${chainKey}] Withdrawing from order...`);
@@ -202,15 +258,12 @@ class BridgeService {
     const receipt = await tx.wait();
     console.log(`  Confirmed in block ${receipt.blockNumber}`);
 
-    return {
-      txHash: tx.hash,
-      blockNumber: receipt.blockNumber,
-    };
+    return { txHash: tx.hash, blockNumber: receipt.blockNumber };
   }
 
   // refund order after timelock expires (signed by admin)
   async refund(params: { orderId: string; chain?: string }): Promise<RefundResult> {
-    const chainKey = params.chain || 'sepolia';
+    const chainKey = chainKeyOf(params.chain);
     const signer = getAdminSigner(chainKey);
 
     console.log(`[${chainKey}] Refunding order...`);
@@ -223,7 +276,6 @@ class BridgeService {
     const receipt = await tx.wait();
     console.log(`  Confirmed in block ${receipt.blockNumber}`);
 
-    // parse OrderRefunded event to get refunded amount
     let refundedAmount = '0';
     for (const log of receipt.logs) {
       try {
@@ -237,16 +289,12 @@ class BridgeService {
       }
     }
 
-    return {
-      txHash: tx.hash,
-      refundedAmount,
-      blockNumber: receipt.blockNumber,
-    };
+    return { txHash: tx.hash, refundedAmount, blockNumber: receipt.blockNumber };
   }
 
   // get order details (read-only, no signer needed)
   async getOrder(params: { orderId: string; chain?: string }) {
-    const chainKey = params.chain || 'sepolia';
+    const chainKey = chainKeyOf(params.chain);
     const htlc = getHTLCContract(chainKey);
     const data = await htlc.getOrder(BigInt(params.orderId));
 
@@ -261,9 +309,8 @@ class BridgeService {
     };
   }
 
-  // get fill details (read-only)
   async getFill(params: { orderId: string; fillId: string; chain?: string }) {
-    const chainKey = params.chain || 'sepolia';
+    const chainKey = chainKeyOf(params.chain);
     const htlc = getHTLCContract(chainKey);
     const data = await htlc.getFill(BigInt(params.orderId), BigInt(params.fillId));
 
@@ -275,9 +322,8 @@ class BridgeService {
     };
   }
 
-  // get all fills for an order (read-only)
   async getOrderFills(params: { orderId: string; chain?: string }) {
-    const chainKey = params.chain || 'sepolia';
+    const chainKey = chainKeyOf(params.chain);
     const htlc = getHTLCContract(chainKey);
     const fills = await htlc.getOrderFills(BigInt(params.orderId));
 
@@ -290,27 +336,24 @@ class BridgeService {
     }));
   }
 
-  // check if order exists (read-only)
   async orderExists(params: { orderId: string; chain?: string }): Promise<boolean> {
-    const chainKey = params.chain || 'sepolia';
+    const chainKey = chainKeyOf(params.chain);
     const htlc = getHTLCContract(chainKey);
     return await htlc.orderExistsCheck(BigInt(params.orderId));
   }
 
-  // get next order ID (read-only)
   async getNextOrderId(params: { chain?: string }): Promise<string> {
-    const chainKey = params.chain || 'sepolia';
+    const chainKey = chainKeyOf(params.chain);
     const htlc = getHTLCContract(chainKey);
     const id = await htlc.nextOrderId();
     return id.toString();
   }
 
-  // get claim status for an order (read-only)
   async getClaimStatus(params: {
     orderId: string;
     chain?: string;
   }): Promise<{ claimed: string; total: string }> {
-    const chainKey = params.chain || 'sepolia';
+    const chainKey = chainKeyOf(params.chain);
     const htlc = getHTLCContract(chainKey);
     const [claimed, total] = await htlc.getClaimStatus(BigInt(params.orderId));
     return { claimed: claimed.toString(), total: total.toString() };

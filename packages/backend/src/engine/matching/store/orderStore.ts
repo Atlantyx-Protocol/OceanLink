@@ -3,21 +3,43 @@ import type { IntentOrder, MatchResult } from '../types.js';
 import { db, schema, logDbError } from '../../../db/client.js';
 import { isTestingMode } from '../../../config/constants.js';
 
-// OrderStore — in-memory cache with write-through persistence to Postgres.
-// matching tick runs against in-memory maps; mutations are mirrored async
-// (fire-and-forget). hydrate() rebuilds state from the DB on boot.
-//   orders     : Map<orderId, IntentOrder>            — O(1) lookup by id
-//   pairIndex  : Map<`${src}-${des}`, Set<orderId>>   — active orders per pair
-//   matchResults: MatchResult[]                       — append-only
+type OrderRow = typeof schema.intentOrders.$inferSelect;
+type MatchRow = typeof schema.matchResults.$inferSelect;
+
+const ACTIVE_STATUSES = new Set<IntentOrder['status']>(['QUEUED', 'PARTIAL']);
+
+function rowToOrder(row: OrderRow): IntentOrder {
+  return {
+    orderId: row.orderId,
+    srcChain: row.srcChain,
+    desChain: row.desChain,
+    amount: row.amount,
+    incentiveFee: row.incentiveFee ?? undefined,
+    deadline: row.deadline,
+    createdAt: row.createdAt,
+    status: row.status,
+    userAddress: row.userAddress,
+  };
+}
+
+function rowToMatchResult(row: MatchRow): MatchResult {
+  return {
+    matchId: row.matchId,
+    matchedAt: row.matchedAt,
+    orders: row.orders,
+    cycles: row.cycles,
+    rawCycles: row.rawCycles,
+  };
+}
+
+function pairKey(srcChain: number, desChain: number): string {
+  return `${srcChain}-${desChain}`;
+}
 
 export class OrderStore {
   private readonly orders = new Map<string, IntentOrder>();
   private readonly pairIndex = new Map<string, Set<string>>();
   private readonly matchResults: MatchResult[] = [];
-
-  private pairKey(srcChain: number, desChain: number): string {
-    return `${srcChain}-${desChain}`;
-  }
 
   // loads persisted orders and match results into memory at boot.
   // active orders (QUEUED|PARTIAL) get added to the pair index.
@@ -28,61 +50,22 @@ export class OrderStore {
     ]);
 
     for (const row of orderRows) {
-      const order: IntentOrder = {
-        orderId: row.orderId,
-        srcChain: row.srcChain,
-        desChain: row.desChain,
-        amount: row.amount,
-        incentiveFee: row.incentiveFee ?? undefined,
-        deadline: row.deadline,
-        createdAt: row.createdAt,
-        status: row.status,
-        userAddress: row.userAddress,
-      };
+      const order = rowToOrder(row);
       this.orders.set(order.orderId, order);
-      if (order.status === 'QUEUED' || order.status === 'PARTIAL') {
-        const key = this.pairKey(order.srcChain, order.desChain);
-        if (!this.pairIndex.has(key)) this.pairIndex.set(key, new Set());
-        this.pairIndex.get(key)!.add(order.orderId);
+      if (ACTIVE_STATUSES.has(order.status)) {
+        this.indexAdd(order);
       }
     }
 
     for (const row of matchRows) {
-      this.matchResults.push({
-        matchId: row.matchId,
-        matchedAt: row.matchedAt,
-        orders: row.orders,
-        cycles: row.cycles,
-        rawCycles: row.rawCycles,
-      });
+      this.matchResults.push(rowToMatchResult(row));
     }
   }
 
   add(order: IntentOrder): void {
     this.orders.set(order.orderId, order);
-    const key = this.pairKey(order.srcChain, order.desChain);
-    if (!this.pairIndex.has(key)) {
-      this.pairIndex.set(key, new Set());
-    }
-    this.pairIndex.get(key)!.add(order.orderId);
-
-    if (!isTestingMode()) {
-      void db
-        .insert(schema.intentOrders)
-        .values({
-          orderId: order.orderId,
-          srcChain: order.srcChain,
-          desChain: order.desChain,
-          amount: order.amount,
-          incentiveFee: order.incentiveFee ?? null,
-          deadline: order.deadline,
-          createdAt: order.createdAt,
-          status: order.status,
-          userAddress: order.userAddress,
-        })
-        .onConflictDoNothing()
-        .catch((err) => logDbError('orders.add', err));
-    }
+    this.indexAdd(order);
+    this.persistInsert(order);
   }
 
   get(orderId: string): IntentOrder | undefined {
@@ -94,35 +77,25 @@ export class OrderStore {
     const order = this.orders.get(orderId);
     if (!order) return false;
     Object.assign(order, updates);
-
-    if (!isTestingMode()) {
-      void db
-        .update(schema.intentOrders)
-        .set({
-          amount: order.amount,
-          incentiveFee: order.incentiveFee ?? null,
-          status: order.status,
-          deadline: order.deadline,
-        })
-        .where(eq(schema.intentOrders.orderId, orderId))
-        .catch((err) => logDbError('orders.update', err));
-    }
+    this.persistUpdate(order);
     return true;
   }
 
   // candidates for the next matching pass (QUEUED or PARTIAL).
   getActiveOrders(): IntentOrder[] {
-    return [...this.orders.values()].filter((o) => o.status === 'QUEUED' || o.status === 'PARTIAL');
+    return [...this.orders.values()].filter((o) => ACTIVE_STATUSES.has(o.status));
   }
 
   // quick lookup of active orders for a specific chain pair.
   getByPair(srcChain: number, desChain: number): IntentOrder[] {
-    const key = this.pairKey(srcChain, desChain);
-    const ids = this.pairIndex.get(key);
+    const ids = this.pairIndex.get(pairKey(srcChain, desChain));
     if (!ids) return [];
-    return [...ids]
-      .map((id) => this.orders.get(id))
-      .filter((o): o is IntentOrder => o !== undefined);
+    const out: IntentOrder[] = [];
+    for (const id of ids) {
+      const order = this.orders.get(id);
+      if (order) out.push(order);
+    }
+    return out;
   }
 
   // call after an order transitions to MATCHED so it stops being a candidate.
@@ -130,51 +103,30 @@ export class OrderStore {
   removeFromPairIndex(orderId: string): void {
     const order = this.orders.get(orderId);
     if (!order) return;
-    this.pairIndex.get(this.pairKey(order.srcChain, order.desChain))?.delete(orderId);
+    this.pairIndex.get(pairKey(order.srcChain, order.desChain))?.delete(orderId);
   }
 
   // marks past-deadline active orders as EXPIRED, drops them from the pair index.
   // returns the count of newly-expired orders.
   expireStale(): number {
     const now = Math.floor(Date.now() / 1000);
-    let count = 0;
     const expiredIds: string[] = [];
+
     for (const order of this.orders.values()) {
-      if ((order.status === 'QUEUED' || order.status === 'PARTIAL') && order.deadline < now) {
+      if (ACTIVE_STATUSES.has(order.status) && order.deadline < now) {
         order.status = 'EXPIRED';
-        this.pairIndex.get(this.pairKey(order.srcChain, order.desChain))?.delete(order.orderId);
+        this.pairIndex.get(pairKey(order.srcChain, order.desChain))?.delete(order.orderId);
         expiredIds.push(order.orderId);
-        count++;
       }
     }
-    if (!isTestingMode()) {
-      for (const id of expiredIds) {
-        void db
-          .update(schema.intentOrders)
-          .set({ status: 'EXPIRED' })
-          .where(eq(schema.intentOrders.orderId, id))
-          .catch((err) => logDbError('orders.expire', err));
-      }
-    }
-    return count;
+
+    if (expiredIds.length > 0) this.persistExpire(expiredIds);
+    return expiredIds.length;
   }
 
   addMatchResult(result: MatchResult): void {
     this.matchResults.push(result);
-
-    if (!isTestingMode()) {
-      void db
-        .insert(schema.matchResults)
-        .values({
-          matchId: result.matchId,
-          matchedAt: result.matchedAt,
-          orders: result.orders,
-          cycles: result.cycles,
-          rawCycles: result.rawCycles,
-        })
-        .onConflictDoNothing()
-        .catch((err) => logDbError('matchResults.add', err));
-    }
+    this.persistMatchResult(result);
   }
 
   // newest-first paginated list of match results.
@@ -220,19 +172,12 @@ export class OrderStore {
         .where(where),
     ]);
 
-    const data: IntentOrder[] = rows.map((row) => ({
-      orderId: row.orderId,
-      srcChain: row.srcChain,
-      desChain: row.desChain,
-      amount: row.amount,
-      incentiveFee: row.incentiveFee ?? undefined,
-      deadline: row.deadline,
-      createdAt: row.createdAt,
-      status: row.status,
-      userAddress: row.userAddress,
-    }));
-
-    return { data, total: totalRow[0]?.count ?? 0, page, pageSize };
+    return {
+      data: rows.map(rowToOrder),
+      total: totalRow[0]?.count ?? 0,
+      page,
+      pageSize,
+    };
   }
 
   // wipes in-memory state — tests only, does not touch the DB.
@@ -240,6 +185,75 @@ export class OrderStore {
     this.orders.clear();
     this.pairIndex.clear();
     this.matchResults.length = 0;
+  }
+
+  private indexAdd(order: IntentOrder): void {
+    const key = pairKey(order.srcChain, order.desChain);
+    let set = this.pairIndex.get(key);
+    if (!set) {
+      set = new Set();
+      this.pairIndex.set(key, set);
+    }
+    set.add(order.orderId);
+  }
+
+  private persistInsert(order: IntentOrder): void {
+    if (isTestingMode()) return;
+    void db
+      .insert(schema.intentOrders)
+      .values({
+        orderId: order.orderId,
+        srcChain: order.srcChain,
+        desChain: order.desChain,
+        amount: order.amount,
+        incentiveFee: order.incentiveFee ?? null,
+        deadline: order.deadline,
+        createdAt: order.createdAt,
+        status: order.status,
+        userAddress: order.userAddress,
+      })
+      .onConflictDoNothing()
+      .catch((err) => logDbError('orders.add', err));
+  }
+
+  private persistUpdate(order: IntentOrder): void {
+    if (isTestingMode()) return;
+    void db
+      .update(schema.intentOrders)
+      .set({
+        amount: order.amount,
+        incentiveFee: order.incentiveFee ?? null,
+        status: order.status,
+        deadline: order.deadline,
+      })
+      .where(eq(schema.intentOrders.orderId, order.orderId))
+      .catch((err) => logDbError('orders.update', err));
+  }
+
+  private persistExpire(orderIds: string[]): void {
+    if (isTestingMode()) return;
+    for (const id of orderIds) {
+      void db
+        .update(schema.intentOrders)
+        .set({ status: 'EXPIRED' })
+        .where(eq(schema.intentOrders.orderId, id))
+        .catch((err) => logDbError('orders.expire', err));
+    }
+  }
+
+  private persistMatchResult(result: MatchResult): void {
+    if (isTestingMode()) return;
+    void db
+      .insert(schema.matchResults)
+      .values({
+        matchId: result.matchId,
+        matchedAt: result.matchedAt,
+        orders: result.orders,
+        cycles: result.cycles,
+        rawCycles: result.rawCycles,
+      })
+      .onConflictDoNothing()
+      .catch((err) => logDbError('matchResults.add', err));
   }
 }
 

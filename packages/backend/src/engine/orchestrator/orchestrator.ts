@@ -2,7 +2,7 @@ import { bridgeService, type CreateOrderResult } from '../execution/bridge.js';
 import { orderStore } from '../matching/store/orderStore.js';
 import type { OrderStore } from '../matching/store/orderStore.js';
 import type { CycleMatch, MatchResult } from '../matching/types.js';
-import { orderEvents } from '../events/orderEvents.js';
+import { orderEvents, type OrderEventType } from '../events/orderEvents.js';
 import {
   type SendAction,
   buildChainIdMap,
@@ -19,14 +19,17 @@ import {
   type ExecutionWithdraw,
 } from './executionStore.js';
 
-// re-export types for consumers
 export type { ExecutionWithdraw, ExecutionData, ExecutionRecord };
 
-// turns matched cycles into on-chain HTLC orders via bridgeService.createOrder().
-// cycles become "send actions"; actions on the same chain are consolidated
-// into one bridge order with multiple receivers. the first group is the
-// "presiding" order that generates fresh secrets; the rest reuse hashlocks
-// for atomic unlocking.
+type WithdrawTx = { chain: string; txHash: string };
+
+interface NonPresidingResult {
+  chainKey: string;
+  orderId: string;
+  htlcTxHash: string;
+  fills: { fillId: string }[];
+  actions: SendAction[];
+}
 
 export class Orchestrator {
   private readonly chainIdToKey: Map<number, string>;
@@ -36,7 +39,6 @@ export class Orchestrator {
     this.chainIdToKey = buildChainIdMap();
   }
 
-  // loads persisted execution records into memory; call once on boot
   async hydrate(): Promise<void> {
     await this.executionStore.hydrate();
   }
@@ -48,46 +50,49 @@ export class Orchestrator {
   // entry point — called by the scheduler after each tick
   async handleMatchResults(matchResults: MatchResult[]): Promise<void> {
     for (const result of matchResults) {
-      this.executionStore.set(result.matchId, { status: 'pending' });
-      const orderIds = result.orders.map((o) => o.orderId);
-      try {
-        await this.executeConsolidated(result.cycles, result.matchId, orderIds);
-
-        // flip each order's status to COMPLETED so the activity feed reflects
-        // on-chain settlement (matchingService only sets MATCHED, which means
-        // "engine matched", not "settled").
-        for (const orderId of orderIds) {
-          this.store.update(orderId, { status: 'COMPLETED' });
-        }
-
-        orderEvents.publishMany(orderIds, {
-          type: 'done',
-          message: 'Bridge execution completed',
-          data: { matchId: result.matchId },
-        });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        this.executionStore.set(result.matchId, { status: 'error', error: msg });
-
-        for (const orderId of orderIds) {
-          this.store.update(orderId, { status: 'FAILED' });
-        }
-
-        console.error(
-          `[Orchestrator] Consolidated execution failed (matchId=${result.matchId}):`,
-          err
-        );
-
-        orderEvents.publishMany(orderIds, {
-          type: 'error',
-          message: `Bridge execution failed: ${msg}`,
-          data: { matchId: result.matchId },
-        });
-      }
+      await this.handleSingleMatch(result);
     }
   }
 
-  // core consolidated execution
+  private async handleSingleMatch(result: MatchResult): Promise<void> {
+    const { matchId, cycles } = result;
+    const orderIds = result.orders.map((o) => o.orderId);
+
+    this.executionStore.set(matchId, { status: 'pending' });
+
+    try {
+      await this.executeConsolidated(cycles, matchId, orderIds);
+      this.markOrdersCompleted(orderIds);
+      this.publish(orderIds, 'done', 'Bridge execution completed', { matchId });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.executionStore.set(matchId, { status: 'error', error: msg });
+      this.markOrdersFailed(orderIds);
+      console.error(
+        `[Orchestrator] Consolidated execution failed (matchId=${matchId}):`,
+        err
+      );
+      this.publish(orderIds, 'error', `Bridge execution failed: ${msg}`, { matchId });
+    }
+  }
+
+  private markOrdersCompleted(orderIds: string[]): void {
+    for (const id of orderIds) this.store.update(id, { status: 'COMPLETED' });
+  }
+
+  private markOrdersFailed(orderIds: string[]): void {
+    for (const id of orderIds) this.store.update(id, { status: 'FAILED' });
+  }
+
+  private publish(
+    orderIds: string[],
+    type: OrderEventType,
+    message: string,
+    data: Record<string, unknown>
+  ): void {
+    orderEvents.publishMany(orderIds, { type, message, data });
+  }
+
   private async executeConsolidated(
     cycles: CycleMatch[],
     matchId: string,
@@ -99,35 +104,16 @@ export class Orchestrator {
     const groupEntries = groupActionsByChainKey(sendActions);
 
     logCycleSummary(cycles, matchId, groupEntries, this.chainIdToKey);
-
-    orderEvents.publishMany(orderIds, {
-      type: 'plan',
-      message: `Execution plan: ${cycles.length} cycle(s), ${groupEntries.length} HTLC group(s) — expect ${groupEntries.length} htlc_created and ${groupEntries.length} withdrawal(s)`,
-      data: {
-        matchId,
-        cycles: cycles.length,
-        groups: groupEntries.map(([key, actions]) => ({
-          key,
-          chain: actions[0].chainKey,
-          sender: actions[0].senderAddress,
-          receivers: actions.map((a) => a.receiverAddress),
-          fills: actions.length,
-        })),
-      },
-    });
+    this.publishExecutionPlan(orderIds, matchId, cycles.length, groupEntries);
 
     const [presidingKey, presidingActions] = groupEntries[0];
-    const presidingChainKey = presidingActions[0].chainKey; // actual chain, separate from group key
+    const presidingChainKey = presidingActions[0].chainKey;
     const presidingResult = await this.executePresidingOrder(presidingActions);
 
-    orderEvents.publishMany(orderIds, {
-      type: 'htlc_created',
-      message: `HTLC created on ${presidingChainKey} (presiding)`,
-      data: {
-        chain: presidingChainKey,
-        orderId: presidingResult.orderId,
-        txHash: presidingResult.htlcTxHash,
-      },
+    this.publish(orderIds, 'htlc_created', `HTLC created on ${presidingChainKey} (presiding)`, {
+      chain: presidingChainKey,
+      orderId: presidingResult.orderId,
+      txHash: presidingResult.htlcTxHash,
     });
 
     const cycleHashlockMap = buildCycleHashlockMap(presidingActions, presidingResult);
@@ -140,14 +126,29 @@ export class Orchestrator {
     );
 
     for (const r of nonPresidingResults) {
-      orderEvents.publishMany(orderIds, {
-        type: 'htlc_created',
-        message: `HTLC created on ${r.chainKey} (txHash=${r.htlcTxHash})`,
-        data: { chain: r.chainKey, orderId: r.orderId, txHash: r.htlcTxHash },
+      this.publish(orderIds, 'htlc_created', `HTLC created on ${r.chainKey} (txHash=${r.htlcTxHash})`, {
+        chain: r.chainKey,
+        orderId: r.orderId,
+        txHash: r.htlcTxHash,
       });
     }
 
-    const withdrawTxs = await this.verifyAndWithdrawOrders(
+    const withdrawTxs = await this.verifyAndWithdrawAll(
+      presidingChainKey,
+      presidingResult,
+      nonPresidingResults,
+      cycleSecretMap
+    );
+
+    this.publish(orderIds, 'withdrawn',
+      `${withdrawTxs.length} withdrawal(s) completed — ` +
+        withdrawTxs.map((w) => `${w.chain}:${w.txHash}`).join(', '),
+      { withdrawals: withdrawTxs }
+    );
+
+    console.log(`[Orchestrator] All ${groupEntries.length} consolidated order(s) on-chain`);
+
+    const executionData = buildExecutionData(
       presidingChainKey,
       presidingActions,
       presidingResult,
@@ -155,59 +156,49 @@ export class Orchestrator {
       cycleSecretMap
     );
 
-    orderEvents.publishMany(orderIds, {
-      type: 'withdrawn',
-      message:
-        `${withdrawTxs.length} withdrawal(s) completed — ` +
-        withdrawTxs.map((w) => `${w.chain}:${w.txHash}`).join(', '),
-      data: { withdrawals: withdrawTxs },
-    });
-
-    console.log(`[Orchestrator] All ${groupEntries.length} consolidated order(s) on-chain`);
-
-    // build and store execution record for API access
-    const executionData: ExecutionData = {
-      presidingOrder: {
-        orderId: presidingResult.orderId,
-        chain: presidingChainKey,
-        withdraws: presidingResult.fills.map((fill, i) => ({
-          fillId: fill.fillId,
-          secret: fill.secret!,
-          receiverAddress: presidingActions[i].receiverAddress,
-        })),
-      },
-      respondingWithdraws: nonPresidingResults.flatMap(({ chainKey, orderId, fills, actions }) =>
-        fills.map((fill, i) => ({
-          orderId,
-          fillId: fill.fillId,
-          chain: chainKey,
-          secret: cycleSecretMap.get(actions[i].cycleIdx)!,
-          receiverAddress: actions[i].receiverAddress,
-        }))
-      ),
-    };
-
     this.executionStore.set(matchId, { status: 'done', data: executionData });
   }
 
-  private async executePresidingOrder(presidingActions: SendAction[]): Promise<CreateOrderResult> {
+  private publishExecutionPlan(
+    orderIds: string[],
+    matchId: string,
+    cycleCount: number,
+    groupEntries: [string, SendAction[]][]
+  ): void {
+    this.publish(orderIds, 'plan',
+      `Execution plan: ${cycleCount} cycle(s), ${groupEntries.length} HTLC group(s) — expect ${groupEntries.length} htlc_created and ${groupEntries.length} withdrawal(s)`,
+      {
+        matchId,
+        cycles: cycleCount,
+        groups: groupEntries.map(([key, actions]) => ({
+          key,
+          chain: actions[0].chainKey,
+          sender: actions[0].senderAddress,
+          receivers: actions.map((a) => a.receiverAddress),
+          fills: actions.length,
+        })),
+      }
+    );
+  }
+
+  private async executePresidingOrder(actions: SendAction[]): Promise<CreateOrderResult> {
+    const chain = actions[0].chainKey;
     console.log(
-      `[Orchestrator] Presiding order: ${presidingActions.length} fill(s) on ${presidingActions[0].chainKey}, ` +
-        `receivers=[${presidingActions.map((a) => a.receiverAddress).join(', ')}]`
+      `[Orchestrator] Presiding order: ${actions.length} fill(s) on ${chain}, ` +
+        `receivers=[${actions.map((a) => a.receiverAddress).join(', ')}]`
     );
 
     const result = await bridgeService.createOrder({
-      receivers: presidingActions.map((a) => a.receiverAddress),
-      amounts: presidingActions.map((a) => a.amount),
-      chain: presidingActions[0].chainKey,
+      receivers: actions.map((a) => a.receiverAddress),
+      amounts: actions.map((a) => a.amount),
+      chain,
       isPresiding: true,
-      onBehalfOf: presidingActions[0].senderAddress,
+      onBehalfOf: actions[0].senderAddress,
     });
 
     console.log(
       `[Orchestrator] Presiding HTLC created — orderId=${result.orderId}, txHash=${result.htlcTxHash}`
     );
-
     return result;
   }
 
@@ -215,26 +206,11 @@ export class Orchestrator {
     groupEntries: [string, SendAction[]][],
     presidingKey: string,
     cycleHashlockMap: Map<number, string>
-  ): Promise<
-    {
-      chainKey: string;
-      orderId: string;
-      htlcTxHash: string;
-      fills: { fillId: string }[];
-      actions: SendAction[];
-    }[]
-  > {
-    const results: {
-      chainKey: string;
-      orderId: string;
-      htlcTxHash: string;
-      fills: { fillId: string }[];
-      actions: SendAction[];
-    }[] = [];
+  ): Promise<NonPresidingResult[]> {
+    const results: NonPresidingResult[] = [];
 
     for (const [key, actions] of groupEntries) {
       if (key === presidingKey) continue;
-
       actions.sort((a, b) => a.cycleIdx - b.cycleIdx);
 
       const hashlocks = actions.map((a) => {
@@ -243,15 +219,16 @@ export class Orchestrator {
         return h;
       });
 
+      const chain = actions[0].chainKey;
       console.log(
-        `[Orchestrator] Non-presiding order: ${actions.length} fill(s) on ${actions[0].chainKey}, ` +
+        `[Orchestrator] Non-presiding order: ${actions.length} fill(s) on ${chain}, ` +
           `sender=${actions[0].senderAddress}, receivers=[${actions.map((a) => a.receiverAddress).join(', ')}]`
       );
 
       const result = await bridgeService.createOrder({
         receivers: actions.map((a) => a.receiverAddress),
         amounts: actions.map((a) => a.amount),
-        chain: actions[0].chainKey,
+        chain,
         isPresiding: false,
         hashlocks,
         onBehalfOf: actions[0].senderAddress,
@@ -262,7 +239,7 @@ export class Orchestrator {
       );
 
       results.push({
-        chainKey: actions[0].chainKey,
+        chainKey: chain,
         orderId: result.orderId,
         htlcTxHash: result.htlcTxHash,
         fills: result.fills.map((f) => ({ fillId: f.fillId })),
@@ -273,35 +250,27 @@ export class Orchestrator {
     return results;
   }
 
-  private async verifyAndWithdrawOrders(
-    presidingKey: string,
-    presidingActions: SendAction[],
-    presidingResult: { orderId: string; fills: { fillId: string; secret?: string }[] },
-    nonPresidingResults: {
-      chainKey: string;
-      orderId: string;
-      fills: { fillId: string }[];
-      actions: SendAction[];
-    }[],
+  private async verifyAndWithdrawAll(
+    presidingChainKey: string,
+    presidingResult: CreateOrderResult,
+    nonPresidingResults: NonPresidingResult[],
     cycleSecretMap: Map<number, string>
-  ): Promise<{ chain: string; txHash: string }[]> {
-    const withdrawTxs: { chain: string; txHash: string }[] = [];
+  ): Promise<WithdrawTx[]> {
+    const withdrawTxs: WithdrawTx[] = [];
 
-    // verify and withdraw presiding order
-    await this.verifyOrder(presidingKey, presidingResult.orderId, 'presiding');
+    await this.verifyOrder(presidingChainKey, presidingResult.orderId, 'presiding');
     for (let i = 0; i < presidingResult.fills.length; i++) {
       const preimage = presidingResult.fills[i].secret;
       if (!preimage) throw new Error(`[Orchestrator] No preimage for presiding fill ${i}`);
       const txHash = await this.withdrawFill(
-        presidingKey,
+        presidingChainKey,
         presidingResult.orderId,
         presidingResult.fills[i].fillId,
         preimage
       );
-      withdrawTxs.push({ chain: presidingKey, txHash });
+      withdrawTxs.push({ chain: presidingChainKey, txHash });
     }
 
-    // verify and withdraw each non-presiding order
     for (const { chainKey, orderId, fills, actions } of nonPresidingResults) {
       await this.verifyOrder(chainKey, orderId, `non-presiding (${chainKey})`);
       for (let i = 0; i < fills.length; i++) {
@@ -334,12 +303,7 @@ export class Orchestrator {
     fillId: string,
     preimage: string
   ): Promise<string> {
-    const result = await bridgeService.withdraw({
-      orderId,
-      fillId,
-      preimage,
-      chain: chainKey,
-    });
+    const result = await bridgeService.withdraw({ orderId, fillId, preimage, chain: chainKey });
     console.log(
       `[Orchestrator] Withdrew from order ${orderId} fill ${fillId} on ${chainKey} — txHash=${result.txHash}`
     );
@@ -347,5 +311,33 @@ export class Orchestrator {
   }
 }
 
-// application-level singleton
+function buildExecutionData(
+  presidingChainKey: string,
+  presidingActions: SendAction[],
+  presidingResult: CreateOrderResult,
+  nonPresidingResults: NonPresidingResult[],
+  cycleSecretMap: Map<number, string>
+): ExecutionData {
+  return {
+    presidingOrder: {
+      orderId: presidingResult.orderId,
+      chain: presidingChainKey,
+      withdraws: presidingResult.fills.map((fill, i) => ({
+        fillId: fill.fillId,
+        secret: fill.secret!,
+        receiverAddress: presidingActions[i].receiverAddress,
+      })),
+    },
+    respondingWithdraws: nonPresidingResults.flatMap(({ chainKey, orderId, fills, actions }) =>
+      fills.map((fill, i) => ({
+        orderId,
+        fillId: fill.fillId,
+        chain: chainKey,
+        secret: cycleSecretMap.get(actions[i].cycleIdx)!,
+        receiverAddress: actions[i].receiverAddress,
+      }))
+    ),
+  };
+}
+
 export const orchestrator = new Orchestrator(orderStore);

@@ -3,10 +3,6 @@ import type { MatchingService } from '../service/matchingService.js';
 import { orchestrator } from '../../orchestrator/orchestrator.js';
 import { getMatchIntervalMs, getMatchThreshold } from '../../../config/constants.js';
 
-// MatchScheduler — periodic tick driving the matching engine.
-// env: MATCH_INTERVAL_MS (default 5000ms).
-// isRunning flag prevents overlapping ticks (single-threaded Node).
-
 export class MatchScheduler {
   private isRunning = false;
   private timer: ReturnType<typeof setInterval> | null = null;
