@@ -1,16 +1,6 @@
-// matching engine — shared types
-
-// lifecycle states of an intent order.
-//   QUEUED    — waiting for matching engine
-//   PARTIAL   — partially matched; remainder still queued
-//   MATCHED   — engine matched; orchestrator settlement in progress
-//   COMPLETED — orchestrator finished HTLC + withdrawals on all chains
-//   FAILED    — orchestrator execution errored
-//   EXPIRED   — deadline passed before match
 export type OrderStatus = 'QUEUED' | 'PARTIAL' | 'MATCHED' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
 
-// an intent order submitted via POST /intent. lives in the queue until matched
-// or expired.
+// an intent order submitted via POST /intent. lives in the queue until matched or exprired
 export interface IntentOrder {
   orderId: string;
   srcChain: number; // source chainId (> 0)

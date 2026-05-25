@@ -3,13 +3,6 @@ import type { IntentOrder, MatchResult } from '../types.js';
 import { db, schema, logDbError } from '../../../db/client.js';
 import { isTestingMode } from '../../../config/constants.js';
 
-// OrderStore — in-memory cache with write-through persistence to Postgres.
-// matching tick runs against in-memory maps; mutations are mirrored async
-// (fire-and-forget). hydrate() rebuilds state from the DB on boot.
-//   orders       : Map<orderId, IntentOrder>            — O(1) lookup by id
-//   pairIndex    : Map<`${src}-${des}`, Set<orderId>>   — active orders per pair
-//   matchResults : MatchResult[]                        — append-only
-
 type OrderRow = typeof schema.intentOrders.$inferSelect;
 type MatchRow = typeof schema.matchResults.$inferSelect;
 
@@ -203,8 +196,6 @@ export class OrderStore {
     }
     set.add(order.orderId);
   }
-
-  // --- persistence (fire-and-forget; no-ops in testing mode) ---
 
   private persistInsert(order: IntentOrder): void {
     if (isTestingMode()) return;

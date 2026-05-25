@@ -21,11 +21,6 @@ import {
 
 export type { ExecutionWithdraw, ExecutionData, ExecutionRecord };
 
-// turns matched cycles into on-chain HTLC orders via bridgeService.
-// cycles → "send actions" → grouped by (chain, sender) into bridge orders.
-// the first group is the presiding order (generates fresh secrets); the rest
-// reuse the same hashlocks so withdrawals unlock atomically.
-
 type WithdrawTx = { chain: string; txHash: string };
 
 interface NonPresidingResult {
